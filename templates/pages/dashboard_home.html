@@ -1,0 +1,80 @@
+{{define "dashboard_home.html"}}
+{{template "dashboard" .}}
+{{end}}
+
+{{define "content"}}
+<div class="page-header">
+    <h1>Dashboard</h1>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>Pending Bookings</h3>
+        <p class="stat-number">{{.Data.PendingCount}}</p>
+        {{if gt .Data.PendingCount 0}}
+        <a href="/dashboard/bookings?filter=pending" class="btn btn-sm">Review</a>
+        {{end}}
+    </div>
+    <div class="stat-card">
+        <h3>Meeting Types</h3>
+        <p class="stat-number">{{len .Data.Templates}}</p>
+        <a href="/dashboard/templates" class="btn btn-sm">Manage</a>
+    </div>
+    <div class="stat-card">
+        <h3>Your Booking Link</h3>
+        <p class="booking-link">{{$.BaseURL}}/{{.Tenant.Slug}}/{{.Host.Slug}}</p>
+        <button onclick="copyLink()" class="btn btn-sm">Copy Link</button>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Upcoming Bookings</h2>
+    {{if .Data.Bookings}}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date & Time</th>
+                <th>Guest</th>
+                <th>Meeting Type</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Data.Bookings}}
+            <tr>
+                <td>{{formatDateTime .StartTime}}</td>
+                <td>
+                    {{.InviteeName}}<br>
+                    <small>{{.InviteeEmail}}</small>
+                </td>
+                <td>{{.Duration}} min</td>
+                <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
+                <td>
+                    {{if eq .Status "pending"}}
+                    <form action="/dashboard/bookings/{{.ID}}/approve" method="POST" style="display:inline">
+                        <button type="submit" class="btn btn-sm btn-success">Approve</button>
+                    </form>
+                    {{end}}
+                    {{if or (eq .Status "pending") (eq .Status "confirmed")}}
+                    <form action="/dashboard/bookings/{{.ID}}/cancel" method="POST" style="display:inline">
+                        <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
+                    </form>
+                    {{end}}
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+    {{else}}
+    <p class="empty-state">No bookings yet. Share your booking link to get started!</p>
+    {{end}}
+</div>
+
+<script>
+function copyLink() {
+    navigator.clipboard.writeText('{{$.BaseURL}}/{{.Tenant.Slug}}/{{.Host.Slug}}');
+    alert('Link copied to clipboard!');
+}
+</script>
+{{end}}

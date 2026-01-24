@@ -1,0 +1,75 @@
+{{define "register.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account | Meet When</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="auth-page">
+    <div class="auth-container">
+        <h1>Meet When</h1>
+        <h2>Create your account</h2>
+
+        {{if .Flash}}
+        <div class="alert alert-{{.Flash.Type}}">{{.Flash.Message}}</div>
+        {{end}}
+
+        <form method="POST" action="/auth/register" class="auth-form">
+            <div class="form-group">
+                <label for="tenant_name">Organization Name</label>
+                <input type="text" id="tenant_name" name="tenant_name" required
+                       value="{{if .Data}}{{.Data.tenant_name}}{{end}}"
+                       placeholder="Acme Inc">
+            </div>
+            <div class="form-group">
+                <label for="tenant_slug">Organization URL</label>
+                <input type="text" id="tenant_slug" name="tenant_slug" required
+                       value="{{if .Data}}{{.Data.tenant_slug}}{{end}}"
+                       placeholder="acme" pattern="[a-z0-9-]+">
+                <small>This will be used in your booking URLs</small>
+            </div>
+            <div class="form-group">
+                <label for="name">Your Name</label>
+                <input type="text" id="name" name="name" required
+                       value="{{if .Data}}{{.Data.name}}{{end}}"
+                       placeholder="John Doe">
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required
+                       value="{{if .Data}}{{.Data.email}}{{end}}"
+                       placeholder="you@example.com">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required minlength="8">
+                <small>Minimum 8 characters</small>
+            </div>
+            <div class="form-group">
+                <label for="timezone">Timezone</label>
+                <select id="timezone" name="timezone">
+                    <option value="UTC">UTC</option>
+                    <option value="America/New_York">Eastern Time</option>
+                    <option value="America/Chicago">Central Time</option>
+                    <option value="America/Denver">Mountain Time</option>
+                    <option value="America/Los_Angeles">Pacific Time</option>
+                    <option value="Europe/London">London</option>
+                    <option value="Europe/Paris">Paris</option>
+                    <option value="Europe/Berlin">Berlin</option>
+                    <option value="Asia/Tokyo">Tokyo</option>
+                    <option value="Asia/Shanghai">Shanghai</option>
+                    <option value="Australia/Sydney">Sydney</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Create Account</button>
+        </form>
+
+        <p class="auth-footer">
+            Already have an account? <a href="/auth/login">Sign in</a>
+        </p>
+    </div>
+</body>
+</html>
+{{end}}

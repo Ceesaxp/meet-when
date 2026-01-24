@@ -1,0 +1,108 @@
+{{define "dashboard_calendars.html"}}
+{{template "dashboard" .}}
+{{end}}
+
+{{define "content"}}
+<div class="page-header">
+    <h1>Calendars & Integrations</h1>
+</div>
+
+<div class="section">
+    <h2>Connected Calendars</h2>
+    <p>Connect your calendars to show your availability and automatically create events.</p>
+
+    {{if .Data.Calendars}}
+    <div class="calendar-list">
+        {{range .Data.Calendars}}
+        <div class="calendar-card">
+            <div class="calendar-info">
+                <strong>{{.Name}}</strong>
+                <span class="badge">{{.Provider}}</span>
+                {{if .IsDefault}}<span class="badge badge-primary">Default</span>{{end}}
+            </div>
+            <div class="calendar-actions">
+                {{if not .IsDefault}}
+                <form action="/dashboard/calendars/{{.ID}}/default" method="POST" style="display:inline">
+                    <button type="submit" class="btn btn-sm">Set Default</button>
+                </form>
+                {{end}}
+                <form action="/dashboard/calendars/{{.ID}}/disconnect" method="POST" style="display:inline">
+                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Disconnect this calendar?')">Disconnect</button>
+                </form>
+            </div>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <p class="empty-state">No calendars connected yet.</p>
+    {{end}}
+
+    <div class="connect-options">
+        <h3>Connect a Calendar</h3>
+        <div class="connect-buttons">
+            <a href="{{.Data.GoogleAuthURL}}" class="btn btn-google">Connect Google Calendar</a>
+        </div>
+
+        <details class="caldav-form">
+            <summary>Connect CalDAV Calendar (iCloud, etc.)</summary>
+            <form method="POST" action="/dashboard/calendars/connect/caldav" class="form">
+                <div class="form-group">
+                    <label for="caldav_name">Calendar Name</label>
+                    <input type="text" id="caldav_name" name="name" required placeholder="My Calendar">
+                </div>
+                <div class="form-group">
+                    <label for="caldav_url">CalDAV URL</label>
+                    <input type="url" id="caldav_url" name="url" required placeholder="https://caldav.example.com/calendars/user/">
+                </div>
+                <div class="form-group">
+                    <label for="caldav_username">Username</label>
+                    <input type="text" id="caldav_username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="caldav_password">Password / App Password</label>
+                    <input type="password" id="caldav_password" name="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Connect CalDAV</button>
+            </form>
+        </details>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Video Conferencing</h2>
+    <p>Connect video conferencing providers to automatically create meeting links.</p>
+
+    <div class="conferencing-list">
+        {{$hasZoom := false}}
+        {{range .Data.Conferencing}}
+            {{if eq .Provider "zoom"}}{{$hasZoom = true}}{{end}}
+        {{end}}
+
+        <div class="conferencing-card">
+            <div class="conferencing-info">
+                <strong>Google Meet</strong>
+                <span class="badge badge-success">Via Google Calendar</span>
+            </div>
+            <small>Google Meet links are created automatically when using Google Calendar</small>
+        </div>
+
+        <div class="conferencing-card">
+            <div class="conferencing-info">
+                <strong>Zoom</strong>
+                {{if $hasZoom}}
+                <span class="badge badge-success">Connected</span>
+                {{else}}
+                <span class="badge">Not Connected</span>
+                {{end}}
+            </div>
+            {{if $hasZoom}}
+            <form action="/dashboard/conferencing/zoom/disconnect" method="POST" style="display:inline">
+                <button type="submit" class="btn btn-sm btn-danger">Disconnect</button>
+            </form>
+            {{else}}
+            <a href="{{.Data.ZoomAuthURL}}" class="btn btn-sm">Connect Zoom</a>
+            {{end}}
+        </div>
+    </div>
+</div>
+{{end}}

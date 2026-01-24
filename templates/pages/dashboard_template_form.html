@@ -1,0 +1,173 @@
+{{define "dashboard_template_form.html"}}
+{{template "dashboard" .}}
+{{end}}
+
+{{define "content"}}
+<div class="page-header">
+    <h1>{{if .Data.IsNew}}New Meeting Type{{else}}Edit Meeting Type{{end}}</h1>
+</div>
+
+<form method="POST" action="{{if .Data.IsNew}}/dashboard/templates{{else}}/dashboard/templates/{{.Data.Template.ID}}{{end}}" class="form">
+    {{if not .Data.IsNew}}
+    <input type="hidden" name="_method" value="PUT">
+    {{end}}
+
+    <div class="form-section">
+        <h3>Basic Information</h3>
+
+        <div class="form-group">
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" required
+                   value="{{if .Data.Template}}{{.Data.Template.Name}}{{end}}"
+                   placeholder="30 Minute Meeting">
+        </div>
+
+        <div class="form-group">
+            <label for="slug">URL Slug</label>
+            <input type="text" id="slug" name="slug" required pattern="[a-z0-9-]+"
+                   value="{{if .Data.Template}}{{.Data.Template.Slug}}{{end}}"
+                   placeholder="30-minute-meeting">
+            <small>Only lowercase letters, numbers, and hyphens</small>
+        </div>
+
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" rows="3"
+                      placeholder="A short meeting to discuss...">{{if .Data.Template}}{{.Data.Template.Description}}{{end}}</textarea>
+        </div>
+    </div>
+
+    <div class="form-section">
+        <h3>Duration & Scheduling</h3>
+
+        <div class="form-group">
+            <label>Duration (minutes)</label>
+            <div class="checkbox-group">
+                <label><input type="checkbox" name="durations" value="15" {{if .Data.Template}}{{if contains .Data.Template.Durations 15}}checked{{end}}{{end}}> 15 min</label>
+                <label><input type="checkbox" name="durations" value="30" {{if .Data.Template}}{{if contains .Data.Template.Durations 30}}checked{{end}}{{else}}checked{{end}}> 30 min</label>
+                <label><input type="checkbox" name="durations" value="45" {{if .Data.Template}}{{if contains .Data.Template.Durations 45}}checked{{end}}{{end}}> 45 min</label>
+                <label><input type="checkbox" name="durations" value="60" {{if .Data.Template}}{{if contains .Data.Template.Durations 60}}checked{{end}}{{end}}> 60 min</label>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="min_notice_minutes">Minimum Notice</label>
+                <select id="min_notice_minutes" name="min_notice_minutes">
+                    <option value="0" {{if .Data.Template}}{{if eq .Data.Template.MinNoticeMinutes 0}}selected{{end}}{{end}}>No minimum</option>
+                    <option value="60" {{if .Data.Template}}{{if eq .Data.Template.MinNoticeMinutes 60}}selected{{end}}{{else}}selected{{end}}>1 hour</option>
+                    <option value="120" {{if .Data.Template}}{{if eq .Data.Template.MinNoticeMinutes 120}}selected{{end}}{{end}}>2 hours</option>
+                    <option value="240" {{if .Data.Template}}{{if eq .Data.Template.MinNoticeMinutes 240}}selected{{end}}{{end}}>4 hours</option>
+                    <option value="1440" {{if .Data.Template}}{{if eq .Data.Template.MinNoticeMinutes 1440}}selected{{end}}{{end}}>1 day</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="max_schedule_days">Scheduling Window</label>
+                <select id="max_schedule_days" name="max_schedule_days">
+                    <option value="7" {{if .Data.Template}}{{if eq .Data.Template.MaxScheduleDays 7}}selected{{end}}{{end}}>1 week</option>
+                    <option value="14" {{if .Data.Template}}{{if eq .Data.Template.MaxScheduleDays 14}}selected{{end}}{{else}}selected{{end}}>2 weeks</option>
+                    <option value="30" {{if .Data.Template}}{{if eq .Data.Template.MaxScheduleDays 30}}selected{{end}}{{end}}>1 month</option>
+                    <option value="60" {{if .Data.Template}}{{if eq .Data.Template.MaxScheduleDays 60}}selected{{end}}{{end}}>2 months</option>
+                    <option value="90" {{if .Data.Template}}{{if eq .Data.Template.MaxScheduleDays 90}}selected{{end}}{{end}}>3 months</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="pre_buffer_minutes">Buffer Before</label>
+                <select id="pre_buffer_minutes" name="pre_buffer_minutes">
+                    <option value="0" {{if .Data.Template}}{{if eq .Data.Template.PreBufferMinutes 0}}selected{{end}}{{else}}selected{{end}}>None</option>
+                    <option value="5" {{if .Data.Template}}{{if eq .Data.Template.PreBufferMinutes 5}}selected{{end}}{{end}}>5 min</option>
+                    <option value="10" {{if .Data.Template}}{{if eq .Data.Template.PreBufferMinutes 10}}selected{{end}}{{end}}>10 min</option>
+                    <option value="15" {{if .Data.Template}}{{if eq .Data.Template.PreBufferMinutes 15}}selected{{end}}{{end}}>15 min</option>
+                    <option value="30" {{if .Data.Template}}{{if eq .Data.Template.PreBufferMinutes 30}}selected{{end}}{{end}}>30 min</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="post_buffer_minutes">Buffer After</label>
+                <select id="post_buffer_minutes" name="post_buffer_minutes">
+                    <option value="0" {{if .Data.Template}}{{if eq .Data.Template.PostBufferMinutes 0}}selected{{end}}{{else}}selected{{end}}>None</option>
+                    <option value="5" {{if .Data.Template}}{{if eq .Data.Template.PostBufferMinutes 5}}selected{{end}}{{end}}>5 min</option>
+                    <option value="10" {{if .Data.Template}}{{if eq .Data.Template.PostBufferMinutes 10}}selected{{end}}{{end}}>10 min</option>
+                    <option value="15" {{if .Data.Template}}{{if eq .Data.Template.PostBufferMinutes 15}}selected{{end}}{{end}}>15 min</option>
+                    <option value="30" {{if .Data.Template}}{{if eq .Data.Template.PostBufferMinutes 30}}selected{{end}}{{end}}>30 min</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-section">
+        <h3>Location</h3>
+
+        <div class="form-group">
+            <label for="location_type">Meeting Location</label>
+            <select id="location_type" name="location_type">
+                <option value="google_meet" {{if .Data.Template}}{{if eq .Data.Template.LocationType "google_meet"}}selected{{end}}{{else}}selected{{end}}>Google Meet</option>
+                <option value="zoom" {{if .Data.Template}}{{if eq .Data.Template.LocationType "zoom"}}selected{{end}}{{end}}>Zoom</option>
+                <option value="phone" {{if .Data.Template}}{{if eq .Data.Template.LocationType "phone"}}selected{{end}}{{end}}>Phone Call</option>
+                <option value="custom" {{if .Data.Template}}{{if eq .Data.Template.LocationType "custom"}}selected{{end}}{{end}}>Custom</option>
+            </select>
+        </div>
+
+        <div class="form-group" id="custom_location_group" style="{{if .Data.Template}}{{if or (eq .Data.Template.LocationType "phone") (eq .Data.Template.LocationType "custom")}}{{else}}display:none{{end}}{{else}}display:none{{end}}">
+            <label for="custom_location">Location Details</label>
+            <input type="text" id="custom_location" name="custom_location"
+                   value="{{if .Data.Template}}{{.Data.Template.CustomLocation}}{{end}}"
+                   placeholder="Phone number or address">
+        </div>
+    </div>
+
+    <div class="form-section">
+        <h3>Calendar</h3>
+
+        <div class="form-group">
+            <label for="calendar_id">Add Event To</label>
+            <select id="calendar_id" name="calendar_id">
+                <option value="">Select a calendar</option>
+                {{range .Data.Calendars}}
+                <option value="{{.ID}}" {{if $.Data.Template}}{{if eq $.Data.Template.CalendarID .ID}}selected{{end}}{{end}}>{{.Name}} ({{.Provider}})</option>
+                {{end}}
+            </select>
+        </div>
+    </div>
+
+    <div class="form-section">
+        <h3>Booking Settings</h3>
+
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" name="requires_approval" {{if .Data.Template}}{{if .Data.Template.RequiresApproval}}checked{{end}}{{else}}checked{{end}}>
+                Require approval before confirming bookings
+            </label>
+        </div>
+
+        {{if not .Data.IsNew}}
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" name="is_active" {{if .Data.Template}}{{if .Data.Template.IsActive}}checked{{end}}{{else}}checked{{end}}>
+                Active (visible on public page)
+            </label>
+        </div>
+        {{end}}
+    </div>
+
+    <div class="form-actions">
+        <a href="/dashboard/templates" class="btn">Cancel</a>
+        <button type="submit" class="btn btn-primary">{{if .Data.IsNew}}Create Meeting Type{{else}}Save Changes{{end}}</button>
+    </div>
+</form>
+
+<script>
+document.getElementById('location_type').addEventListener('change', function() {
+    var customGroup = document.getElementById('custom_location_group');
+    if (this.value === 'phone' || this.value === 'custom') {
+        customGroup.style.display = 'block';
+    } else {
+        customGroup.style.display = 'none';
+    }
+});
+</script>
+{{end}}

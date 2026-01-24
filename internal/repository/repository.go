@@ -1,0 +1,787 @@
+package repository
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"time"
+
+	"github.com/meet-when/meet-when/internal/models"
+)
+
+// Repositories holds all repository instances
+type Repositories struct {
+	Tenant       *TenantRepository
+	Host         *HostRepository
+	Calendar     *CalendarRepository
+	Conferencing *ConferencingRepository
+	Template     *TemplateRepository
+	Booking      *BookingRepository
+	Session      *SessionRepository
+	WorkingHours *WorkingHoursRepository
+	AuditLog     *AuditLogRepository
+}
+
+// NewRepositories creates all repositories
+func NewRepositories(db *sql.DB) *Repositories {
+	return &Repositories{
+		Tenant:       &TenantRepository{db: db},
+		Host:         &HostRepository{db: db},
+		Calendar:     &CalendarRepository{db: db},
+		Conferencing: &ConferencingRepository{db: db},
+		Template:     &TemplateRepository{db: db},
+		Booking:      &BookingRepository{db: db},
+		Session:      &SessionRepository{db: db},
+		WorkingHours: &WorkingHoursRepository{db: db},
+		AuditLog:     &AuditLogRepository{db: db},
+	}
+}
+
+// TenantRepository handles tenant database operations
+type TenantRepository struct {
+	db *sql.DB
+}
+
+func (r *TenantRepository) Create(ctx context.Context, tenant *models.Tenant) error {
+	query := `
+		INSERT INTO tenants (id, slug, name, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5)
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		tenant.ID, tenant.Slug, tenant.Name, tenant.CreatedAt, tenant.UpdatedAt)
+	return err
+}
+
+func (r *TenantRepository) GetByID(ctx context.Context, id string) (*models.Tenant, error) {
+	tenant := &models.Tenant{}
+	query := `SELECT id, slug, name, created_at, updated_at FROM tenants WHERE id = $1`
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&tenant.ID, &tenant.Slug, &tenant.Name, &tenant.CreatedAt, &tenant.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return tenant, err
+}
+
+func (r *TenantRepository) GetBySlug(ctx context.Context, slug string) (*models.Tenant, error) {
+	tenant := &models.Tenant{}
+	query := `SELECT id, slug, name, created_at, updated_at FROM tenants WHERE slug = $1`
+	err := r.db.QueryRowContext(ctx, query, slug).Scan(
+		&tenant.ID, &tenant.Slug, &tenant.Name, &tenant.CreatedAt, &tenant.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return tenant, err
+}
+
+// HostRepository handles host database operations
+type HostRepository struct {
+	db *sql.DB
+}
+
+func (r *HostRepository) Create(ctx context.Context, host *models.Host) error {
+	query := `
+		INSERT INTO hosts (id, tenant_id, email, password_hash, name, slug, timezone, is_admin, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		host.ID, host.TenantID, host.Email, host.PasswordHash, host.Name,
+		host.Slug, host.Timezone, host.IsAdmin, host.CreatedAt, host.UpdatedAt)
+	return err
+}
+
+func (r *HostRepository) GetByID(ctx context.Context, id string) (*models.Host, error) {
+	host := &models.Host{}
+	query := `
+		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
+		       default_calendar_id, is_admin, created_at, updated_at
+		FROM hosts WHERE id = $1
+	`
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
+		&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
+		&host.CreatedAt, &host.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return host, err
+}
+
+func (r *HostRepository) GetByEmail(ctx context.Context, tenantID, email string) (*models.Host, error) {
+	host := &models.Host{}
+	query := `
+		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
+		       default_calendar_id, is_admin, created_at, updated_at
+		FROM hosts WHERE tenant_id = $1 AND email = $2
+	`
+	err := r.db.QueryRowContext(ctx, query, tenantID, email).Scan(
+		&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
+		&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
+		&host.CreatedAt, &host.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return host, err
+}
+
+func (r *HostRepository) GetBySlug(ctx context.Context, tenantID, slug string) (*models.Host, error) {
+	host := &models.Host{}
+	query := `
+		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
+		       default_calendar_id, is_admin, created_at, updated_at
+		FROM hosts WHERE tenant_id = $1 AND slug = $2
+	`
+	err := r.db.QueryRowContext(ctx, query, tenantID, slug).Scan(
+		&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
+		&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
+		&host.CreatedAt, &host.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return host, err
+}
+
+func (r *HostRepository) Update(ctx context.Context, host *models.Host) error {
+	query := `
+		UPDATE hosts
+		SET name = $1, slug = $2, timezone = $3, default_calendar_id = $4
+		WHERE id = $5
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		host.Name, host.Slug, host.Timezone, host.DefaultCalendarID, host.ID)
+	return err
+}
+
+func (r *HostRepository) UpdatePassword(ctx context.Context, id, passwordHash string) error {
+	query := `UPDATE hosts SET password_hash = $1 WHERE id = $2`
+	_, err := r.db.ExecContext(ctx, query, passwordHash, id)
+	return err
+}
+
+// CalendarRepository handles calendar connection database operations
+type CalendarRepository struct {
+	db *sql.DB
+}
+
+func (r *CalendarRepository) Create(ctx context.Context, cal *models.CalendarConnection) error {
+	query := `
+		INSERT INTO calendar_connections (id, host_id, provider, name, calendar_id,
+			access_token, refresh_token, token_expiry, caldav_url, caldav_username,
+			caldav_password, is_default, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		cal.ID, cal.HostID, cal.Provider, cal.Name, cal.CalendarID,
+		cal.AccessToken, cal.RefreshToken, cal.TokenExpiry,
+		cal.CalDAVURL, cal.CalDAVUsername, cal.CalDAVPassword,
+		cal.IsDefault, cal.CreatedAt, cal.UpdatedAt)
+	return err
+}
+
+func (r *CalendarRepository) GetByID(ctx context.Context, id string) (*models.CalendarConnection, error) {
+	cal := &models.CalendarConnection{}
+	query := `
+		SELECT id, host_id, provider, name, calendar_id, access_token, refresh_token,
+		       token_expiry, caldav_url, caldav_username, caldav_password, is_default,
+		       created_at, updated_at
+		FROM calendar_connections WHERE id = $1
+	`
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&cal.ID, &cal.HostID, &cal.Provider, &cal.Name, &cal.CalendarID,
+		&cal.AccessToken, &cal.RefreshToken, &cal.TokenExpiry,
+		&cal.CalDAVURL, &cal.CalDAVUsername, &cal.CalDAVPassword,
+		&cal.IsDefault, &cal.CreatedAt, &cal.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return cal, err
+}
+
+func (r *CalendarRepository) GetByHostID(ctx context.Context, hostID string) ([]*models.CalendarConnection, error) {
+	query := `
+		SELECT id, host_id, provider, name, calendar_id, access_token, refresh_token,
+		       token_expiry, caldav_url, caldav_username, caldav_password, is_default,
+		       created_at, updated_at
+		FROM calendar_connections WHERE host_id = $1
+		ORDER BY is_default DESC, created_at ASC
+	`
+	rows, err := r.db.QueryContext(ctx, query, hostID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var calendars []*models.CalendarConnection
+	for rows.Next() {
+		cal := &models.CalendarConnection{}
+		err := rows.Scan(
+			&cal.ID, &cal.HostID, &cal.Provider, &cal.Name, &cal.CalendarID,
+			&cal.AccessToken, &cal.RefreshToken, &cal.TokenExpiry,
+			&cal.CalDAVURL, &cal.CalDAVUsername, &cal.CalDAVPassword,
+			&cal.IsDefault, &cal.CreatedAt, &cal.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		calendars = append(calendars, cal)
+	}
+	return calendars, nil
+}
+
+func (r *CalendarRepository) Update(ctx context.Context, cal *models.CalendarConnection) error {
+	query := `
+		UPDATE calendar_connections
+		SET name = $1, access_token = $2, refresh_token = $3, token_expiry = $4,
+		    caldav_url = $5, caldav_username = $6, caldav_password = $7, is_default = $8
+		WHERE id = $9
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		cal.Name, cal.AccessToken, cal.RefreshToken, cal.TokenExpiry,
+		cal.CalDAVURL, cal.CalDAVUsername, cal.CalDAVPassword,
+		cal.IsDefault, cal.ID)
+	return err
+}
+
+func (r *CalendarRepository) Delete(ctx context.Context, id string) error {
+	query := `DELETE FROM calendar_connections WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, id)
+	return err
+}
+
+func (r *CalendarRepository) SetDefault(ctx context.Context, hostID, calendarID string) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Clear all defaults for this host
+	_, err = tx.ExecContext(ctx, `UPDATE calendar_connections SET is_default = FALSE WHERE host_id = $1`, hostID)
+	if err != nil {
+		return err
+	}
+
+	// Set the new default
+	_, err = tx.ExecContext(ctx, `UPDATE calendar_connections SET is_default = TRUE WHERE id = $1`, calendarID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// ConferencingRepository handles conferencing connection database operations
+type ConferencingRepository struct {
+	db *sql.DB
+}
+
+func (r *ConferencingRepository) Create(ctx context.Context, conn *models.ConferencingConnection) error {
+	query := `
+		INSERT INTO conferencing_connections (id, host_id, provider, access_token,
+			refresh_token, token_expiry, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		conn.ID, conn.HostID, conn.Provider, conn.AccessToken,
+		conn.RefreshToken, conn.TokenExpiry, conn.CreatedAt, conn.UpdatedAt)
+	return err
+}
+
+func (r *ConferencingRepository) GetByHostID(ctx context.Context, hostID string) ([]*models.ConferencingConnection, error) {
+	query := `
+		SELECT id, host_id, provider, access_token, refresh_token, token_expiry,
+		       created_at, updated_at
+		FROM conferencing_connections WHERE host_id = $1
+	`
+	rows, err := r.db.QueryContext(ctx, query, hostID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var connections []*models.ConferencingConnection
+	for rows.Next() {
+		conn := &models.ConferencingConnection{}
+		err := rows.Scan(
+			&conn.ID, &conn.HostID, &conn.Provider, &conn.AccessToken,
+			&conn.RefreshToken, &conn.TokenExpiry, &conn.CreatedAt, &conn.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		connections = append(connections, conn)
+	}
+	return connections, nil
+}
+
+func (r *ConferencingRepository) GetByHostAndProvider(ctx context.Context, hostID string, provider models.ConferencingProvider) (*models.ConferencingConnection, error) {
+	conn := &models.ConferencingConnection{}
+	query := `
+		SELECT id, host_id, provider, access_token, refresh_token, token_expiry,
+		       created_at, updated_at
+		FROM conferencing_connections WHERE host_id = $1 AND provider = $2
+	`
+	err := r.db.QueryRowContext(ctx, query, hostID, provider).Scan(
+		&conn.ID, &conn.HostID, &conn.Provider, &conn.AccessToken,
+		&conn.RefreshToken, &conn.TokenExpiry, &conn.CreatedAt, &conn.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return conn, err
+}
+
+func (r *ConferencingRepository) Update(ctx context.Context, conn *models.ConferencingConnection) error {
+	query := `
+		UPDATE conferencing_connections
+		SET access_token = $1, refresh_token = $2, token_expiry = $3
+		WHERE id = $4
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		conn.AccessToken, conn.RefreshToken, conn.TokenExpiry, conn.ID)
+	return err
+}
+
+func (r *ConferencingRepository) Delete(ctx context.Context, id string) error {
+	query := `DELETE FROM conferencing_connections WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, id)
+	return err
+}
+
+// TemplateRepository handles meeting template database operations
+type TemplateRepository struct {
+	db *sql.DB
+}
+
+func (r *TemplateRepository) Create(ctx context.Context, tmpl *models.MeetingTemplate) error {
+	query := `
+		INSERT INTO meeting_templates (id, host_id, slug, name, description, durations,
+			location_type, custom_location, calendar_id, requires_approval,
+			min_notice_minutes, max_schedule_days, pre_buffer_minutes, post_buffer_minutes,
+			availability_rules, invitee_questions, confirmation_email, reminder_email,
+			is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		tmpl.ID, tmpl.HostID, tmpl.Slug, tmpl.Name, tmpl.Description,
+		tmpl.Durations, tmpl.LocationType, tmpl.CustomLocation, tmpl.CalendarID,
+		tmpl.RequiresApproval, tmpl.MinNoticeMinutes, tmpl.MaxScheduleDays,
+		tmpl.PreBufferMinutes, tmpl.PostBufferMinutes, tmpl.AvailabilityRules,
+		tmpl.InviteeQuestions, tmpl.ConfirmationEmail, tmpl.ReminderEmail,
+		tmpl.IsActive, tmpl.CreatedAt, tmpl.UpdatedAt)
+	return err
+}
+
+func (r *TemplateRepository) GetByID(ctx context.Context, id string) (*models.MeetingTemplate, error) {
+	tmpl := &models.MeetingTemplate{}
+	query := `
+		SELECT id, host_id, slug, name, description, durations, location_type,
+		       custom_location, calendar_id, requires_approval, min_notice_minutes,
+		       max_schedule_days, pre_buffer_minutes, post_buffer_minutes,
+		       availability_rules, invitee_questions, confirmation_email, reminder_email,
+		       is_active, created_at, updated_at
+		FROM meeting_templates WHERE id = $1
+	`
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&tmpl.ID, &tmpl.HostID, &tmpl.Slug, &tmpl.Name, &tmpl.Description,
+		&tmpl.Durations, &tmpl.LocationType, &tmpl.CustomLocation, &tmpl.CalendarID,
+		&tmpl.RequiresApproval, &tmpl.MinNoticeMinutes, &tmpl.MaxScheduleDays,
+		&tmpl.PreBufferMinutes, &tmpl.PostBufferMinutes, &tmpl.AvailabilityRules,
+		&tmpl.InviteeQuestions, &tmpl.ConfirmationEmail, &tmpl.ReminderEmail,
+		&tmpl.IsActive, &tmpl.CreatedAt, &tmpl.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return tmpl, err
+}
+
+func (r *TemplateRepository) GetByHostAndSlug(ctx context.Context, hostID, slug string) (*models.MeetingTemplate, error) {
+	tmpl := &models.MeetingTemplate{}
+	query := `
+		SELECT id, host_id, slug, name, description, durations, location_type,
+		       custom_location, calendar_id, requires_approval, min_notice_minutes,
+		       max_schedule_days, pre_buffer_minutes, post_buffer_minutes,
+		       availability_rules, invitee_questions, confirmation_email, reminder_email,
+		       is_active, created_at, updated_at
+		FROM meeting_templates WHERE host_id = $1 AND slug = $2
+	`
+	err := r.db.QueryRowContext(ctx, query, hostID, slug).Scan(
+		&tmpl.ID, &tmpl.HostID, &tmpl.Slug, &tmpl.Name, &tmpl.Description,
+		&tmpl.Durations, &tmpl.LocationType, &tmpl.CustomLocation, &tmpl.CalendarID,
+		&tmpl.RequiresApproval, &tmpl.MinNoticeMinutes, &tmpl.MaxScheduleDays,
+		&tmpl.PreBufferMinutes, &tmpl.PostBufferMinutes, &tmpl.AvailabilityRules,
+		&tmpl.InviteeQuestions, &tmpl.ConfirmationEmail, &tmpl.ReminderEmail,
+		&tmpl.IsActive, &tmpl.CreatedAt, &tmpl.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return tmpl, err
+}
+
+func (r *TemplateRepository) GetByHostID(ctx context.Context, hostID string) ([]*models.MeetingTemplate, error) {
+	query := `
+		SELECT id, host_id, slug, name, description, durations, location_type,
+		       custom_location, calendar_id, requires_approval, min_notice_minutes,
+		       max_schedule_days, pre_buffer_minutes, post_buffer_minutes,
+		       availability_rules, invitee_questions, confirmation_email, reminder_email,
+		       is_active, created_at, updated_at
+		FROM meeting_templates WHERE host_id = $1
+		ORDER BY created_at DESC
+	`
+	rows, err := r.db.QueryContext(ctx, query, hostID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var templates []*models.MeetingTemplate
+	for rows.Next() {
+		tmpl := &models.MeetingTemplate{}
+		err := rows.Scan(
+			&tmpl.ID, &tmpl.HostID, &tmpl.Slug, &tmpl.Name, &tmpl.Description,
+			&tmpl.Durations, &tmpl.LocationType, &tmpl.CustomLocation, &tmpl.CalendarID,
+			&tmpl.RequiresApproval, &tmpl.MinNoticeMinutes, &tmpl.MaxScheduleDays,
+			&tmpl.PreBufferMinutes, &tmpl.PostBufferMinutes, &tmpl.AvailabilityRules,
+			&tmpl.InviteeQuestions, &tmpl.ConfirmationEmail, &tmpl.ReminderEmail,
+			&tmpl.IsActive, &tmpl.CreatedAt, &tmpl.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		templates = append(templates, tmpl)
+	}
+	return templates, nil
+}
+
+func (r *TemplateRepository) Update(ctx context.Context, tmpl *models.MeetingTemplate) error {
+	query := `
+		UPDATE meeting_templates
+		SET slug = $1, name = $2, description = $3, durations = $4, location_type = $5,
+		    custom_location = $6, calendar_id = $7, requires_approval = $8,
+		    min_notice_minutes = $9, max_schedule_days = $10, pre_buffer_minutes = $11,
+		    post_buffer_minutes = $12, availability_rules = $13, invitee_questions = $14,
+		    confirmation_email = $15, reminder_email = $16, is_active = $17
+		WHERE id = $18
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		tmpl.Slug, tmpl.Name, tmpl.Description, tmpl.Durations, tmpl.LocationType,
+		tmpl.CustomLocation, tmpl.CalendarID, tmpl.RequiresApproval,
+		tmpl.MinNoticeMinutes, tmpl.MaxScheduleDays, tmpl.PreBufferMinutes,
+		tmpl.PostBufferMinutes, tmpl.AvailabilityRules, tmpl.InviteeQuestions,
+		tmpl.ConfirmationEmail, tmpl.ReminderEmail, tmpl.IsActive, tmpl.ID)
+	return err
+}
+
+func (r *TemplateRepository) Delete(ctx context.Context, id string) error {
+	query := `DELETE FROM meeting_templates WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, id)
+	return err
+}
+
+// BookingRepository handles booking database operations
+type BookingRepository struct {
+	db *sql.DB
+}
+
+func (r *BookingRepository) Create(ctx context.Context, booking *models.Booking) error {
+	query := `
+		INSERT INTO bookings (id, template_id, host_id, token, status, start_time,
+			end_time, duration, invitee_name, invitee_email, invitee_timezone,
+			invitee_phone, additional_guests, answers, conference_link,
+			calendar_event_id, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		booking.ID, booking.TemplateID, booking.HostID, booking.Token,
+		booking.Status, booking.StartTime, booking.EndTime, booking.Duration,
+		booking.InviteeName, booking.InviteeEmail, booking.InviteeTimezone,
+		booking.InviteePhone, booking.AdditionalGuests, booking.Answers,
+		booking.ConferenceLink, booking.CalendarEventID,
+		booking.CreatedAt, booking.UpdatedAt)
+	return err
+}
+
+func (r *BookingRepository) GetByID(ctx context.Context, id string) (*models.Booking, error) {
+	booking := &models.Booking{}
+	query := `
+		SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
+		       invitee_name, invitee_email, invitee_timezone, invitee_phone,
+		       additional_guests, answers, conference_link, calendar_event_id,
+		       cancelled_by, cancel_reason, created_at, updated_at
+		FROM bookings WHERE id = $1
+	`
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&booking.ID, &booking.TemplateID, &booking.HostID, &booking.Token,
+		&booking.Status, &booking.StartTime, &booking.EndTime, &booking.Duration,
+		&booking.InviteeName, &booking.InviteeEmail, &booking.InviteeTimezone,
+		&booking.InviteePhone, &booking.AdditionalGuests, &booking.Answers,
+		&booking.ConferenceLink, &booking.CalendarEventID,
+		&booking.CancelledBy, &booking.CancelReason,
+		&booking.CreatedAt, &booking.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return booking, err
+}
+
+func (r *BookingRepository) GetByToken(ctx context.Context, token string) (*models.Booking, error) {
+	booking := &models.Booking{}
+	query := `
+		SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
+		       invitee_name, invitee_email, invitee_timezone, invitee_phone,
+		       additional_guests, answers, conference_link, calendar_event_id,
+		       cancelled_by, cancel_reason, created_at, updated_at
+		FROM bookings WHERE token = $1
+	`
+	err := r.db.QueryRowContext(ctx, query, token).Scan(
+		&booking.ID, &booking.TemplateID, &booking.HostID, &booking.Token,
+		&booking.Status, &booking.StartTime, &booking.EndTime, &booking.Duration,
+		&booking.InviteeName, &booking.InviteeEmail, &booking.InviteeTimezone,
+		&booking.InviteePhone, &booking.AdditionalGuests, &booking.Answers,
+		&booking.ConferenceLink, &booking.CalendarEventID,
+		&booking.CancelledBy, &booking.CancelReason,
+		&booking.CreatedAt, &booking.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return booking, err
+}
+
+func (r *BookingRepository) GetByHostID(ctx context.Context, hostID string, status *models.BookingStatus) ([]*models.Booking, error) {
+	var query string
+	var args []interface{}
+
+	if status != nil {
+		query = `
+			SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
+			       invitee_name, invitee_email, invitee_timezone, invitee_phone,
+			       additional_guests, answers, conference_link, calendar_event_id,
+			       cancelled_by, cancel_reason, created_at, updated_at
+			FROM bookings WHERE host_id = $1 AND status = $2
+			ORDER BY start_time ASC
+		`
+		args = []interface{}{hostID, *status}
+	} else {
+		query = `
+			SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
+			       invitee_name, invitee_email, invitee_timezone, invitee_phone,
+			       additional_guests, answers, conference_link, calendar_event_id,
+			       cancelled_by, cancel_reason, created_at, updated_at
+			FROM bookings WHERE host_id = $1
+			ORDER BY start_time ASC
+		`
+		args = []interface{}{hostID}
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var bookings []*models.Booking
+	for rows.Next() {
+		booking := &models.Booking{}
+		err := rows.Scan(
+			&booking.ID, &booking.TemplateID, &booking.HostID, &booking.Token,
+			&booking.Status, &booking.StartTime, &booking.EndTime, &booking.Duration,
+			&booking.InviteeName, &booking.InviteeEmail, &booking.InviteeTimezone,
+			&booking.InviteePhone, &booking.AdditionalGuests, &booking.Answers,
+			&booking.ConferenceLink, &booking.CalendarEventID,
+			&booking.CancelledBy, &booking.CancelReason,
+			&booking.CreatedAt, &booking.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		bookings = append(bookings, booking)
+	}
+	return bookings, nil
+}
+
+func (r *BookingRepository) GetByHostIDAndTimeRange(ctx context.Context, hostID string, start, end time.Time) ([]*models.Booking, error) {
+	query := `
+		SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
+		       invitee_name, invitee_email, invitee_timezone, invitee_phone,
+		       additional_guests, answers, conference_link, calendar_event_id,
+		       cancelled_by, cancel_reason, created_at, updated_at
+		FROM bookings
+		WHERE host_id = $1
+		  AND status IN ('pending', 'confirmed')
+		  AND start_time < $3 AND end_time > $2
+		ORDER BY start_time ASC
+	`
+	rows, err := r.db.QueryContext(ctx, query, hostID, start, end)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var bookings []*models.Booking
+	for rows.Next() {
+		booking := &models.Booking{}
+		err := rows.Scan(
+			&booking.ID, &booking.TemplateID, &booking.HostID, &booking.Token,
+			&booking.Status, &booking.StartTime, &booking.EndTime, &booking.Duration,
+			&booking.InviteeName, &booking.InviteeEmail, &booking.InviteeTimezone,
+			&booking.InviteePhone, &booking.AdditionalGuests, &booking.Answers,
+			&booking.ConferenceLink, &booking.CalendarEventID,
+			&booking.CancelledBy, &booking.CancelReason,
+			&booking.CreatedAt, &booking.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		bookings = append(bookings, booking)
+	}
+	return bookings, nil
+}
+
+func (r *BookingRepository) Update(ctx context.Context, booking *models.Booking) error {
+	query := `
+		UPDATE bookings
+		SET status = $1, conference_link = $2, calendar_event_id = $3,
+		    cancelled_by = $4, cancel_reason = $5
+		WHERE id = $6
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		booking.Status, booking.ConferenceLink, booking.CalendarEventID,
+		booking.CancelledBy, booking.CancelReason, booking.ID)
+	return err
+}
+
+// SessionRepository handles session database operations
+type SessionRepository struct {
+	db *sql.DB
+}
+
+func (r *SessionRepository) Create(ctx context.Context, session *models.Session) error {
+	query := `
+		INSERT INTO sessions (id, host_id, token, expires_at, created_at)
+		VALUES ($1, $2, $3, $4, $5)
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		session.ID, session.HostID, session.Token, session.ExpiresAt, session.CreatedAt)
+	return err
+}
+
+func (r *SessionRepository) GetByToken(ctx context.Context, token string) (*models.Session, error) {
+	session := &models.Session{}
+	query := `
+		SELECT id, host_id, token, expires_at, created_at
+		FROM sessions WHERE token = $1 AND expires_at > NOW()
+	`
+	err := r.db.QueryRowContext(ctx, query, token).Scan(
+		&session.ID, &session.HostID, &session.Token, &session.ExpiresAt, &session.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return session, err
+}
+
+func (r *SessionRepository) Delete(ctx context.Context, token string) error {
+	query := `DELETE FROM sessions WHERE token = $1`
+	_, err := r.db.ExecContext(ctx, query, token)
+	return err
+}
+
+func (r *SessionRepository) DeleteExpired(ctx context.Context) error {
+	query := `DELETE FROM sessions WHERE expires_at < NOW()`
+	_, err := r.db.ExecContext(ctx, query)
+	return err
+}
+
+// WorkingHoursRepository handles working hours database operations
+type WorkingHoursRepository struct {
+	db *sql.DB
+}
+
+func (r *WorkingHoursRepository) GetByHostID(ctx context.Context, hostID string) ([]*models.WorkingHours, error) {
+	query := `
+		SELECT id, host_id, day_of_week, start_time, end_time, is_enabled, created_at, updated_at
+		FROM working_hours WHERE host_id = $1
+		ORDER BY day_of_week, start_time
+	`
+	rows, err := r.db.QueryContext(ctx, query, hostID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var hours []*models.WorkingHours
+	for rows.Next() {
+		wh := &models.WorkingHours{}
+		err := rows.Scan(
+			&wh.ID, &wh.HostID, &wh.DayOfWeek, &wh.StartTime, &wh.EndTime,
+			&wh.IsEnabled, &wh.CreatedAt, &wh.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		hours = append(hours, wh)
+	}
+	return hours, nil
+}
+
+func (r *WorkingHoursRepository) SetForHost(ctx context.Context, hostID string, hours []*models.WorkingHours) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Delete existing working hours
+	_, err = tx.ExecContext(ctx, `DELETE FROM working_hours WHERE host_id = $1`, hostID)
+	if err != nil {
+		return err
+	}
+
+	// Insert new working hours
+	for _, wh := range hours {
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO working_hours (id, host_id, day_of_week, start_time, end_time, is_enabled, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		`, wh.ID, hostID, wh.DayOfWeek, wh.StartTime, wh.EndTime, wh.IsEnabled, wh.CreatedAt, wh.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("failed to insert working hour: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// AuditLogRepository handles audit log database operations
+type AuditLogRepository struct {
+	db *sql.DB
+}
+
+func (r *AuditLogRepository) Create(ctx context.Context, log *models.AuditLog) error {
+	query := `
+		INSERT INTO audit_logs (id, tenant_id, host_id, action, entity_type, entity_id, details, ip_address, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		log.ID, log.TenantID, log.HostID, log.Action, log.EntityType,
+		log.EntityID, log.Details, log.IPAddress, log.CreatedAt)
+	return err
+}
+
+func (r *AuditLogRepository) GetByTenantID(ctx context.Context, tenantID string, limit, offset int) ([]*models.AuditLog, error) {
+	query := `
+		SELECT id, tenant_id, host_id, action, entity_type, entity_id, details, ip_address, created_at
+		FROM audit_logs WHERE tenant_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3
+	`
+	rows, err := r.db.QueryContext(ctx, query, tenantID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []*models.AuditLog
+	for rows.Next() {
+		log := &models.AuditLog{}
+		err := rows.Scan(
+			&log.ID, &log.TenantID, &log.HostID, &log.Action, &log.EntityType,
+			&log.EntityID, &log.Details, &log.IPAddress, &log.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		logs = append(logs, log)
+	}
+	return logs, nil
+}

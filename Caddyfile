@@ -1,0 +1,31 @@
+# Replace with your domain
+{$DOMAIN:localhost} {
+    # Enable automatic HTTPS
+    tls {$TLS_EMAIL:internal}
+
+    # Reverse proxy to the app
+    reverse_proxy app:8080
+
+    # Security headers
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    # Compress responses
+    encode gzip
+
+    # Logging
+    log {
+        output stdout
+        format json
+    }
+}
+
+# Health check endpoint for load balancers
+:8081 {
+    respond /health "OK" 200
+}

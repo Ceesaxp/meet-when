@@ -1,0 +1,44 @@
+{{define "slots_partial.html"}}
+<div class="slots-wrapper">
+    {{if .Slots}}
+    <div class="date-navigation">
+        <button onclick="navigateWeek(-1)" class="btn btn-sm">&larr; Previous</button>
+        <span>{{formatDate .StartDate}} - {{formatDate .EndDate}}</span>
+        <button onclick="navigateWeek(1)" class="btn btn-sm">Next &rarr;</button>
+    </div>
+
+    <div class="slots-grid">
+        {{range $date, $slots := .Slots}}
+        <div class="date-column">
+            <h4>{{formatDate (index $slots 0).Start}}</h4>
+            <div class="time-slots">
+                {{range $slots}}
+                <button type="button" class="slot-btn"
+                        onclick="selectSlot('{{.Start.Format "2006-01-02T15:04:05Z07:00"}}', '{{formatDateTime .Start}}')">
+                    {{formatTime .Start}}
+                </button>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <div class="no-slots">
+        <p>No available times for this week.</p>
+        <button onclick="navigateWeek(1)" class="btn btn-sm">Check next week &rarr;</button>
+    </div>
+    {{end}}
+</div>
+
+<script>
+var currentStartDate = '{{.StartDate.Format "2006-01-02"}}';
+
+function navigateWeek(direction) {
+    var date = new Date(currentStartDate);
+    date.setDate(date.getDate() + (direction * 7));
+    var newDate = date.toISOString().split('T')[0];
+    var tz = document.getElementById('timezone').value;
+    htmx.ajax('GET', window.location.pathname + '/slots?date=' + newDate + '&timezone=' + tz + '&duration={{.Duration}}', {target: '#slots-container'});
+}
+</script>
+{{end}}
