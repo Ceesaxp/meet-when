@@ -1,0 +1,146 @@
+{{define "public_template.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} | Meet When</title>
+    <meta name="description" content="{{.Description}}">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body class="public-page booking-page">
+    <div class="booking-container">
+        <div class="booking-sidebar">
+            <a href="/{{.Tenant.Slug}}/{{.Host.Slug}}" class="back-link">&larr; Back</a>
+            <h1>{{.Host.Name}}</h1>
+            <h2>{{.Data.Template.Name}}</h2>
+            {{if .Data.Template.Description}}
+            <p>{{.Data.Template.Description}}</p>
+            {{end}}
+            <div class="meeting-details">
+                <div class="detail">
+                    <strong>Duration:</strong>
+                    <span>{{index .Data.Template.Durations 0}} minutes</span>
+                </div>
+                <div class="detail">
+                    <strong>Location:</strong>
+                    <span>
+                        {{if eq .Data.Template.LocationType "google_meet"}}Google Meet{{end}}
+                        {{if eq .Data.Template.LocationType "zoom"}}Zoom{{end}}
+                        {{if eq .Data.Template.LocationType "phone"}}Phone{{end}}
+                        {{if eq .Data.Template.LocationType "custom"}}{{.Data.Template.CustomLocation}}{{end}}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="booking-main">
+            {{if .Flash}}
+            <div class="alert alert-{{.Flash.Type}}">{{.Flash.Message}}</div>
+            {{end}}
+
+            <div id="booking-step-1" class="booking-step">
+                <h3>Select a Date & Time</h3>
+                <p>Timezone: <select id="timezone" onchange="loadSlots()">
+                    <option value="UTC">UTC</option>
+                    <option value="America/New_York">Eastern Time</option>
+                    <option value="America/Chicago">Central Time</option>
+                    <option value="America/Denver">Mountain Time</option>
+                    <option value="America/Los_Angeles">Pacific Time</option>
+                    <option value="Europe/London">London</option>
+                    <option value="Europe/Paris">Paris</option>
+                    <option value="Europe/Berlin">Berlin</option>
+                    <option value="Asia/Tokyo">Tokyo</option>
+                    <option value="Australia/Sydney">Sydney</option>
+                </select></p>
+
+                <div id="slots-container"
+                     hx-get="/{{.Tenant.Slug}}/{{.Host.Slug}}/{{.Data.Template.Slug}}/slots"
+                     hx-trigger="load"
+                     hx-vals='{"timezone": "UTC", "duration": "{{index .Data.Template.Durations 0}}"}'
+                     hx-swap="innerHTML">
+                    <div class="loading">Loading available times...</div>
+                </div>
+            </div>
+
+            <div id="booking-step-2" class="booking-step" style="display:none">
+                <h3>Enter Your Details</h3>
+                <form method="POST" action="/{{.Tenant.Slug}}/{{.Host.Slug}}/{{.Data.Template.Slug}}/book" class="booking-form">
+                    <input type="hidden" name="start_time" id="selected_start_time">
+                    <input type="hidden" name="timezone" id="form_timezone">
+
+                    <div class="selected-time" id="selected-time-display"></div>
+
+                    <div class="form-group">
+                        <label for="name">Your Name *</label>
+                        <input type="text" id="name" name="name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">Email *</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="phone">Phone (optional)</label>
+                        <input type="tel" id="phone" name="phone">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="additional_guests">Additional Guests (optional)</label>
+                        <textarea id="additional_guests" name="additional_guests" rows="2"
+                                  placeholder="Enter email addresses, one per line"></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" onclick="showStep(1)" class="btn">Back</button>
+                        <button type="submit" class="btn btn-primary">
+                            {{if .Data.Template.RequiresApproval}}Request Booking{{else}}Confirm Booking{{end}}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Detect user timezone
+        try {
+            var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            var select = document.getElementById('timezone');
+            for (var i = 0; i < select.options.length; i++) {
+                if (select.options[i].value === tz) {
+                    select.selectedIndex = i;
+                    break;
+                }
+            }
+        } catch (e) {}
+
+        function loadSlots() {
+            var tz = document.getElementById('timezone').value;
+            var container = document.getElementById('slots-container');
+            htmx.ajax('GET', '/{{.Tenant.Slug}}/{{.Host.Slug}}/{{.Data.Template.Slug}}/slots?timezone=' + tz + '&duration={{index .Data.Template.Durations 0}}', {target: '#slots-container'});
+        }
+
+        function selectSlot(startTime, displayTime) {
+            document.getElementById('selected_start_time').value = startTime;
+            document.getElementById('form_timezone').value = document.getElementById('timezone').value;
+            document.getElementById('selected-time-display').textContent = displayTime;
+            showStep(2);
+        }
+
+        function showStep(step) {
+            document.getElementById('booking-step-1').style.display = step === 1 ? 'block' : 'none';
+            document.getElementById('booking-step-2').style.display = step === 2 ? 'block' : 'none';
+        }
+
+        // Load slots on timezone change
+        document.getElementById('timezone').addEventListener('change', loadSlots);
+
+        // Load initial slots
+        loadSlots();
+    </script>
+</body>
+</html>
+{{end}}

@@ -1,0 +1,38 @@
+{{define "reschedule.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reschedule | Meet When</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="public-page">
+    <div class="reschedule-container">
+        <h1>Reschedule Your Booking</h1>
+        <p>To reschedule, please cancel your current booking and create a new one.</p>
+
+        <div class="booking-details-card">
+            <h3>Current Booking</h3>
+            <div class="booking-detail">
+                <strong>Meeting:</strong> {{.Data.Template.Name}}
+            </div>
+            <div class="booking-detail">
+                <strong>With:</strong> {{.Host.Name}}
+            </div>
+            <div class="booking-detail">
+                <strong>When:</strong> {{formatDateTime .Data.Booking.StartTime}}
+            </div>
+        </div>
+
+        <div class="reschedule-actions">
+            <form action="/booking/{{.Data.Booking.Token}}/cancel" method="POST">
+                <input type="hidden" name="reason" value="Rescheduling">
+                <button type="submit" class="btn btn-primary">Cancel & Book New Time</button>
+            </form>
+            <a href="/booking/{{.Data.Booking.Token}}" class="btn">Keep Current Booking</a>
+        </div>
+    </div>
+</body>
+</html>
+{{end}}

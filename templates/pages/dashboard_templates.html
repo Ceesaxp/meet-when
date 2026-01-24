@@ -1,0 +1,44 @@
+{{define "dashboard_templates.html"}}
+{{template "dashboard" .}}
+{{end}}
+
+{{define "content"}}
+<div class="page-header">
+    <h1>Meeting Types</h1>
+    <a href="/dashboard/templates/new" class="btn btn-primary">New Meeting Type</a>
+</div>
+
+{{if .Data.Templates}}
+<div class="template-grid">
+    {{range .Data.Templates}}
+    <div class="template-card {{if not .IsActive}}inactive{{end}}">
+        <div class="template-header">
+            <h3>{{.Name}}</h3>
+            {{if not .IsActive}}
+            <span class="badge badge-inactive">Inactive</span>
+            {{end}}
+        </div>
+        <p class="template-description">{{.Description}}</p>
+        <div class="template-meta">
+            <span>{{index .Durations 0}} min</span>
+            <span>{{.LocationType}}</span>
+        </div>
+        <div class="template-actions">
+            <a href="/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}" target="_blank" class="btn btn-sm">Preview</a>
+            <a href="/dashboard/templates/{{.ID}}" class="btn btn-sm">Edit</a>
+            <form action="/dashboard/templates/{{.ID}}" method="POST" style="display:inline">
+                <input type="hidden" name="_method" value="DELETE">
+                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this meeting type?')">Delete</button>
+            </form>
+        </div>
+    </div>
+    {{end}}
+</div>
+{{else}}
+<div class="empty-state">
+    <h3>No meeting types yet</h3>
+    <p>Create your first meeting type to start accepting bookings.</p>
+    <a href="/dashboard/templates/new" class="btn btn-primary">Create Meeting Type</a>
+</div>
+{{end}}
+{{end}}

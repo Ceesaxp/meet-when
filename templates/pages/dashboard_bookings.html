@@ -1,0 +1,77 @@
+{{define "dashboard_bookings.html"}}
+{{template "dashboard" .}}
+{{end}}
+
+{{define "content"}}
+<div class="page-header">
+    <h1>Bookings</h1>
+</div>
+
+<div class="filter-bar">
+    <a href="/dashboard/bookings" class="btn btn-sm {{if eq .Data.Filter ""}}btn-primary{{end}}">All</a>
+    <a href="/dashboard/bookings?filter=pending" class="btn btn-sm {{if eq .Data.Filter "pending"}}btn-primary{{end}}">Pending</a>
+    <a href="/dashboard/bookings?filter=confirmed" class="btn btn-sm {{if eq .Data.Filter "confirmed"}}btn-primary{{end}}">Confirmed</a>
+    <a href="/dashboard/bookings?filter=cancelled" class="btn btn-sm {{if eq .Data.Filter "cancelled"}}btn-primary{{end}}">Cancelled</a>
+</div>
+
+{{if .Data.Bookings}}
+<table class="table">
+    <thead>
+        <tr>
+            <th>Date & Time</th>
+            <th>Guest</th>
+            <th>Meeting Type</th>
+            <th>Duration</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Data.Bookings}}
+        <tr>
+            <td>
+                {{formatDate .StartTime}}<br>
+                <small>{{formatTime .StartTime}} - {{formatTime .EndTime}}</small>
+            </td>
+            <td>
+                {{.InviteeName}}<br>
+                <small>{{.InviteeEmail}}</small>
+                {{if .InviteePhone}}<br><small>{{.InviteePhone}}</small>{{end}}
+            </td>
+            <td>
+                {{with index $.Data.Templates .TemplateID}}
+                {{.Name}}
+                {{end}}
+            </td>
+            <td>{{.Duration}} min</td>
+            <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
+            <td>
+                {{if eq .Status "pending"}}
+                <form action="/dashboard/bookings/{{.ID}}/approve" method="POST" style="display:inline">
+                    <button type="submit" class="btn btn-sm btn-success">Approve</button>
+                </form>
+                <form action="/dashboard/bookings/{{.ID}}/reject" method="POST" style="display:inline">
+                    <input type="hidden" name="reason" value="">
+                    <button type="submit" class="btn btn-sm btn-danger">Reject</button>
+                </form>
+                {{else if eq .Status "confirmed"}}
+                {{if .ConferenceLink}}
+                <a href="{{.ConferenceLink}}" target="_blank" class="btn btn-sm">Join</a>
+                {{end}}
+                <form action="/dashboard/bookings/{{.ID}}/cancel" method="POST" style="display:inline">
+                    <input type="hidden" name="reason" value="">
+                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Cancel this booking?')">Cancel</button>
+                </form>
+                {{end}}
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{else}}
+<div class="empty-state">
+    <h3>No bookings found</h3>
+    <p>{{if .Data.Filter}}No {{.Data.Filter}} bookings.{{else}}You haven't received any bookings yet.{{end}}</p>
+</div>
+{{end}}
+{{end}}

@@ -1,0 +1,61 @@
+{{define "booking_status.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} | Meet When</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="public-page">
+    <div class="booking-status-container">
+        {{if eq .Data.Booking.Status "pending"}}
+        <div class="status-icon status-pending">&#9203;</div>
+        <h1>Booking Requested</h1>
+        <p>Your booking request has been sent to {{.Host.Name}}. You'll receive an email once it's confirmed.</p>
+        {{else if eq .Data.Booking.Status "confirmed"}}
+        <div class="status-icon status-confirmed">&#10003;</div>
+        <h1>Booking Confirmed!</h1>
+        <p>Your meeting with {{.Host.Name}} is confirmed.</p>
+        {{else if eq .Data.Booking.Status "cancelled"}}
+        <div class="status-icon status-cancelled">&#10005;</div>
+        <h1>Booking Cancelled</h1>
+        <p>This booking has been cancelled.</p>
+        {{else if eq .Data.Booking.Status "rejected"}}
+        <div class="status-icon status-rejected">&#10005;</div>
+        <h1>Booking Declined</h1>
+        <p>Unfortunately, this booking request was not approved.</p>
+        {{end}}
+
+        <div class="booking-details-card">
+            <h3>{{.Data.Template.Name}}</h3>
+            <div class="booking-detail">
+                <strong>When:</strong>
+                {{formatDateTime .Data.Booking.StartTime}}
+            </div>
+            <div class="booking-detail">
+                <strong>Duration:</strong>
+                {{.Data.Booking.Duration}} minutes
+            </div>
+            {{if and (eq .Data.Booking.Status "confirmed") .Data.Booking.ConferenceLink}}
+            <div class="booking-detail">
+                <strong>Location:</strong>
+                <a href="{{.Data.Booking.ConferenceLink}}" target="_blank">{{.Data.Booking.ConferenceLink}}</a>
+            </div>
+            {{end}}
+        </div>
+
+        {{if or (eq .Data.Booking.Status "pending") (eq .Data.Booking.Status "confirmed")}}
+        <div class="booking-actions">
+            <a href="/booking/{{.Data.Booking.Token}}/reschedule" class="btn">Reschedule</a>
+            <form action="/booking/{{.Data.Booking.Token}}/cancel" method="POST" style="display:inline">
+                <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to cancel this booking?')">Cancel Booking</button>
+            </form>
+        </div>
+        {{end}}
+
+        <a href="/{{.Tenant.Slug}}/{{.Host.Slug}}" class="book-again-link">Book another meeting</a>
+    </div>
+</body>
+</html>
+{{end}}

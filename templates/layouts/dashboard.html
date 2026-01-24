@@ -1,0 +1,43 @@
+{{define "dashboard"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} | Meet When</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body class="dashboard">
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h1>Meet When</h1>
+        </div>
+        <ul class="nav-menu">
+            <li><a href="/dashboard" class="nav-link">Dashboard</a></li>
+            <li><a href="/dashboard/templates" class="nav-link">Meeting Types</a></li>
+            <li><a href="/dashboard/bookings" class="nav-link">Bookings</a></li>
+            <li><a href="/dashboard/calendars" class="nav-link">Calendars</a></li>
+            <li><a href="/dashboard/settings" class="nav-link">Settings</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <span>{{.Host.Name}}</span>
+                <small>{{.Tenant.Name}}</small>
+            </div>
+            <form action="/auth/logout" method="POST">
+                <button type="submit" class="btn btn-sm">Logout</button>
+            </form>
+        </div>
+    </nav>
+    <main class="main-content">
+        {{if .Flash}}
+        <div class="alert alert-{{.Flash.Type}}">
+            {{.Flash.Message}}
+        </div>
+        {{end}}
+        {{template "content" .}}
+    </main>
+</body>
+</html>
+{{end}}

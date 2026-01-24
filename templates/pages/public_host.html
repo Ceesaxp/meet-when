@@ -1,0 +1,45 @@
+{{define "public_host.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} | Meet When</title>
+    <meta name="description" content="{{.Description}}">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="public-page">
+    <div class="public-container">
+        <div class="host-header">
+            <h1>{{.Host.Name}}</h1>
+            <p>Select a meeting type to schedule</p>
+        </div>
+
+        {{if .Data.Templates}}
+        <div class="template-list">
+            {{range .Data.Templates}}
+            <a href="/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}" class="template-link">
+                <div class="template-link-content">
+                    <h3>{{.Name}}</h3>
+                    {{if .Description}}
+                    <p>{{.Description}}</p>
+                    {{end}}
+                    <span class="duration-badge">{{index .Durations 0}} min</span>
+                </div>
+                <span class="arrow">&rarr;</span>
+            </a>
+            {{end}}
+        </div>
+        {{else}}
+        <div class="empty-state">
+            <p>No meeting types available.</p>
+        </div>
+        {{end}}
+
+        <footer class="public-footer">
+            <p>Powered by <a href="/">Meet When</a></p>
+        </footer>
+    </div>
+</body>
+</html>
+{{end}}

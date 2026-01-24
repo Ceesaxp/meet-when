@@ -1,0 +1,45 @@
+{{define "login.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Meet When</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="auth-page">
+    <div class="auth-container">
+        <h1>Meet When</h1>
+        <h2>Sign in to your account</h2>
+
+        {{if .Flash}}
+        <div class="alert alert-{{.Flash.Type}}">{{.Flash.Message}}</div>
+        {{end}}
+
+        <form method="POST" action="/auth/login" class="auth-form">
+            <div class="form-group">
+                <label for="tenant">Organization</label>
+                <input type="text" id="tenant" name="tenant" required
+                       value="{{if .Data}}{{.Data.tenant}}{{end}}"
+                       placeholder="your-organization">
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required
+                       value="{{if .Data}}{{.Data.email}}{{end}}"
+                       placeholder="you@example.com">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+        </form>
+
+        <p class="auth-footer">
+            Don't have an account? <a href="/auth/register">Create one</a>
+        </p>
+    </div>
+</body>
+</html>
+{{end}}

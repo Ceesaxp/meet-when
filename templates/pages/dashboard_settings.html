@@ -1,0 +1,88 @@
+{{define "dashboard_settings.html"}}
+{{template "dashboard" .}}
+{{end}}
+
+{{define "content"}}
+<div class="page-header">
+    <h1>Settings</h1>
+</div>
+
+<div class="section">
+    <h2>Profile</h2>
+    <form method="POST" action="/dashboard/settings" class="form">
+        <input type="hidden" name="_method" value="PUT">
+
+        <div class="form-group">
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" required value="{{.Host.Name}}">
+        </div>
+
+        <div class="form-group">
+            <label for="slug">URL Slug</label>
+            <input type="text" id="slug" name="slug" required pattern="[a-z0-9-]+" value="{{.Host.Slug}}">
+            <small>Your booking URL: {{$.BaseURL}}/{{.Tenant.Slug}}/<strong>{{.Host.Slug}}</strong></small>
+        </div>
+
+        <div class="form-group">
+            <label for="timezone">Timezone</label>
+            <select id="timezone" name="timezone">
+                <option value="UTC" {{if eq .Host.Timezone "UTC"}}selected{{end}}>UTC</option>
+                <option value="America/New_York" {{if eq .Host.Timezone "America/New_York"}}selected{{end}}>Eastern Time</option>
+                <option value="America/Chicago" {{if eq .Host.Timezone "America/Chicago"}}selected{{end}}>Central Time</option>
+                <option value="America/Denver" {{if eq .Host.Timezone "America/Denver"}}selected{{end}}>Mountain Time</option>
+                <option value="America/Los_Angeles" {{if eq .Host.Timezone "America/Los_Angeles"}}selected{{end}}>Pacific Time</option>
+                <option value="Europe/London" {{if eq .Host.Timezone "Europe/London"}}selected{{end}}>London</option>
+                <option value="Europe/Paris" {{if eq .Host.Timezone "Europe/Paris"}}selected{{end}}>Paris</option>
+                <option value="Europe/Berlin" {{if eq .Host.Timezone "Europe/Berlin"}}selected{{end}}>Berlin</option>
+                <option value="Asia/Tokyo" {{if eq .Host.Timezone "Asia/Tokyo"}}selected{{end}}>Tokyo</option>
+                <option value="Asia/Shanghai" {{if eq .Host.Timezone "Asia/Shanghai"}}selected{{end}}>Shanghai</option>
+                <option value="Australia/Sydney" {{if eq .Host.Timezone "Australia/Sydney"}}selected{{end}}>Sydney</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save Profile</button>
+    </form>
+</div>
+
+<div class="section">
+    <h2>Working Hours</h2>
+    <p>Set your default availability. These can be overridden per meeting type.</p>
+
+    <form method="POST" action="/dashboard/settings/working-hours" class="form">
+        <input type="hidden" name="_method" value="PUT">
+
+        <table class="working-hours-table">
+            <thead>
+                <tr>
+                    <th>Day</th>
+                    <th>Enabled</th>
+                    <th>Start</th>
+                    <th>End</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range $i, $day := .Data.DayNames}}
+                {{$hours := index $.Data.WorkingHours $i}}
+                <tr>
+                    <td>{{$day}}</td>
+                    <td>
+                        <input type="checkbox" name="day_{{$i}}_enabled"
+                               {{if $hours}}{{if (index $hours 0).IsEnabled}}checked{{end}}{{end}}>
+                    </td>
+                    <td>
+                        <input type="time" name="day_{{$i}}_start"
+                               value="{{if $hours}}{{(index $hours 0).StartTime}}{{else}}09:00{{end}}">
+                    </td>
+                    <td>
+                        <input type="time" name="day_{{$i}}_end"
+                               value="{{if $hours}}{{(index $hours 0).EndTime}}{{else}}17:00{{end}}">
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+
+        <button type="submit" class="btn btn-primary">Save Working Hours</button>
+    </form>
+</div>
+{{end}}
