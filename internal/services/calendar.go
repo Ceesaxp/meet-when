@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -262,7 +263,11 @@ func (s *CalendarService) exchangeGoogleAuthCode(code, redirectURI string) (*goo
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -278,7 +283,7 @@ func (s *CalendarService) exchangeGoogleAuthCode(code, redirectURI string) (*goo
 }
 
 func (s *CalendarService) refreshGoogleToken(cal *models.CalendarConnection) error {
-	if cal.TokenExpiry == nil || time.Now().Before(cal.TokenExpiry.Time.Add(-5*time.Minute)) {
+	if cal.TokenExpiry == nil || time.Now().Before(cal.TokenExpiry.Add(-5*time.Minute)) {
 		return nil // Token still valid
 	}
 
@@ -295,7 +300,11 @@ func (s *CalendarService) refreshGoogleToken(cal *models.CalendarConnection) err
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return ErrCalendarAuth
@@ -321,7 +330,11 @@ func (s *CalendarService) getGoogleCalendarInfo(accessToken string) (*googleCale
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, ErrCalendarAuth
@@ -361,7 +374,11 @@ func (s *CalendarService) getGoogleBusyTimes(ctx context.Context, cal *models.Ca
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, ErrCalendarAuth
@@ -446,7 +463,11 @@ func (s *CalendarService) createGoogleEvent(ctx context.Context, cal *models.Cal
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -486,7 +507,11 @@ func (s *CalendarService) deleteGoogleEvent(ctx context.Context, cal *models.Cal
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to delete event")
@@ -505,7 +530,11 @@ func (s *CalendarService) validateCalDAVConnection(url, username, password strin
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return ErrCalendarAuth
@@ -534,7 +563,11 @@ func (s *CalendarService) getCalDAVBusyTimes(ctx context.Context, cal *models.Ca
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	// Parse response - simplified, would need proper XML parsing in production
 	// For MVP, we'll return empty if the query fails
@@ -576,7 +609,11 @@ END:VCALENDAR`,
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
 		return "", fmt.Errorf("failed to create CalDAV event")
@@ -594,7 +631,11 @@ func (s *CalendarService) deleteCalDAVEvent(ctx context.Context, cal *models.Cal
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -132,7 +133,11 @@ func (s *ConferencingService) exchangeZoomAuthCode(code, redirectURI string) (*z
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -148,7 +153,7 @@ func (s *ConferencingService) exchangeZoomAuthCode(code, redirectURI string) (*z
 }
 
 func (s *ConferencingService) refreshZoomToken(conn *models.ConferencingConnection) error {
-	if conn.TokenExpiry == nil || time.Now().Before(conn.TokenExpiry.Time.Add(-5*time.Minute)) {
+	if conn.TokenExpiry == nil || time.Now().Before(conn.TokenExpiry.Add(-5*time.Minute)) {
 		return nil
 	}
 
@@ -162,7 +167,11 @@ func (s *ConferencingService) refreshZoomToken(conn *models.ConferencingConnecti
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to refresh token")
@@ -216,7 +225,11 @@ func (s *ConferencingService) createZoomMeeting(ctx context.Context, details *Bo
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusCreated {
 		respBody, _ := io.ReadAll(resp.Body)

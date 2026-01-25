@@ -1,23 +1,23 @@
 # Build stage
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
 # Install build dependencies
 RUN apk add --no-cache git
 
-# Copy go mod files
+# Copy go mod files first for better layer caching
 COPY go.mod go.sum ./
-RUN go mod download
+RUN go mod download && go mod verify
 
 # Copy source code
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server ./cmd/server
+# Build the application with optimizations
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o server ./cmd/server
 
 # Runtime stage
-FROM alpine:3.19
+FROM alpine:3.21
 
 WORKDIR /app
 
@@ -33,7 +33,8 @@ COPY --from=builder /app/static ./static
 COPY --from=builder /app/migrations ./migrations
 
 # Create non-root user
-RUN adduser -D -g '' appuser
+RUN adduser -D -g '' appuser && \
+    chown -R appuser:appuser /app
 USER appuser
 
 # Expose port

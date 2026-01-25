@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"regexp"
 	"time"
 
@@ -45,15 +46,6 @@ func q(driver, query string) string {
 		return re.ReplaceAllString(query, "?")
 	}
 	return query
-}
-
-// nowFunc returns the appropriate NOW() function for the database
-func nowFunc(driver string) string {
-	if driver == "sqlite" {
-		// Use strftime to get RFC3339 format for consistent timestamp comparisons
-		return "strftime('%Y-%m-%dT%H:%M:%SZ', 'now')"
-	}
-	return "NOW()"
 }
 
 // TenantRepository handles tenant database operations
@@ -231,7 +223,11 @@ func (r *CalendarRepository) GetByHostID(ctx context.Context, hostID string) ([]
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error closing rows: %v", err)
+		}
+	}()
 
 	var calendars []*models.CalendarConnection
 	for rows.Next() {
@@ -274,7 +270,11 @@ func (r *CalendarRepository) SetDefault(ctx context.Context, hostID, calendarID 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			log.Printf("Error rolling back transaction: %v", err)
+		}
+	}()
 
 	_, err = tx.ExecContext(ctx, q(r.driver, `UPDATE calendar_connections SET is_default = FALSE WHERE host_id = $1`), hostID)
 	if err != nil {
@@ -317,7 +317,11 @@ func (r *ConferencingRepository) GetByHostID(ctx context.Context, hostID string)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error closing rows: %v", err)
+		}
+	}()
 
 	var connections []*models.ConferencingConnection
 	for rows.Next() {
@@ -451,7 +455,11 @@ func (r *TemplateRepository) GetByHostID(ctx context.Context, hostID string) ([]
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error closing rows: %v", err)
+		}
+	}()
 
 	var templates []*models.MeetingTemplate
 	for rows.Next() {
@@ -596,7 +604,11 @@ func (r *BookingRepository) GetByHostID(ctx context.Context, hostID string, stat
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error closing rows: %v", err)
+		}
+	}()
 
 	var bookings []*models.Booking
 	for rows.Next() {
@@ -633,7 +645,11 @@ func (r *BookingRepository) GetByHostIDAndTimeRange(ctx context.Context, hostID 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error closing rows: %v", err)
+		}
+	}()
 
 	var bookings []*models.Booking
 	for rows.Next() {
@@ -734,7 +750,11 @@ func (r *WorkingHoursRepository) GetByHostID(ctx context.Context, hostID string)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error closing rows: %v", err)
+		}
+	}()
 
 	var hours []*models.WorkingHours
 	for rows.Next() {
@@ -755,7 +775,11 @@ func (r *WorkingHoursRepository) SetForHost(ctx context.Context, hostID string, 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			log.Printf("Error rolling back transaction: %v", err)
+		}
+	}()
 
 	_, err = tx.ExecContext(ctx, q(r.driver, `DELETE FROM working_hours WHERE host_id = $1`), hostID)
 	if err != nil {
@@ -805,7 +829,11 @@ func (r *AuditLogRepository) GetByTenantID(ctx context.Context, tenantID string,
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error closing rows: %v", err)
+		}
+	}()
 
 	var logs []*models.AuditLog
 	for rows.Next() {

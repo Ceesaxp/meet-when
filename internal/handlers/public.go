@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"time"
@@ -398,9 +397,3 @@ func splitEmails(s string) []string {
 	}
 	return result
 }
-
-// Ensure imports are available
-type contextKey string
-
-// Import models in handlers
-var _ = json.Marshal

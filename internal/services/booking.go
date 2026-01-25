@@ -153,8 +153,7 @@ func (s *BookingService) CreateBooking(ctx context.Context, input CreateBookingI
 	// If auto-approved, create calendar event and send confirmation
 	if status == models.BookingStatusConfirmed {
 		if err := s.processConfirmedBooking(ctx, details); err != nil {
-			// Log but don't fail the booking
-			// In production, you might want to queue this for retry
+			log.Printf("[BOOKING] Warning: processConfirmedBooking failed (booking still created): %v", err)
 		}
 	} else {
 		// Send pending notification to host
@@ -201,7 +200,7 @@ func (s *BookingService) ApproveBooking(ctx context.Context, hostID, tenantID, b
 
 	// Process confirmed booking (create calendar event, send emails)
 	if err := s.processConfirmedBooking(ctx, details); err != nil {
-		// Log but don't fail
+		log.Printf("[BOOKING] Warning: processConfirmedBooking failed after approval: %v", err)
 	}
 
 	// Audit log

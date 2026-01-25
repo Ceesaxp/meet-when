@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -32,9 +33,15 @@ func New(cfg config.DatabaseConfig) (*sql.DB, error) {
 			return nil, fmt.Errorf("failed to enable foreign keys: %w", err)
 		}
 		// SQLite optimizations for development
-		db.Exec("PRAGMA journal_mode = WAL")
-		db.Exec("PRAGMA synchronous = NORMAL")
-		db.Exec("PRAGMA busy_timeout = 5000")
+		if _, err := db.Exec("PRAGMA journal_mode = WAL"); err != nil {
+			log.Printf("Warning: failed to set WAL journal mode: %v", err)
+		}
+		if _, err := db.Exec("PRAGMA synchronous = NORMAL"); err != nil {
+			log.Printf("Warning: failed to set synchronous mode: %v", err)
+		}
+		if _, err := db.Exec("PRAGMA busy_timeout = 5000"); err != nil {
+			log.Printf("Warning: failed to set busy timeout: %v", err)
+		}
 	case "postgres":
 		db, err = sql.Open("postgres", cfg.ConnectionString())
 		if err != nil {
@@ -92,7 +99,11 @@ func Migrate(db *sql.DB, cfg config.DatabaseConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to query migrations: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error closing rows: %v", err)
+		}
+	}()
 
 	applied := make(map[string]bool)
 	for rows.Next() {
@@ -143,13 +154,17 @@ func Migrate(db *sql.DB, cfg config.DatabaseConfig) error {
 					continue
 				}
 				if _, err := tx.Exec(stmt); err != nil {
-					tx.Rollback()
+					if rbErr := tx.Rollback(); rbErr != nil {
+						log.Printf("Error rolling back transaction: %v", rbErr)
+					}
 					return fmt.Errorf("failed to apply migration %s: %w\nStatement: %s", migration, err, stmt)
 				}
 			}
 		} else {
 			if _, err := tx.Exec(string(content)); err != nil {
-				tx.Rollback()
+				if rbErr := tx.Rollback(); rbErr != nil {
+					log.Printf("Error rolling back transaction: %v", rbErr)
+				}
 				return fmt.Errorf("failed to apply migration %s: %w", migration, err)
 			}
 		}
@@ -163,7 +178,9 @@ func Migrate(db *sql.DB, cfg config.DatabaseConfig) error {
 		}
 
 		if _, err := tx.Exec(insertSQL, version); err != nil {
-			tx.Rollback()
+			if rbErr := tx.Rollback(); rbErr != nil {
+				log.Printf("Error rolling back transaction: %v", rbErr)
+			}
 			return fmt.Errorf("failed to record migration %s: %w", migration, err)
 		}
 

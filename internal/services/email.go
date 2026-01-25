@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"log"
 	"net/smtp"
 	"strings"
 	"time"
@@ -53,7 +54,11 @@ Meet When`,
 		s.cfg.Server.BaseURL,
 	)
 
-	go s.sendEmail(details.Host.Email, subject, body, "")
+	go func() {
+		if err := s.sendEmail(details.Host.Email, subject, body, ""); err != nil {
+			log.Printf("Error sending email to host %s: %v", details.Host.Email, err)
+		}
+	}()
 }
 
 // SendBookingConfirmed sends confirmation to both host and invitee
@@ -113,7 +118,11 @@ Meet When`,
 	// Generate ICS attachment
 	ics := s.generateICS(details)
 
-	go s.sendEmail(details.Booking.InviteeEmail, subject, body, ics)
+	go func() {
+		if err := s.sendEmail(details.Booking.InviteeEmail, subject, body, ics); err != nil {
+			log.Printf("Error sending email to invitee %s: %v", details.Booking.InviteeEmail, err)
+		}
+	}()
 }
 
 func (s *EmailService) sendHostConfirmation(ctx context.Context, details *BookingWithDetails) {
@@ -153,7 +162,11 @@ Meet When`,
 		s.cfg.Server.BaseURL,
 	)
 
-	go s.sendEmail(details.Host.Email, subject, body, "")
+	go func() {
+		if err := s.sendEmail(details.Host.Email, subject, body, ""); err != nil {
+			log.Printf("Error sending email to host %s: %v", details.Host.Email, err)
+		}
+	}()
 }
 
 // SendBookingCancelled sends cancellation notice
@@ -192,7 +205,11 @@ Meet When`,
 		formatCancelReason(details.Booking.CancelReason),
 	)
 
-	go s.sendEmail(details.Host.Email, subject, body, "")
+	go func() {
+		if err := s.sendEmail(details.Host.Email, subject, body, ""); err != nil {
+			log.Printf("Error sending email to host %s: %v", details.Host.Email, err)
+		}
+	}()
 }
 
 func (s *EmailService) sendCancellationToInvitee(ctx context.Context, details *BookingWithDetails) {
@@ -229,7 +246,11 @@ Meet When`,
 		details.Host.Slug,
 	)
 
-	go s.sendEmail(details.Booking.InviteeEmail, subject, body, "")
+	go func() {
+		if err := s.sendEmail(details.Booking.InviteeEmail, subject, body, ""); err != nil {
+			log.Printf("Error sending email to invitee %s: %v", details.Booking.InviteeEmail, err)
+		}
+	}()
 }
 
 // SendBookingRejected sends rejection notice to invitee
@@ -267,7 +288,11 @@ Meet When`,
 		details.Host.Slug,
 	)
 
-	go s.sendEmail(details.Booking.InviteeEmail, subject, body, "")
+	go func() {
+		if err := s.sendEmail(details.Booking.InviteeEmail, subject, body, ""); err != nil {
+			log.Printf("Error sending email to invitee %s: %v", details.Booking.InviteeEmail, err)
+		}
+	}()
 }
 
 // generateICS creates an ICS calendar attachment
