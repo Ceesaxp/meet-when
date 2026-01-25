@@ -48,3 +48,8 @@ caddy_config/
 # Temporary files
 tmp/
 temp/
+
+# Other
+client_secr*
+*.db*
+*creds*
