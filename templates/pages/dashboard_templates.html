@@ -24,7 +24,7 @@
             <span>{{.LocationType}}</span>
         </div>
         <div class="template-actions">
-            <a href="/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}" target="_blank" class="btn btn-sm">Preview</a>
+            <a href="/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}" target="_blank" class="btn btn-sm">Preview</a>
             <a href="/dashboard/templates/{{.ID}}" class="btn btn-sm">Edit</a>
             <form action="/dashboard/templates/{{.ID}}" method="POST" style="display:inline">
                 <input type="hidden" name="_method" value="DELETE">
