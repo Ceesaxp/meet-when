@@ -1,0 +1,58 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    environment: production
+    steps:
+      - name: Deploy via SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+        run: |
+          # Set up SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          # Use the correct SHA from the workflow run that triggered this
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.workflow_run.head_sha }}"
+
+          # Deploy
+          ssh -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" bash -s << DEPLOY_SCRIPT
+            set -e
+
+            # Login to GHCR
+            echo "${GHCR_PAT}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull new image
+            docker pull ${IMAGE}
+
+            # Update and restart
+            cd ~/app
+            docker compose down
+            docker compose up -d --remove-orphans
+
+            # Cleanup
+            docker system prune -f
+            docker logout ghcr.io
+
+            echo "Deployed ${IMAGE} successfully"
+          DEPLOY_SCRIPT
+
+          # Cleanup SSH key
+          rm -f ~/.ssh/deploy_key
