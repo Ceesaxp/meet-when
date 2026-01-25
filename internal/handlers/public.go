@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -191,6 +192,8 @@ func (h *PublicHandler) GetSlots(w http.ResponseWriter, r *http.Request) {
 
 // CreateBooking handles booking form submission
 func (h *PublicHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[BOOKING] CreateBooking called: method=%s path=%s", r.Method, r.URL.Path)
+
 	tenantSlug := r.PathValue("tenant")
 	hostSlug := r.PathValue("host")
 	templateSlug := r.PathValue("template")
@@ -271,8 +274,11 @@ func (h *PublicHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		Answers:          answers,
 	}
 
+	log.Printf("[BOOKING] Creating booking: template=%s invitee=%s time=%s", input.TemplateID, input.InviteeEmail, input.StartTime)
+
 	booking, err := h.handlers.services.Booking.CreateBooking(r.Context(), input)
 	if err != nil {
+		log.Printf("[BOOKING] Error creating booking: %v", err)
 		message := "Failed to create booking"
 		switch err {
 		case services.ErrSlotNotAvailable:
@@ -292,19 +298,27 @@ func (h *PublicHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("[BOOKING] Booking created successfully: id=%s token=%s", booking.Booking.ID, booking.Booking.Token)
+
 	// Redirect to confirmation page
-	h.handlers.redirect(w, r, "/booking/"+booking.Booking.Token)
+	redirectURL := "/booking/" + booking.Booking.Token
+	log.Printf("[BOOKING] Redirecting to: %s", redirectURL)
+	h.handlers.redirect(w, r, redirectURL)
 }
 
 // BookingStatus shows the booking confirmation/status page
 func (h *PublicHandler) BookingStatus(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[BOOKING-STATUS] Handler called: path=%s", r.URL.Path)
 	token := r.PathValue("token")
+	log.Printf("[BOOKING-STATUS] Token from path: %s", token)
 
 	details, err := h.handlers.services.Booking.GetBookingByToken(r.Context(), token)
 	if err != nil {
+		log.Printf("[BOOKING-STATUS] Error getting booking: %v", err)
 		h.handlers.error(w, r, http.StatusNotFound, "Booking not found")
 		return
 	}
+	log.Printf("[BOOKING-STATUS] Booking found: id=%s status=%s", details.Booking.ID, details.Booking.Status)
 
 	h.handlers.render(w, "booking_status.html", PageData{
 		Title:   "Booking " + string(details.Booking.Status),

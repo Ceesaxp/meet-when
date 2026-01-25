@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -342,23 +343,37 @@ func (s *BookingService) GetPendingBookings(ctx context.Context, hostID string) 
 
 // processConfirmedBooking handles post-confirmation actions
 func (s *BookingService) processConfirmedBooking(ctx context.Context, details *BookingWithDetails) error {
+	log.Printf("[BOOKING] processConfirmedBooking: booking=%s template=%s calendar=%s",
+		details.Booking.ID, details.Template.ID, details.Template.CalendarID)
+
 	// Create conference link if needed
 	if details.Template.LocationType == models.ConferencingProviderGoogleMeet ||
 		details.Template.LocationType == models.ConferencingProviderZoom {
+		log.Printf("[BOOKING] Creating conference link for location type: %s", details.Template.LocationType)
 		link, err := s.conferencing.CreateMeeting(ctx, details)
-		if err == nil && link != "" {
+		if err != nil {
+			log.Printf("[BOOKING] Error creating conference link: %v", err)
+		} else if link != "" {
+			log.Printf("[BOOKING] Conference link created: %s", link)
 			details.Booking.ConferenceLink = link
 		}
 	}
 
 	// Create calendar event
+	log.Printf("[BOOKING] Creating calendar event...")
 	eventID, err := s.calendar.CreateEvent(ctx, details)
-	if err == nil && eventID != "" {
+	if err != nil {
+		log.Printf("[BOOKING] Error creating calendar event: %v", err)
+	} else if eventID != "" {
+		log.Printf("[BOOKING] Calendar event created: %s", eventID)
 		details.Booking.CalendarEventID = eventID
+	} else {
+		log.Printf("[BOOKING] No calendar event created (no calendar configured or empty response)")
 	}
 
 	// Update booking with conference link and event ID
 	if err := s.repos.Booking.Update(ctx, details.Booking); err != nil {
+		log.Printf("[BOOKING] Error updating booking: %v", err)
 		return err
 	}
 

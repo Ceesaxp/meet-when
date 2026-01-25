@@ -53,8 +53,14 @@ func (h *DashboardHandler) Calendars(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	calendars, _ := h.handlers.services.Calendar.GetCalendars(r.Context(), host.Host.ID)
-	conferencing, _ := h.handlers.services.Conferencing.GetConnections(r.Context(), host.Host.ID)
+	calendars, err := h.handlers.services.Calendar.GetCalendars(r.Context(), host.Host.ID)
+	if err != nil {
+		log.Printf("Error fetching calendars: %v", err)
+	}
+	conferencing, err := h.handlers.services.Conferencing.GetConnections(r.Context(), host.Host.ID)
+	if err != nil {
+		log.Printf("Error fetching conferences: %v", err)
+	}
 
 	// Build OAuth URLs
 	googleAuthURL := h.handlers.services.Calendar.GetGoogleAuthURL(host.Host.ID)

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"html/template"
+	"log"
 	"net/http"
 	"path/filepath"
 
@@ -13,7 +14,7 @@ import (
 type Handlers struct {
 	cfg       *config.Config
 	services  *services.Services
-	templates *template.Template
+	templates map[string]*template.Template
 
 	Auth      *AuthHandler
 	Public    *PublicHandler
@@ -22,13 +23,13 @@ type Handlers struct {
 
 // New creates all handlers
 func New(cfg *config.Config, svc *services.Services) *Handlers {
-	// Load templates
-	tmpl := template.Must(template.New("").Funcs(templateFuncs()).ParseGlob(filepath.Join("templates", "**", "*.html")))
+	// Load templates - each page gets its own template instance with layouts
+	templates := loadTemplates()
 
 	h := &Handlers{
 		cfg:       cfg,
 		services:  svc,
-		templates: tmpl,
+		templates: templates,
 	}
 
 	h.Auth = &AuthHandler{handlers: h}
@@ -38,10 +39,67 @@ func New(cfg *config.Config, svc *services.Services) *Handlers {
 	return h
 }
 
+// loadTemplates loads all templates, giving each page its own template set
+func loadTemplates() map[string]*template.Template {
+	templates := make(map[string]*template.Template)
+	funcs := templateFuncs()
+
+	// Find all layout files
+	layoutFiles, _ := filepath.Glob("templates/layouts/*.html")
+
+	// Find all page files
+	pageFiles, _ := filepath.Glob("templates/pages/*.html")
+
+	// Find all partial files
+	partialFiles, _ := filepath.Glob("templates/partials/*.html")
+
+	// Combine layouts and partials as base files
+	baseFiles := append(layoutFiles, partialFiles...)
+
+	// For each page, create a template that includes layouts + partials + that page
+	for _, page := range pageFiles {
+		pageName := filepath.Base(page)
+
+		// Create a new template for this page
+		files := append([]string{page}, baseFiles...)
+		tmpl, err := template.New(pageName).Funcs(funcs).ParseFiles(files...)
+		if err != nil {
+			log.Printf("Error parsing template %s: %v", pageName, err)
+			continue
+		}
+
+		templates[pageName] = tmpl
+	}
+
+	// Also load partials as standalone templates for HTMX responses
+	for _, partial := range partialFiles {
+		partialName := filepath.Base(partial)
+
+		tmpl, err := template.New(partialName).Funcs(funcs).ParseFiles(partial)
+		if err != nil {
+			log.Printf("Error parsing partial %s: %v", partialName, err)
+			continue
+		}
+
+		templates[partialName] = tmpl
+	}
+
+	return templates
+}
+
 // render renders a template with the given data
 func (h *Handlers) render(w http.ResponseWriter, name string, data interface{}) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := h.templates.ExecuteTemplate(w, name, data); err != nil {
+
+	tmpl, ok := h.templates[name]
+	if !ok {
+		log.Printf("Template not found: %s", name)
+		http.Error(w, "Template not found", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tmpl.ExecuteTemplate(w, name, data); err != nil {
+		log.Printf("Error executing template %s: %v", name, err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
@@ -49,7 +107,16 @@ func (h *Handlers) render(w http.ResponseWriter, name string, data interface{}) 
 // renderPartial renders a partial template (for HTMX)
 func (h *Handlers) renderPartial(w http.ResponseWriter, name string, data interface{}) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := h.templates.ExecuteTemplate(w, name, data); err != nil {
+
+	tmpl, ok := h.templates[name]
+	if !ok {
+		log.Printf("Partial template not found: %s", name)
+		http.Error(w, "Template not found", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tmpl.ExecuteTemplate(w, name, data); err != nil {
+		log.Printf("Error executing partial %s: %v", name, err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }

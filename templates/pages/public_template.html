@@ -12,7 +12,7 @@
 <body class="public-page booking-page">
     <div class="booking-container">
         <div class="booking-sidebar">
-            <a href="/{{.Tenant.Slug}}/{{.Host.Slug}}" class="back-link">&larr; Back</a>
+            <a href="/m/{{.Tenant.Slug}}/{{.Host.Slug}}" class="back-link">&larr; Back</a>
             <h1>{{.Host.Name}}</h1>
             <h2>{{.Data.Template.Name}}</h2>
             {{if .Data.Template.Description}}
@@ -56,7 +56,7 @@
                 </select></p>
 
                 <div id="slots-container"
-                     hx-get="/{{.Tenant.Slug}}/{{.Host.Slug}}/{{.Data.Template.Slug}}/slots"
+                     hx-get="/m/{{.Tenant.Slug}}/{{.Host.Slug}}/{{.Data.Template.Slug}}/slots"
                      hx-trigger="load"
                      hx-vals='{"timezone": "UTC", "duration": "{{index .Data.Template.Durations 0}}"}'
                      hx-swap="innerHTML">
@@ -66,7 +66,7 @@
 
             <div id="booking-step-2" class="booking-step" style="display:none">
                 <h3>Enter Your Details</h3>
-                <form method="POST" action="/{{.Tenant.Slug}}/{{.Host.Slug}}/{{.Data.Template.Slug}}/book" class="booking-form">
+                <form method="POST" action="/m/{{.Tenant.Slug}}/{{.Host.Slug}}/{{.Data.Template.Slug}}/book" class="booking-form">
                     <input type="hidden" name="start_time" id="selected_start_time">
                     <input type="hidden" name="timezone" id="form_timezone">
 
@@ -120,7 +120,7 @@
         function loadSlots() {
             var tz = document.getElementById('timezone').value;
             var container = document.getElementById('slots-container');
-            htmx.ajax('GET', '/{{.Tenant.Slug}}/{{.Host.Slug}}/{{.Data.Template.Slug}}/slots?timezone=' + tz + '&duration={{index .Data.Template.Durations 0}}', {target: '#slots-container'});
+            htmx.ajax('GET', '/m/{{.Tenant.Slug}}/{{.Host.Slug}}/{{.Data.Template.Slug}}/slots?timezone=' + tz + '&duration={{index .Data.Template.Durations 0}}', {target: '#slots-container'});
         }
 
         function selectSlot(startTime, displayTime) {

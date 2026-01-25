@@ -25,6 +25,8 @@ func New(cfg config.DatabaseConfig) (*sql.DB, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to open sqlite database: %w", err)
 		}
+		// SQLite: use single connection to avoid WAL visibility issues
+		db.SetMaxOpenConns(1)
 		// Enable foreign keys for SQLite
 		if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
 			return nil, fmt.Errorf("failed to enable foreign keys: %w", err)
@@ -32,6 +34,7 @@ func New(cfg config.DatabaseConfig) (*sql.DB, error) {
 		// SQLite optimizations for development
 		db.Exec("PRAGMA journal_mode = WAL")
 		db.Exec("PRAGMA synchronous = NORMAL")
+		db.Exec("PRAGMA busy_timeout = 5000")
 	case "postgres":
 		db, err = sql.Open("postgres", cfg.ConnectionString())
 		if err != nil {

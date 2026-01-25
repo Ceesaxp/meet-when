@@ -20,7 +20,7 @@
         <div class="form-group">
             <label for="slug">URL Slug</label>
             <input type="text" id="slug" name="slug" required pattern="[a-z0-9-]+" value="{{.Host.Slug}}">
-            <small>Your booking URL: {{$.BaseURL}}/{{.Tenant.Slug}}/<strong>{{.Host.Slug}}</strong></small>
+            <small>Your booking URL: {{$.BaseURL}}/m/{{.Tenant.Slug}}/<strong>{{.Host.Slug}}</strong></small>
         </div>
 
         <div class="form-group">

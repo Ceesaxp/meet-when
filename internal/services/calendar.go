@@ -396,12 +396,15 @@ func (s *CalendarService) createGoogleEvent(ctx context.Context, cal *models.Cal
 		return "", err
 	}
 
-	// Build attendees list
+	// Build attendees list, filtering out invalid emails
 	attendees := []map[string]string{
 		{"email": details.Booking.InviteeEmail},
 	}
 	for _, guest := range details.Booking.AdditionalGuests {
-		attendees = append(attendees, map[string]string{"email": guest})
+		// Basic email validation - must contain @ and have content on both sides
+		if strings.Contains(guest, "@") && len(strings.Split(guest, "@")[0]) > 0 && len(strings.Split(guest, "@")[1]) > 1 {
+			attendees = append(attendees, map[string]string{"email": guest})
+		}
 	}
 
 	event := map[string]interface{}{

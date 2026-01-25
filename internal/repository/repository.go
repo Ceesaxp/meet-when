@@ -524,9 +524,9 @@ func (r *BookingRepository) GetByID(ctx context.Context, id string) (*models.Boo
 	booking := &models.Booking{}
 	query := q(r.driver, `
 		SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
-		       invitee_name, invitee_email, invitee_timezone, invitee_phone,
-		       additional_guests, answers, conference_link, calendar_event_id,
-		       cancelled_by, cancel_reason, created_at, updated_at
+		       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
+		       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
+		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), created_at, updated_at
 		FROM bookings WHERE id = $1
 	`)
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
@@ -547,9 +547,9 @@ func (r *BookingRepository) GetByToken(ctx context.Context, token string) (*mode
 	booking := &models.Booking{}
 	query := q(r.driver, `
 		SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
-		       invitee_name, invitee_email, invitee_timezone, invitee_phone,
-		       additional_guests, answers, conference_link, calendar_event_id,
-		       cancelled_by, cancel_reason, created_at, updated_at
+		       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
+		       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
+		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), created_at, updated_at
 		FROM bookings WHERE token = $1
 	`)
 	err := r.db.QueryRowContext(ctx, query, token).Scan(
@@ -573,9 +573,9 @@ func (r *BookingRepository) GetByHostID(ctx context.Context, hostID string, stat
 	if status != nil {
 		query = q(r.driver, `
 			SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
-			       invitee_name, invitee_email, invitee_timezone, invitee_phone,
-			       additional_guests, answers, conference_link, calendar_event_id,
-			       cancelled_by, cancel_reason, created_at, updated_at
+			       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
+			       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
+			       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), created_at, updated_at
 			FROM bookings WHERE host_id = $1 AND status = $2
 			ORDER BY start_time ASC
 		`)
@@ -583,9 +583,9 @@ func (r *BookingRepository) GetByHostID(ctx context.Context, hostID string, stat
 	} else {
 		query = q(r.driver, `
 			SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
-			       invitee_name, invitee_email, invitee_timezone, invitee_phone,
-			       additional_guests, answers, conference_link, calendar_event_id,
-			       cancelled_by, cancel_reason, created_at, updated_at
+			       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
+			       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
+			       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), created_at, updated_at
 			FROM bookings WHERE host_id = $1
 			ORDER BY start_time ASC
 		`)
