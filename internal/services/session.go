@@ -41,8 +41,8 @@ func (s *SessionService) CreateSession(ctx context.Context, hostID string) (stri
 		ID:        uuid.New().String(),
 		HostID:    hostID,
 		Token:     token,
-		ExpiresAt: time.Now().Add(s.cfg.App.SessionDuration),
-		CreatedAt: time.Now(),
+		ExpiresAt: models.NewSQLiteTime(time.Now().Add(s.cfg.App.SessionDuration)),
+		CreatedAt: models.Now(),
 	}
 
 	if err := s.repos.Session.Create(ctx, session); err != nil {

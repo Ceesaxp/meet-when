@@ -114,15 +114,15 @@ func (s *BookingService) CreateBooking(ctx context.Context, input CreateBookingI
 		status = models.BookingStatusConfirmed
 	}
 
-	now := time.Now()
+	now := models.Now()
 	booking := &models.Booking{
 		ID:               uuid.New().String(),
 		TemplateID:       input.TemplateID,
 		HostID:           input.HostID,
 		Token:            token,
 		Status:           status,
-		StartTime:        input.StartTime.UTC(),
-		EndTime:          endTime.UTC(),
+		StartTime:        models.NewSQLiteTime(input.StartTime.UTC()),
+		EndTime:          models.NewSQLiteTime(endTime.UTC()),
 		Duration:         input.Duration,
 		InviteeName:      input.InviteeName,
 		InviteeEmail:     input.InviteeEmail,

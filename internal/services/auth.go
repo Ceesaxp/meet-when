@@ -7,7 +7,6 @@ import (
 	"errors"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/meet-when/meet-when/internal/config"
@@ -87,7 +86,7 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*Regis
 	}
 
 	// Create tenant
-	now := time.Now()
+	now := models.Now()
 	tenant := &models.Tenant{
 		ID:        uuid.New().String(),
 		Slug:      slug,
@@ -230,7 +229,7 @@ func generateToken(length int) (string, error) {
 }
 
 func createDefaultWorkingHours(hostID string) []*models.WorkingHours {
-	now := time.Now()
+	now := models.Now()
 	var hours []*models.WorkingHours
 
 	// Monday (1) through Friday (5)

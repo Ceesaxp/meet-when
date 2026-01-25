@@ -52,8 +52,8 @@ func (s *ConferencingService) ConnectZoom(ctx context.Context, hostID, authCode,
 		return nil, fmt.Errorf("failed to exchange auth code: %w", err)
 	}
 
-	now := time.Now()
-	expiry := now.Add(time.Duration(tokens.ExpiresIn) * time.Second)
+	now := models.Now()
+	expiry := models.NewSQLiteTime(time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second))
 
 	// Check if connection already exists
 	existing, _ := s.repos.Conferencing.GetByHostAndProvider(ctx, hostID, models.ConferencingProviderZoom)
@@ -148,7 +148,7 @@ func (s *ConferencingService) exchangeZoomAuthCode(code, redirectURI string) (*z
 }
 
 func (s *ConferencingService) refreshZoomToken(conn *models.ConferencingConnection) error {
-	if conn.TokenExpiry == nil || time.Now().Before(conn.TokenExpiry.Add(-5*time.Minute)) {
+	if conn.TokenExpiry == nil || time.Now().Before(conn.TokenExpiry.Time.Add(-5*time.Minute)) {
 		return nil
 	}
 
@@ -177,7 +177,7 @@ func (s *ConferencingService) refreshZoomToken(conn *models.ConferencingConnecti
 	if tokens.RefreshToken != "" {
 		conn.RefreshToken = tokens.RefreshToken
 	}
-	expiry := time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second)
+	expiry := models.NewSQLiteTime(time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second))
 	conn.TokenExpiry = &expiry
 
 	return s.repos.Conferencing.Update(context.Background(), conn)

@@ -11,9 +11,9 @@ BINARY_NAME=server
 build:
 	$(GOBUILD) -o $(BINARY_NAME) ./cmd/server
 
-# Run the application
+# Run the application (loads .env file)
 run: build
-	./$(BINARY_NAME)
+	@export $$(grep -v '^#' .env | xargs) && ./$(BINARY_NAME)
 
 # Run tests
 test:
@@ -28,8 +28,12 @@ clean:
 docker-build:
 	docker build -t meetwhen .
 
-# Start development environment
-dev:
+# Start development environment (local with SQLite)
+dev: build
+	@export $$(grep -v '^#' .env | xargs) && ./$(BINARY_NAME)
+
+# Start development environment with Docker (Postgres + Mailhog)
+dev-docker:
 	docker-compose --profile dev up -d
 
 # Start production environment

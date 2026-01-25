@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/meet-when/meet-when/internal/models"
@@ -71,7 +70,7 @@ func (s *TemplateService) CreateTemplate(ctx context.Context, input CreateTempla
 		input.MaxScheduleDays = 14 // 2 weeks default
 	}
 
-	now := time.Now()
+	now := models.Now()
 	template := &models.MeetingTemplate{
 		ID:                uuid.New().String(),
 		HostID:            input.HostID,

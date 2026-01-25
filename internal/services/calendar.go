@@ -56,8 +56,8 @@ func (s *CalendarService) ConnectGoogleCalendar(ctx context.Context, input Googl
 		return nil, fmt.Errorf("failed to get calendar info: %w", err)
 	}
 
-	now := time.Now()
-	expiry := now.Add(time.Duration(tokens.ExpiresIn) * time.Second)
+	now := models.Now()
+	expiry := models.NewSQLiteTime(time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second))
 
 	calendar := &models.CalendarConnection{
 		ID:           uuid.New().String(),
@@ -102,7 +102,7 @@ func (s *CalendarService) ConnectCalDAV(ctx context.Context, input CalDAVConnect
 		return nil, fmt.Errorf("failed to validate CalDAV connection: %w", err)
 	}
 
-	now := time.Now()
+	now := models.Now()
 	calendar := &models.CalendarConnection{
 		ID:             uuid.New().String(),
 		HostID:         input.HostID,
@@ -278,7 +278,7 @@ func (s *CalendarService) exchangeGoogleAuthCode(code, redirectURI string) (*goo
 }
 
 func (s *CalendarService) refreshGoogleToken(cal *models.CalendarConnection) error {
-	if cal.TokenExpiry == nil || time.Now().Before(cal.TokenExpiry.Add(-5*time.Minute)) {
+	if cal.TokenExpiry == nil || time.Now().Before(cal.TokenExpiry.Time.Add(-5*time.Minute)) {
 		return nil // Token still valid
 	}
 
@@ -307,7 +307,7 @@ func (s *CalendarService) refreshGoogleToken(cal *models.CalendarConnection) err
 	}
 
 	cal.AccessToken = tokens.AccessToken
-	expiry := time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second)
+	expiry := models.NewSQLiteTime(time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second))
 	cal.TokenExpiry = &expiry
 
 	return s.repos.Calendar.Update(context.Background(), cal)

@@ -1,9 +1,9 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/meet-when/meet-when/internal/middleware"
@@ -82,6 +82,7 @@ func (h *DashboardHandler) ConnectGoogle(w http.ResponseWriter, r *http.Request)
 	}
 
 	authURL := h.handlers.services.Calendar.GetGoogleAuthURL(host.Host.ID)
+	log.Printf("Redirecting to Google auth URL: %s", authURL)
 	http.Redirect(w, r, authURL, http.StatusSeeOther)
 }
 
@@ -372,9 +373,9 @@ func (h *DashboardHandler) Bookings(w http.ResponseWriter, r *http.Request) {
 		Host:   host.Host,
 		Tenant: host.Tenant,
 		Data: map[string]interface{}{
-			"Bookings":    bookings,
-			"Templates":   templateMap,
-			"Filter":      filter,
+			"Bookings":  bookings,
+			"Templates": templateMap,
+			"Filter":    filter,
 		},
 	})
 }
@@ -522,7 +523,7 @@ func (h *DashboardHandler) UpdateWorkingHours(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	now := time.Now()
+	now := models.Now()
 	var hours []*models.WorkingHours
 
 	// Parse form for each day

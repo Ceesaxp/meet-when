@@ -24,6 +24,7 @@ type ServerConfig struct {
 
 // DatabaseConfig holds database configuration
 type DatabaseConfig struct {
+	Driver         string // "postgres" or "sqlite"
 	Host           string
 	Port           int
 	User           string
@@ -79,8 +80,11 @@ type AppConfig struct {
 	EncryptionKey       string
 }
 
-// ConnectionString returns the PostgreSQL connection string
+// ConnectionString returns the database connection string
 func (d DatabaseConfig) ConnectionString() string {
+	if d.Driver == "sqlite" {
+		return d.Name // For SQLite, Name is the file path
+	}
 	return fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		d.Host, d.Port, d.User, d.Password, d.Name, d.SSLMode,
@@ -95,11 +99,12 @@ func Load() (*Config, error) {
 			BaseURL: getEnv("BASE_URL", "http://localhost:8080"),
 		},
 		Database: DatabaseConfig{
+			Driver:         getEnv("DB_DRIVER", "sqlite"),
 			Host:           getEnv("DB_HOST", "localhost"),
 			Port:           getEnvInt("DB_PORT", 5432),
 			User:           getEnv("DB_USER", "meetwhen"),
 			Password:       getEnv("DB_PASSWORD", "meetwhen"),
-			Name:           getEnv("DB_NAME", "meetwhen"),
+			Name:           getEnv("DB_NAME", "meetwhen.db"),
 			SSLMode:        getEnv("DB_SSLMODE", "disable"),
 			MigrationsPath: getEnv("MIGRATIONS_PATH", "migrations"),
 		},

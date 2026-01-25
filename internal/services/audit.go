@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/meet-when/meet-when/internal/models"
@@ -30,7 +29,7 @@ func (s *AuditLogService) Log(ctx context.Context, tenantID string, hostID *stri
 		EntityID:   entityID,
 		Details:    details,
 		IPAddress:  ipAddress,
-		CreatedAt:  time.Now(),
+		CreatedAt:  models.Now(),
 	}
 
 	// Fire and forget - don't block on audit log failures

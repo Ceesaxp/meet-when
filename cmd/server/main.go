@@ -32,12 +32,12 @@ func main() {
 	defer db.Close()
 
 	// Run migrations
-	if err := database.Migrate(db, cfg.Database.MigrationsPath); err != nil {
+	if err := database.Migrate(db, cfg.Database); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
 	// Initialize repositories
-	repos := repository.NewRepositories(db)
+	repos := repository.NewRepositories(db, cfg.Database.Driver)
 
 	// Initialize services
 	svc := services.New(cfg, repos)
@@ -51,11 +51,11 @@ func main() {
 	// Static files
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
-	// Public routes (booking pages)
-	mux.HandleFunc("GET /{tenant}/{host}", h.Public.HostPage)
-	mux.HandleFunc("GET /{tenant}/{host}/{template}", h.Public.TemplatePage)
-	mux.HandleFunc("GET /{tenant}/{host}/{template}/slots", h.Public.GetSlots)
-	mux.HandleFunc("POST /{tenant}/{host}/{template}/book", h.Public.CreateBooking)
+	// Public routes (booking pages) - prefixed with /m/ to avoid route conflicts
+	mux.HandleFunc("GET /m/{tenant}/{host}", h.Public.HostPage)
+	mux.HandleFunc("GET /m/{tenant}/{host}/{template}", h.Public.TemplatePage)
+	mux.HandleFunc("GET /m/{tenant}/{host}/{template}/slots", h.Public.GetSlots)
+	mux.HandleFunc("POST /m/{tenant}/{host}/{template}/book", h.Public.CreateBooking)
 	mux.HandleFunc("GET /booking/{token}", h.Public.BookingStatus)
 	mux.HandleFunc("POST /booking/{token}/cancel", h.Public.CancelBooking)
 	mux.HandleFunc("GET /booking/{token}/reschedule", h.Public.ReschedulePage)
