@@ -387,3 +387,54 @@ The following features from the requirements document are already fully implemen
   - BookingRepository already had `GetByID` method - just needed service layer wrapper
 
 ---
+
+## 2026-01-26 - US-014 - Add host welcome/onboarding flow
+- What was implemented:
+  - Added `onboarding_completed` boolean field to Host model
+  - Created database migrations for PostgreSQL and SQLite (003_add_onboarding_completed.up.sql)
+  - Updated HostRepository: all queries now include `onboarding_completed`, added `UpdateOnboardingCompleted` method
+  - Added `CompleteOnboarding` method to AuthService
+  - Created OnboardingHandler with multiple endpoints:
+    - `Step()` - displays onboarding step pages (1-3)
+    - `SaveWorkingHours()` - saves working hours from step 1
+    - `ConnectGoogleCalendar()` - initiates OAuth with `:onboarding` state suffix
+    - `ConnectCalDAV()` - handles iCloud/CalDAV connection
+    - `SkipStep()` - skips to next step or completes onboarding
+    - `CreateTemplate()` - creates first meeting template and marks onboarding complete
+    - `Complete()` - shows completion page with booking link
+  - Created `onboarding.html` template with:
+    - Progress bar showing 3 steps with completion indicators
+    - Step 1: Working hours table (Mon-Fri 9-5 default)
+    - Step 2: Google Calendar OAuth or iCloud CalDAV connection forms
+    - Step 3: Simple template form (name, slug, duration, location)
+    - Skip buttons on each step
+  - Created `onboarding_complete.html` template with:
+    - Success message and booking link copy button
+    - List of created templates with their URLs
+    - Next steps guidance
+  - Updated registration handler to redirect to `/onboarding/step/1` instead of `/dashboard`
+  - Updated Google OAuth callback to detect `:onboarding` suffix in state and redirect appropriately
+  - Fixed .gitignore to include `migrations/**/*.sql` for SQLite migrations subfolder
+- Files changed:
+  - `internal/models/models.go` - Added OnboardingCompleted field to Host struct
+  - `migrations/003_add_onboarding_completed.up.sql` - PostgreSQL migration
+  - `migrations/sqlite/003_add_onboarding_completed.up.sql` - SQLite migration
+  - `internal/repository/repository.go` - Updated Host queries, added UpdateOnboardingCompleted
+  - `internal/services/auth.go` - Added CompleteOnboarding method
+  - `internal/handlers/onboarding.go` - New file with OnboardingHandler (~315 lines)
+  - `internal/handlers/handlers.go` - Added Onboarding field to Handlers struct
+  - `internal/handlers/auth.go` - Updated Register redirect, Google callback for onboarding
+  - `cmd/server/main.go` - Added onboarding routes with auth middleware
+  - `templates/pages/onboarding.html` - New file (~300 lines)
+  - `templates/pages/onboarding_complete.html` - New file (~150 lines)
+  - `.gitignore` - Added `!migrations/**/*.sql` pattern
+- **Learnings for future iterations:**
+  - The `RequireAuth` middleware applies to a whole ServeMux, so onboarding routes were added to the dashboard mux
+  - Google OAuth state parameter can carry metadata like `:onboarding` suffix to customize callback behavior
+  - To parse state suffixes, use string length checks: `state[len(state)-11:] == ":onboarding"`
+  - CalDAVConnectInput doesn't have TenantID - just HostID is needed
+  - Config structure is nested: use `cfg.Server.BaseURL` not `cfg.BaseURL`
+  - SQLite migrations folder was gitignored by `*.sql` pattern - needed explicit include pattern
+  - Template data access in nested templates: pass data through `StepData` map and access via `$stepData := .Data.StepData`
+
+---
