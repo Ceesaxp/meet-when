@@ -280,8 +280,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 17,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented BookingCount struct in repository, GetBookingCountsByHostID method to fetch counts grouped by template and status, updated Templates handler to pass counts, and dashboard_templates.html displays total/pending/confirmed breakdown"
     },
     {
       "id": "US-018",

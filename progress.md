@@ -487,3 +487,25 @@ The following features from the requirements document are already fully implemen
   - Template repository already had `GetByHostAndSlug` which made collision detection easy
 
 ---
+
+## 2026-01-26 - US-017 - Show booking count on templates
+- What was implemented:
+  - Added `BookingCount` struct in repository to hold total, pending, and confirmed counts per template
+  - Added `GetBookingCountsByHostID` method to BookingRepository that groups bookings by template_id and status
+  - Added `GetBookingCountsByHostID` method to BookingService as a thin wrapper to repository
+  - Updated `Templates` handler in dashboard to fetch booking counts and pass to template
+  - Updated `dashboard_templates.html` to display booking counts with pending/confirmed breakdown
+  - Added CSS styles for `.template-bookings`, `.booking-count`, and `.booking-breakdown`
+- Files changed:
+  - `internal/repository/repository.go` - Added BookingCount struct and GetBookingCountsByHostID method (~50 lines)
+  - `internal/services/booking.go` - Added GetBookingCountsByHostID service method
+  - `internal/handlers/dashboard.go` - Updated Templates handler to include booking counts
+  - `templates/pages/dashboard_templates.html` - Added booking count display section
+  - `static/css/style.css` - Added styles for booking count display
+- **Learnings for future iterations:**
+  - SQL GROUP BY with multiple columns (template_id, status) allows efficient aggregation in a single query
+  - Using `map[string]*BookingCount` allows O(1) lookup in Go templates with `{{index $.Data.BookingCounts .ID}}`
+  - Go templates support conditional pluralization with `{{if ne $counts.Total 1}}s{{end}}`
+  - The repository method accumulates counts by iterating rows, switching on status values to populate Pending/Confirmed fields
+
+---
