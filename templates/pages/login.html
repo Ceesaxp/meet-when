@@ -18,12 +18,6 @@
 
         <form method="POST" action="/auth/login" class="auth-form">
             <div class="form-group">
-                <label for="tenant">Organization</label>
-                <input type="text" id="tenant" name="tenant" required
-                       value="{{if .Data}}{{.Data.tenant}}{{end}}"
-                       placeholder="your-organization">
-            </div>
-            <div class="form-group">
                 <label for="email">Email</label>
                 <input type="email" id="email" name="email" required
                        value="{{if .Data}}{{.Data.email}}{{end}}"
