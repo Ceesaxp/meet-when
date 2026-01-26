@@ -390,10 +390,21 @@ function escapeHtml(text) {
 }
 
 // Update hidden input before form submission
-document.querySelector('form').addEventListener('submit', function() {
+document.querySelector('form').addEventListener('submit', function(e) {
     updateHiddenInput();
     updateAvailabilityHiddenInput();
     updateEmailTemplateHiddenInputs();
+
+    // Validate intervals for overlaps
+    if (!validateIntervals()) {
+        e.preventDefault();
+        // Scroll to the first error
+        var firstError = document.querySelector('.interval-error[style*="display: block"]');
+        if (firstError) {
+            firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        return false;
+    }
 });
 
 // Availability Rules Builder
@@ -500,6 +511,13 @@ function renderAvailabilityDays() {
         }(day);
         addIntervalBtn.style.display = (isEnabled && intervals.length < MAX_INTERVALS_PER_DAY) ? 'inline-block' : 'none';
         timeRangesDiv.appendChild(addIntervalBtn);
+
+        // Error message div for overlap validation
+        var errorDiv = document.createElement('div');
+        errorDiv.className = 'interval-error';
+        errorDiv.id = 'interval-error-' + day;
+        errorDiv.style.display = 'none';
+        timeRangesDiv.appendChild(errorDiv);
 
         dayDiv.appendChild(timeRangesDiv);
         container.appendChild(dayDiv);
@@ -693,6 +711,9 @@ function updateAvailabilityRules() {
 
     availabilityRules.days = days;
     updateAvailabilityHiddenInput();
+
+    // Validate intervals on every change for immediate feedback
+    validateIntervals();
 }
 
 function updateAvailabilityHiddenInput() {
@@ -704,6 +725,69 @@ function updateAvailabilityHiddenInput() {
     } else {
         input.value = '';
     }
+}
+
+// Interval Overlap Validation
+// Overlap check: interval A overlaps B if A.start < B.end AND A.end > B.start
+function intervalsOverlap(a, b) {
+    return a.start < b.end && a.end > b.start;
+}
+
+function validateIntervals() {
+    var checkbox = document.getElementById('use_custom_availability');
+    if (!checkbox.checked) {
+        return true; // No custom availability, no validation needed
+    }
+
+    var hasErrors = false;
+
+    for (var day = 0; day <= 6; day++) {
+        var errorDiv = document.getElementById('interval-error-' + day);
+        var enabledCheckbox = document.querySelector('.day-enabled[data-day="' + day + '"]');
+
+        if (!enabledCheckbox || !enabledCheckbox.checked) {
+            if (errorDiv) errorDiv.style.display = 'none';
+            continue;
+        }
+
+        var intervalsContainer = document.getElementById('intervals-container-' + day);
+        var intervalElements = intervalsContainer.querySelectorAll('.time-range');
+        var intervals = [];
+
+        intervalElements.forEach(function(el) {
+            var start = el.querySelector('.interval-start').value;
+            var end = el.querySelector('.interval-end').value;
+            if (start && end) {
+                intervals.push({ start: start, end: end });
+            }
+        });
+
+        // Check for overlaps between all pairs of intervals
+        var overlapFound = false;
+        for (var i = 0; i < intervals.length; i++) {
+            for (var j = i + 1; j < intervals.length; j++) {
+                if (intervalsOverlap(intervals[i], intervals[j])) {
+                    overlapFound = true;
+                    break;
+                }
+            }
+            if (overlapFound) break;
+        }
+
+        if (overlapFound) {
+            hasErrors = true;
+            if (errorDiv) {
+                errorDiv.textContent = 'Intervals overlap. Please adjust the times so they do not overlap.';
+                errorDiv.style.display = 'block';
+            }
+        } else {
+            if (errorDiv) {
+                errorDiv.style.display = 'none';
+            }
+        }
+    }
+
+    return !hasErrors;
 }
 
 function initializeAvailabilityRules() {
