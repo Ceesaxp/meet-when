@@ -118,9 +118,19 @@ func main() {
 	// Audit logs (admin only)
 	dashboard.HandleFunc("GET /dashboard/audit-logs", h.Dashboard.AuditLogs)
 
-	// Apply auth middleware to dashboard
+	// Onboarding routes (also protected)
+	dashboard.HandleFunc("GET /onboarding/step/{step}", h.Onboarding.Step)
+	dashboard.HandleFunc("POST /onboarding/working-hours", h.Onboarding.SaveWorkingHours)
+	dashboard.HandleFunc("GET /onboarding/connect/google", h.Onboarding.ConnectGoogleCalendar)
+	dashboard.HandleFunc("POST /onboarding/connect/caldav", h.Onboarding.ConnectCalDAV)
+	dashboard.HandleFunc("GET /onboarding/skip/{step}", h.Onboarding.SkipStep)
+	dashboard.HandleFunc("POST /onboarding/template", h.Onboarding.CreateTemplate)
+	dashboard.HandleFunc("GET /onboarding/complete", h.Onboarding.Complete)
+
+	// Apply auth middleware to dashboard and onboarding
 	mux.Handle("/dashboard", middleware.RequireAuth(svc.Session)(dashboard))
 	mux.Handle("/dashboard/", middleware.RequireAuth(svc.Session)(dashboard))
+	mux.Handle("/onboarding/", middleware.RequireAuth(svc.Session)(dashboard))
 
 	// Health check
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {

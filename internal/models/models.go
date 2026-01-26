@@ -73,17 +73,18 @@ type Tenant struct {
 
 // Host represents a user who can receive bookings
 type Host struct {
-	ID                string     `json:"id" db:"id"`
-	TenantID          string     `json:"tenant_id" db:"tenant_id"`
-	Email             string     `json:"email" db:"email"`
-	PasswordHash      string     `json:"-" db:"password_hash"`
-	Name              string     `json:"name" db:"name"`
-	Slug              string     `json:"slug" db:"slug"`
-	Timezone          string     `json:"timezone" db:"timezone"`
-	DefaultCalendarID *string    `json:"default_calendar_id" db:"default_calendar_id"`
-	IsAdmin           bool       `json:"is_admin" db:"is_admin"`
-	CreatedAt         SQLiteTime `json:"created_at" db:"created_at"`
-	UpdatedAt         SQLiteTime `json:"updated_at" db:"updated_at"`
+	ID                  string     `json:"id" db:"id"`
+	TenantID            string     `json:"tenant_id" db:"tenant_id"`
+	Email               string     `json:"email" db:"email"`
+	PasswordHash        string     `json:"-" db:"password_hash"`
+	Name                string     `json:"name" db:"name"`
+	Slug                string     `json:"slug" db:"slug"`
+	Timezone            string     `json:"timezone" db:"timezone"`
+	DefaultCalendarID   *string    `json:"default_calendar_id" db:"default_calendar_id"`
+	IsAdmin             bool       `json:"is_admin" db:"is_admin"`
+	OnboardingCompleted bool       `json:"onboarding_completed" db:"onboarding_completed"`
+	CreatedAt           SQLiteTime `json:"created_at" db:"created_at"`
+	UpdatedAt           SQLiteTime `json:"updated_at" db:"updated_at"`
 }
 
 // WorkingHours represents the host's available working hours

@@ -1,0 +1,438 @@
+{{define "onboarding.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "content"}}
+<div class="onboarding-container">
+    <div class="onboarding-header">
+        <h1>Welcome to MeetWhen</h1>
+        <p>Let's get your scheduling set up in just a few steps.</p>
+    </div>
+
+    {{if .Flash}}
+    <div class="alert alert-{{.Flash.Type}}">{{.Flash.Message}}</div>
+    {{end}}
+
+    <div class="onboarding-progress">
+        <div class="progress-step {{if ge .Data.Step 1}}active{{end}} {{if .Data.Step1Complete}}completed{{end}}">
+            <div class="step-number">1</div>
+            <div class="step-label">Working Hours</div>
+        </div>
+        <div class="progress-line {{if ge .Data.Step 2}}active{{end}}"></div>
+        <div class="progress-step {{if ge .Data.Step 2}}active{{end}} {{if .Data.Step2Complete}}completed{{end}}">
+            <div class="step-number">2</div>
+            <div class="step-label">Calendar</div>
+        </div>
+        <div class="progress-line {{if ge .Data.Step 3}}active{{end}}"></div>
+        <div class="progress-step {{if ge .Data.Step 3}}active{{end}} {{if .Data.Step3Complete}}completed{{end}}">
+            <div class="step-number">3</div>
+            <div class="step-label">First Meeting</div>
+        </div>
+    </div>
+
+    <div class="onboarding-content">
+        {{if eq .Data.Step 1}}
+        <!-- Step 1: Working Hours -->
+        <div class="onboarding-step">
+            <h2>Set Your Working Hours</h2>
+            <p>When are you typically available for meetings? You can always adjust this later.</p>
+
+            <form method="POST" action="/onboarding/working-hours" class="form">
+                <table class="working-hours-table">
+                    <thead>
+                        <tr>
+                            <th>Day</th>
+                            <th>Available</th>
+                            <th>Start</th>
+                            <th>End</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{$stepData := .Data.StepData}}
+                        {{range $i, $day := $stepData.DayNames}}
+                        {{$hours := index $stepData.WorkingHours $i}}
+                        <tr>
+                            <td>{{$day}}</td>
+                            <td>
+                                <input type="checkbox" name="day_{{$i}}_enabled"
+                                       {{if $hours}}{{if (index $hours 0).IsEnabled}}checked{{end}}{{else}}{{if and (ge $i 1) (le $i 5)}}checked{{end}}{{end}}>
+                            </td>
+                            <td>
+                                <input type="time" name="day_{{$i}}_start"
+                                       value="{{if $hours}}{{(index $hours 0).StartTime}}{{else}}09:00{{end}}">
+                            </td>
+                            <td>
+                                <input type="time" name="day_{{$i}}_end"
+                                       value="{{if $hours}}{{(index $hours 0).EndTime}}{{else}}17:00{{end}}">
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+
+                <div class="onboarding-actions">
+                    <a href="/onboarding/skip/1" class="btn btn-secondary">Skip for Now</a>
+                    <button type="submit" class="btn btn-primary">Continue</button>
+                </div>
+            </form>
+        </div>
+        {{end}}
+
+        {{if eq .Data.Step 2}}
+        <!-- Step 2: Calendar Connection -->
+        <div class="onboarding-step">
+            <h2>Connect Your Calendar</h2>
+            <p>Connect a calendar to automatically check your availability and add new bookings.</p>
+
+            {{$stepData := .Data.StepData}}
+            {{if $stepData.Calendars}}
+            <div class="connected-calendars">
+                <h3>Connected Calendars</h3>
+                <ul>
+                    {{range $stepData.Calendars}}
+                    <li><span class="badge badge-{{.Provider}}">{{.Provider}}</span> {{.Name}}</li>
+                    {{end}}
+                </ul>
+            </div>
+            {{end}}
+
+            <div class="calendar-options">
+                <div class="calendar-option">
+                    <h3>Google Calendar</h3>
+                    <p>Recommended for most users. Automatically syncs availability and creates events.</p>
+                    <a href="/onboarding/connect/google" class="btn btn-google">
+                        <img src="/static/img/google-icon.svg" alt="Google" onerror="this.style.display='none'">
+                        Connect Google Calendar
+                    </a>
+                </div>
+
+                <div class="calendar-option">
+                    <h3>iCloud Calendar</h3>
+                    <p>For Apple users. Requires an app-specific password from Apple ID settings.</p>
+
+                    <form method="POST" action="/onboarding/connect/caldav" class="form caldav-form">
+                        <input type="hidden" name="provider" value="icloud">
+                        <input type="hidden" name="url" value="https://caldav.icloud.com/">
+
+                        <div class="form-group">
+                            <label for="icloud_name">Calendar Name</label>
+                            <input type="text" id="icloud_name" name="name" required placeholder="My iCloud Calendar">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="icloud_username">Apple ID Email</label>
+                            <input type="email" id="icloud_username" name="username" required placeholder="your@icloud.com">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="icloud_password">App-Specific Password</label>
+                            <input type="password" id="icloud_password" name="password" required placeholder="xxxx-xxxx-xxxx-xxxx">
+                            <small class="form-help">
+                                Generate at <a href="https://appleid.apple.com/account/manage" target="_blank">appleid.apple.com</a> > Sign-In and Security > App-Specific Passwords
+                            </small>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Connect iCloud</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="onboarding-actions">
+                <a href="/onboarding/skip/2" class="btn btn-secondary">Skip for Now</a>
+                {{if $stepData.Calendars}}
+                <a href="/onboarding/step/3" class="btn btn-primary">Continue</a>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+
+        {{if eq .Data.Step 3}}
+        <!-- Step 3: Create First Meeting Template -->
+        <div class="onboarding-step">
+            <h2>Create Your First Meeting Type</h2>
+            <p>Set up a meeting template that people can book with you.</p>
+
+            {{$stepData := .Data.StepData}}
+            <form method="POST" action="/onboarding/template" class="form">
+                <div class="form-group">
+                    <label for="name">Meeting Name</label>
+                    <input type="text" id="name" name="name" required placeholder="30 Minute Meeting" value="30 Minute Meeting">
+                </div>
+
+                <div class="form-group">
+                    <label for="slug">URL Slug</label>
+                    <input type="text" id="slug" name="slug" required pattern="[a-z0-9-]+" placeholder="30min" value="30min">
+                    <small>Your booking link will be: /m/{{.Tenant.Slug}}/{{.Host.Slug}}/<strong>30min</strong></small>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description (optional)</label>
+                    <textarea id="description" name="description" rows="2" placeholder="A quick call to discuss..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Duration</label>
+                    <div class="duration-options">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="durations" value="15"> 15 min
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="durations" value="30" checked> 30 min
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="durations" value="45"> 45 min
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="durations" value="60"> 60 min
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="location_type">Location</label>
+                    <select id="location_type" name="location_type">
+                        <option value="google_meet">Google Meet</option>
+                        <option value="zoom">Zoom</option>
+                        <option value="phone">Phone Call</option>
+                        <option value="custom">Custom Location</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="custom_location_group" style="display: none;">
+                    <label for="custom_location">Location Details</label>
+                    <input type="text" id="custom_location" name="custom_location" placeholder="Enter address or meeting link">
+                </div>
+
+                {{if $stepData.Calendars}}
+                <div class="form-group">
+                    <label for="calendar_id">Add to Calendar</label>
+                    <select id="calendar_id" name="calendar_id">
+                        {{range $stepData.Calendars}}
+                        <option value="{{.ID}}">{{.Name}}</option>
+                        {{end}}
+                    </select>
+                </div>
+                {{end}}
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="requires_approval"> Require my approval before confirming bookings
+                    </label>
+                </div>
+
+                <div class="onboarding-actions">
+                    <a href="/onboarding/skip/3" class="btn btn-secondary">Skip for Now</a>
+                    <button type="submit" class="btn btn-primary">Create & Finish Setup</button>
+                </div>
+            </form>
+        </div>
+        {{end}}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const locationSelect = document.getElementById('location_type');
+    const customLocationGroup = document.getElementById('custom_location_group');
+    const customLocationInput = document.getElementById('custom_location');
+    const customLocationLabel = customLocationGroup ? customLocationGroup.querySelector('label') : null;
+
+    if (locationSelect) {
+        locationSelect.addEventListener('change', function() {
+            if (this.value === 'custom' || this.value === 'phone') {
+                customLocationGroup.style.display = 'block';
+                if (this.value === 'phone') {
+                    customLocationLabel.textContent = 'Phone Number';
+                    customLocationInput.placeholder = '+1 (555) 123-4567';
+                } else {
+                    customLocationLabel.textContent = 'Location Details';
+                    customLocationInput.placeholder = 'Enter address or meeting link';
+                }
+            } else {
+                customLocationGroup.style.display = 'none';
+            }
+        });
+    }
+
+    // Auto-generate slug from name
+    const nameInput = document.getElementById('name');
+    const slugInput = document.getElementById('slug');
+    if (nameInput && slugInput) {
+        nameInput.addEventListener('input', function() {
+            if (!slugInput.dataset.edited) {
+                slugInput.value = this.value.toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-|-$/g, '');
+            }
+        });
+        slugInput.addEventListener('input', function() {
+            this.dataset.edited = 'true';
+        });
+    }
+});
+</script>
+
+<style>
+.onboarding-container {
+    max-width: 700px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+
+.onboarding-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.onboarding-header h1 {
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+
+.onboarding-header p {
+    color: #666;
+    font-size: 1.1rem;
+}
+
+.onboarding-progress {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 40px;
+}
+
+.progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    opacity: 0.5;
+}
+
+.progress-step.active {
+    opacity: 1;
+}
+
+.progress-step.completed .step-number {
+    background: var(--success-color);
+}
+
+.step-number {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: white;
+    margin-bottom: 8px;
+}
+
+.progress-step.active .step-number {
+    background: var(--primary-color);
+}
+
+.step-label {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.progress-line {
+    width: 60px;
+    height: 3px;
+    background: #ddd;
+    margin: 0 10px;
+    margin-bottom: 28px;
+}
+
+.progress-line.active {
+    background: var(--primary-color);
+}
+
+.onboarding-content {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.onboarding-step h2 {
+    margin-bottom: 10px;
+}
+
+.onboarding-step > p {
+    color: #666;
+    margin-bottom: 25px;
+}
+
+.onboarding-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+.calendar-options {
+    display: grid;
+    gap: 25px;
+    margin-top: 20px;
+}
+
+.calendar-option {
+    padding: 20px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+}
+
+.calendar-option h3 {
+    margin-bottom: 8px;
+}
+
+.calendar-option > p {
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 15px;
+}
+
+.caldav-form {
+    margin-top: 15px;
+}
+
+.connected-calendars {
+    background: #f0fdf4;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.connected-calendars h3 {
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+
+.connected-calendars ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.connected-calendars li {
+    padding: 5px 0;
+}
+
+.duration-options {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+</style>
+{{end}}

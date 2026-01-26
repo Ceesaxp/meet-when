@@ -36,6 +36,7 @@ Thumbs.db
 # Database backups
 *.sql
 !migrations/*.sql
+!migrations/**/*.sql
 
 # Logs
 *.log

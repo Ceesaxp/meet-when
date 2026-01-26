@@ -268,3 +268,8 @@ func (s *AuthService) GetHostByID(ctx context.Context, id string) (*models.Host,
 func (s *AuthService) UpdateHost(ctx context.Context, host *models.Host) error {
 	return s.repos.Host.Update(ctx, host)
 }
+
+// CompleteOnboarding marks a host's onboarding as complete
+func (s *AuthService) CompleteOnboarding(ctx context.Context, hostID string) error {
+	return s.repos.Host.UpdateOnboardingCompleted(ctx, hostID, true)
+}

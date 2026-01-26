@@ -94,12 +94,12 @@ type HostRepository struct {
 
 func (r *HostRepository) Create(ctx context.Context, host *models.Host) error {
 	query := q(r.driver, `
-		INSERT INTO hosts (id, tenant_id, email, password_hash, name, slug, timezone, is_admin, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO hosts (id, tenant_id, email, password_hash, name, slug, timezone, is_admin, onboarding_completed, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`)
 	_, err := r.db.ExecContext(ctx, query,
 		host.ID, host.TenantID, host.Email, host.PasswordHash, host.Name,
-		host.Slug, host.Timezone, host.IsAdmin, host.CreatedAt, host.UpdatedAt)
+		host.Slug, host.Timezone, host.IsAdmin, host.OnboardingCompleted, host.CreatedAt, host.UpdatedAt)
 	return err
 }
 
@@ -107,13 +107,13 @@ func (r *HostRepository) GetByID(ctx context.Context, id string) (*models.Host, 
 	host := &models.Host{}
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
-		       default_calendar_id, is_admin, created_at, updated_at
+		       default_calendar_id, is_admin, COALESCE(onboarding_completed, 0), created_at, updated_at
 		FROM hosts WHERE id = $1
 	`)
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
 		&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
-		&host.CreatedAt, &host.UpdatedAt)
+		&host.OnboardingCompleted, &host.CreatedAt, &host.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -124,13 +124,13 @@ func (r *HostRepository) GetByEmail(ctx context.Context, tenantID, email string)
 	host := &models.Host{}
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
-		       default_calendar_id, is_admin, created_at, updated_at
+		       default_calendar_id, is_admin, COALESCE(onboarding_completed, 0), created_at, updated_at
 		FROM hosts WHERE tenant_id = $1 AND email = $2
 	`)
 	err := r.db.QueryRowContext(ctx, query, tenantID, email).Scan(
 		&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
 		&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
-		&host.CreatedAt, &host.UpdatedAt)
+		&host.OnboardingCompleted, &host.CreatedAt, &host.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -141,13 +141,13 @@ func (r *HostRepository) GetBySlug(ctx context.Context, tenantID, slug string) (
 	host := &models.Host{}
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
-		       default_calendar_id, is_admin, created_at, updated_at
+		       default_calendar_id, is_admin, COALESCE(onboarding_completed, 0), created_at, updated_at
 		FROM hosts WHERE tenant_id = $1 AND slug = $2
 	`)
 	err := r.db.QueryRowContext(ctx, query, tenantID, slug).Scan(
 		&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
 		&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
-		&host.CreatedAt, &host.UpdatedAt)
+		&host.OnboardingCompleted, &host.CreatedAt, &host.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -168,6 +168,12 @@ func (r *HostRepository) Update(ctx context.Context, host *models.Host) error {
 func (r *HostRepository) UpdatePassword(ctx context.Context, id, passwordHash string) error {
 	query := q(r.driver, `UPDATE hosts SET password_hash = $1 WHERE id = $2`)
 	_, err := r.db.ExecContext(ctx, query, passwordHash, id)
+	return err
+}
+
+func (r *HostRepository) UpdateOnboardingCompleted(ctx context.Context, id string, completed bool) error {
+	query := q(r.driver, `UPDATE hosts SET onboarding_completed = $1 WHERE id = $2`)
+	_, err := r.db.ExecContext(ctx, query, completed, id)
 	return err
 }
 

@@ -1,0 +1,200 @@
+{{define "onboarding_complete.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "content"}}
+<div class="onboarding-complete-container">
+    <div class="success-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+    </div>
+
+    <h1>You're All Set!</h1>
+    <p class="subtitle">Your scheduling page is ready. Share your booking link to start accepting meetings.</p>
+
+    <div class="booking-link-box">
+        <label>Your Booking Link</label>
+        <div class="link-container">
+            <input type="text" id="booking-link" value="{{.Data.BookingURL}}" readonly>
+            <button type="button" class="btn btn-primary" onclick="copyLink()">Copy</button>
+        </div>
+        <small id="copy-feedback" class="copy-feedback" style="display: none;">Copied!</small>
+    </div>
+
+    {{if .Data.Templates}}
+    <div class="templates-list">
+        <h3>Your Meeting Types</h3>
+        <ul>
+            {{range .Data.Templates}}
+            <li>
+                <strong>{{.Name}}</strong>
+                <span class="template-link">{{$.Data.BookingURL}}/{{.Slug}}</span>
+            </li>
+            {{end}}
+        </ul>
+    </div>
+    {{end}}
+
+    <div class="next-steps">
+        <h3>What's Next?</h3>
+        <ul>
+            <li>Share your booking link with clients, colleagues, or anyone who needs to schedule with you</li>
+            <li>Create additional meeting types for different purposes (e.g., 15-min intro, 60-min consultation)</li>
+            <li>Customize your calendar integrations and notification settings</li>
+        </ul>
+    </div>
+
+    <div class="action-buttons">
+        <a href="{{.Data.BookingURL}}" class="btn btn-secondary" target="_blank">Preview Booking Page</a>
+        <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
+    </div>
+</div>
+
+<script>
+function copyLink() {
+    const linkInput = document.getElementById('booking-link');
+    const feedback = document.getElementById('copy-feedback');
+
+    navigator.clipboard.writeText(linkInput.value).then(function() {
+        feedback.style.display = 'block';
+        setTimeout(function() {
+            feedback.style.display = 'none';
+        }, 2000);
+    }).catch(function() {
+        // Fallback for older browsers
+        linkInput.select();
+        document.execCommand('copy');
+        feedback.style.display = 'block';
+        setTimeout(function() {
+            feedback.style.display = 'none';
+        }, 2000);
+    });
+}
+</script>
+
+<style>
+.onboarding-complete-container {
+    max-width: 600px;
+    margin: 60px auto;
+    padding: 40px;
+    text-align: center;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+}
+
+.success-icon {
+    color: var(--success-color);
+    margin-bottom: 20px;
+}
+
+.onboarding-complete-container h1 {
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    color: #666;
+    font-size: 1.1rem;
+    margin-bottom: 30px;
+}
+
+.booking-link-box {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+    text-align: left;
+}
+
+.booking-link-box label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.link-container {
+    display: flex;
+    gap: 10px;
+}
+
+.link-container input {
+    flex: 1;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    background: white;
+}
+
+.copy-feedback {
+    display: block;
+    margin-top: 8px;
+    color: var(--success-color);
+    font-weight: 500;
+}
+
+.templates-list {
+    text-align: left;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #f0f9ff;
+    border-radius: 8px;
+}
+
+.templates-list h3 {
+    font-size: 1rem;
+    margin-bottom: 15px;
+}
+
+.templates-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.templates-list li {
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.templates-list li:last-child {
+    border-bottom: none;
+}
+
+.template-link {
+    display: block;
+    font-size: 0.85rem;
+    color: #666;
+    margin-top: 4px;
+}
+
+.next-steps {
+    text-align: left;
+    margin-bottom: 30px;
+}
+
+.next-steps h3 {
+    font-size: 1rem;
+    margin-bottom: 15px;
+}
+
+.next-steps ul {
+    padding-left: 20px;
+    color: #666;
+}
+
+.next-steps li {
+    padding: 5px 0;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+</style>
+{{end}}

@@ -116,7 +116,8 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	h.handlers.redirect(w, r, "/dashboard")
+	// Redirect new users to onboarding
+	h.handlers.redirect(w, r, "/onboarding/step/1")
 }
 
 // Logout handles logout
@@ -150,18 +151,34 @@ func (h *AuthHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	// State contains hostID for calendar connection
 	// For login/register, it would be different
 	if state != "" {
+		// Check if this is from onboarding (state ends with :onboarding)
+		fromOnboarding := false
+		hostID := state
+		if len(state) > 11 && state[len(state)-11:] == ":onboarding" {
+			fromOnboarding = true
+			hostID = state[:len(state)-11]
+		}
+
 		// This is a calendar connection callback
 		// The state should contain the host ID
 		_, err := h.handlers.services.Calendar.ConnectGoogleCalendar(r.Context(), services.GoogleCalendarConnectInput{
-			HostID:      state,
+			HostID:      hostID,
 			AuthCode:    code,
 			RedirectURI: h.handlers.cfg.OAuth.Google.RedirectURL,
 		})
 		if err != nil {
-			h.handlers.redirect(w, r, "/dashboard/calendars?error=connection_failed")
+			if fromOnboarding {
+				h.handlers.redirect(w, r, "/onboarding/step/2?error=connection_failed")
+			} else {
+				h.handlers.redirect(w, r, "/dashboard/calendars?error=connection_failed")
+			}
 			return
 		}
-		h.handlers.redirect(w, r, "/dashboard/calendars?success=calendar_connected")
+		if fromOnboarding {
+			h.handlers.redirect(w, r, "/onboarding/step/3")
+		} else {
+			h.handlers.redirect(w, r, "/dashboard/calendars?success=calendar_connected")
+		}
 		return
 	}
 
