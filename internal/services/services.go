@@ -16,6 +16,7 @@ type Services struct {
 	Availability *AvailabilityService
 	Email        *EmailService
 	AuditLog     *AuditLogService
+	Reminder     *ReminderService
 }
 
 // New creates all services
@@ -30,6 +31,7 @@ func New(cfg *config.Config, repos *repository.Repositories) *Services {
 	templateSvc := NewTemplateService(repos, auditLogSvc)
 	sessionSvc := NewSessionService(cfg, repos)
 	authSvc := NewAuthService(cfg, repos, sessionSvc, auditLogSvc)
+	reminderSvc := NewReminderService(repos, emailSvc)
 
 	return &Services{
 		Auth:         authSvc,
@@ -41,5 +43,6 @@ func New(cfg *config.Config, repos *repository.Repositories) *Services {
 		Availability: availabilitySvc,
 		Email:        emailSvc,
 		AuditLog:     auditLogSvc,
+		Reminder:     reminderSvc,
 	}
 }

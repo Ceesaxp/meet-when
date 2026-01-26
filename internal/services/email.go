@@ -470,6 +470,78 @@ Meet When`,
 	}()
 }
 
+// defaultReminderBody returns the default reminder email body
+func (s *EmailService) defaultReminderBody(data *EmailTemplateData) string {
+	return fmt.Sprintf(`Hello %s,
+
+This is a reminder about your upcoming meeting:
+
+Meeting: %s
+With: %s
+When: %s
+Duration: %d minutes
+Location: %s
+
+Need to make changes?
+Cancel: %s
+Reschedule: %s
+
+Best regards,
+Meet When`,
+		data.InviteeName,
+		data.MeetingName,
+		data.HostName,
+		data.MeetingTime,
+		data.Duration,
+		data.Location,
+		data.CancelLink,
+		data.RescheduleLink,
+	)
+}
+
+// SendBookingReminder sends a reminder email to the invitee before their meeting
+func (s *EmailService) SendBookingReminder(ctx context.Context, details *BookingWithDetails) {
+	// Format time in invitee's timezone
+	inviteeLoc, _ := time.LoadLocation(details.Booking.InviteeTimezone)
+	if inviteeLoc == nil {
+		inviteeLoc = time.UTC
+	}
+
+	// Build template data for custom templates
+	templateData := s.buildEmailTemplateData(details, inviteeLoc)
+
+	var subject, body string
+
+	// Check for custom reminder email template
+	customTemplate := parseEmailTemplate(details.Template.ReminderEmail)
+	if customTemplate != nil {
+		// Use custom template
+		if customTemplate.Subject != "" {
+			subject = renderEmailTemplate(customTemplate.Subject, templateData)
+		} else {
+			subject = fmt.Sprintf("Reminder: %s with %s tomorrow", details.Template.Name, details.Host.Name)
+		}
+		if customTemplate.Body != "" {
+			body = renderEmailTemplate(customTemplate.Body, templateData)
+		} else {
+			body = s.defaultReminderBody(templateData)
+		}
+	} else {
+		// Use default template
+		subject = fmt.Sprintf("Reminder: %s with %s tomorrow", details.Template.Name, details.Host.Name)
+		body = s.defaultReminderBody(templateData)
+	}
+
+	// Generate ICS attachment
+	ics := s.generateICS(details)
+
+	go func() {
+		if err := s.sendEmail(details.Booking.InviteeEmail, subject, body, ics); err != nil {
+			log.Printf("Error sending reminder email to invitee %s: %v", details.Booking.InviteeEmail, err)
+		}
+	}()
+}
+
 func (s *EmailService) sendHostRescheduleNotification(ctx context.Context, details *BookingWithDetails, oldStartTime time.Time) {
 	subject := fmt.Sprintf("Meeting rescheduled: %s with %s", details.Template.Name, details.Booking.InviteeName)
 

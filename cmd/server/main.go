@@ -46,6 +46,10 @@ func main() {
 	// Initialize services
 	svc := services.New(cfg, repos)
 
+	// Start background reminder service
+	svc.Reminder.Start()
+	defer svc.Reminder.Stop()
+
 	// Initialize handlers
 	h := handlers.New(cfg, svc)
 

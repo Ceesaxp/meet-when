@@ -515,15 +515,15 @@ func (r *BookingRepository) Create(ctx context.Context, booking *models.Booking)
 		INSERT INTO bookings (id, template_id, host_id, token, status, start_time,
 			end_time, duration, invitee_name, invitee_email, invitee_timezone,
 			invitee_phone, additional_guests, answers, conference_link,
-			calendar_event_id, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+			calendar_event_id, reminder_sent, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 	`)
 	_, err := r.db.ExecContext(ctx, query,
 		booking.ID, booking.TemplateID, booking.HostID, booking.Token,
 		booking.Status, booking.StartTime, booking.EndTime, booking.Duration,
 		booking.InviteeName, booking.InviteeEmail, booking.InviteeTimezone,
 		booking.InviteePhone, booking.AdditionalGuests, booking.Answers,
-		booking.ConferenceLink, booking.CalendarEventID,
+		booking.ConferenceLink, booking.CalendarEventID, booking.ReminderSent,
 		booking.CreatedAt, booking.UpdatedAt)
 	return err
 }
@@ -534,7 +534,8 @@ func (r *BookingRepository) GetByID(ctx context.Context, id string) (*models.Boo
 		SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
 		       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
 		       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
-		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), created_at, updated_at
+		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, 0),
+		       created_at, updated_at
 		FROM bookings WHERE id = $1
 	`)
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
@@ -543,7 +544,7 @@ func (r *BookingRepository) GetByID(ctx context.Context, id string) (*models.Boo
 		&booking.InviteeName, &booking.InviteeEmail, &booking.InviteeTimezone,
 		&booking.InviteePhone, &booking.AdditionalGuests, &booking.Answers,
 		&booking.ConferenceLink, &booking.CalendarEventID,
-		&booking.CancelledBy, &booking.CancelReason,
+		&booking.CancelledBy, &booking.CancelReason, &booking.ReminderSent,
 		&booking.CreatedAt, &booking.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -557,7 +558,8 @@ func (r *BookingRepository) GetByToken(ctx context.Context, token string) (*mode
 		SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
 		       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
 		       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
-		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), created_at, updated_at
+		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, 0),
+		       created_at, updated_at
 		FROM bookings WHERE token = $1
 	`)
 	err := r.db.QueryRowContext(ctx, query, token).Scan(
@@ -566,7 +568,7 @@ func (r *BookingRepository) GetByToken(ctx context.Context, token string) (*mode
 		&booking.InviteeName, &booking.InviteeEmail, &booking.InviteeTimezone,
 		&booking.InviteePhone, &booking.AdditionalGuests, &booking.Answers,
 		&booking.ConferenceLink, &booking.CalendarEventID,
-		&booking.CancelledBy, &booking.CancelReason,
+		&booking.CancelledBy, &booking.CancelReason, &booking.ReminderSent,
 		&booking.CreatedAt, &booking.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -583,7 +585,8 @@ func (r *BookingRepository) GetByHostID(ctx context.Context, hostID string, stat
 			SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
 			       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
 			       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
-			       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), created_at, updated_at
+			       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, 0),
+			       created_at, updated_at
 			FROM bookings WHERE host_id = $1 AND status = $2
 			ORDER BY start_time ASC
 		`)
@@ -593,7 +596,8 @@ func (r *BookingRepository) GetByHostID(ctx context.Context, hostID string, stat
 			SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
 			       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
 			       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
-			       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), created_at, updated_at
+			       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, 0),
+			       created_at, updated_at
 			FROM bookings WHERE host_id = $1
 			ORDER BY start_time ASC
 		`)
@@ -619,7 +623,7 @@ func (r *BookingRepository) GetByHostID(ctx context.Context, hostID string, stat
 			&booking.InviteeName, &booking.InviteeEmail, &booking.InviteeTimezone,
 			&booking.InviteePhone, &booking.AdditionalGuests, &booking.Answers,
 			&booking.ConferenceLink, &booking.CalendarEventID,
-			&booking.CancelledBy, &booking.CancelReason,
+			&booking.CancelledBy, &booking.CancelReason, &booking.ReminderSent,
 			&booking.CreatedAt, &booking.UpdatedAt)
 		if err != nil {
 			return nil, err
@@ -634,7 +638,7 @@ func (r *BookingRepository) GetByHostIDAndTimeRange(ctx context.Context, hostID 
 		SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
 		       invitee_name, invitee_email, invitee_timezone, invitee_phone,
 		       additional_guests, answers, conference_link, calendar_event_id,
-		       cancelled_by, cancel_reason, created_at, updated_at
+		       cancelled_by, cancel_reason, COALESCE(reminder_sent, 0), created_at, updated_at
 		FROM bookings
 		WHERE host_id = $1
 		  AND status IN ('pending', 'confirmed')
@@ -660,7 +664,7 @@ func (r *BookingRepository) GetByHostIDAndTimeRange(ctx context.Context, hostID 
 			&booking.InviteeName, &booking.InviteeEmail, &booking.InviteeTimezone,
 			&booking.InviteePhone, &booking.AdditionalGuests, &booking.Answers,
 			&booking.ConferenceLink, &booking.CalendarEventID,
-			&booking.CancelledBy, &booking.CancelReason,
+			&booking.CancelledBy, &booking.CancelReason, &booking.ReminderSent,
 			&booking.CreatedAt, &booking.UpdatedAt)
 		if err != nil {
 			return nil, err
@@ -674,12 +678,64 @@ func (r *BookingRepository) Update(ctx context.Context, booking *models.Booking)
 	query := q(r.driver, `
 		UPDATE bookings
 		SET status = $1, conference_link = $2, calendar_event_id = $3,
-		    cancelled_by = $4, cancel_reason = $5
-		WHERE id = $6
+		    cancelled_by = $4, cancel_reason = $5, reminder_sent = $6
+		WHERE id = $7
 	`)
 	_, err := r.db.ExecContext(ctx, query,
 		booking.Status, booking.ConferenceLink, booking.CalendarEventID,
-		booking.CancelledBy, booking.CancelReason, booking.ID)
+		booking.CancelledBy, booking.CancelReason, booking.ReminderSent, booking.ID)
+	return err
+}
+
+// GetBookingsNeedingReminder returns confirmed bookings that start within the given time range
+// and haven't had a reminder sent yet
+func (r *BookingRepository) GetBookingsNeedingReminder(ctx context.Context, start, end time.Time) ([]*models.Booking, error) {
+	query := q(r.driver, `
+		SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
+		       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
+		       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
+		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, 0),
+		       created_at, updated_at
+		FROM bookings
+		WHERE status = 'confirmed'
+		  AND (reminder_sent = 0 OR reminder_sent IS NULL)
+		  AND start_time >= $1
+		  AND start_time <= $2
+		ORDER BY start_time ASC
+	`)
+	rows, err := r.db.QueryContext(ctx, query, start, end)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error closing rows: %v", err)
+		}
+	}()
+
+	var bookings []*models.Booking
+	for rows.Next() {
+		booking := &models.Booking{}
+		err := rows.Scan(
+			&booking.ID, &booking.TemplateID, &booking.HostID, &booking.Token,
+			&booking.Status, &booking.StartTime, &booking.EndTime, &booking.Duration,
+			&booking.InviteeName, &booking.InviteeEmail, &booking.InviteeTimezone,
+			&booking.InviteePhone, &booking.AdditionalGuests, &booking.Answers,
+			&booking.ConferenceLink, &booking.CalendarEventID,
+			&booking.CancelledBy, &booking.CancelReason, &booking.ReminderSent,
+			&booking.CreatedAt, &booking.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		bookings = append(bookings, booking)
+	}
+	return bookings, nil
+}
+
+// MarkReminderSent marks a booking's reminder as sent
+func (r *BookingRepository) MarkReminderSent(ctx context.Context, bookingID string) error {
+	query := q(r.driver, `UPDATE bookings SET reminder_sent = $1 WHERE id = $2`)
+	_, err := r.db.ExecContext(ctx, query, true, bookingID)
 	return err
 }
 
