@@ -262,3 +262,37 @@ The following features from the requirements document are already fully implemen
   - JavaScript bundles subject+body into hidden JSON field on form submit, similar to pattern used for custom questions and availability rules
 
 ---
+
+## 2026-01-26 - US-010 - Send booking reminder emails
+- What was implemented:
+  - Added `reminder_sent` boolean field to bookings table (PostgreSQL and SQLite migrations)
+  - Updated Booking model with `ReminderSent` field
+  - Updated BookingRepository with `reminder_sent` in all CRUD operations (Create, GetByID, GetByToken, GetByHostID, GetByHostIDAndTimeRange, Update)
+  - Added `GetBookingsNeedingReminder()` method to find confirmed bookings in a time window without reminders sent
+  - Added `MarkReminderSent()` method to mark booking reminders as sent
+  - Added `SendBookingReminder()` to EmailService with custom template support via `ReminderEmail` field
+  - Added `defaultReminderBody()` for fallback reminder content
+  - Created `ReminderService` as background service with:
+    - 15-minute interval check loop
+    - Finds confirmed bookings starting 23-25 hours from now
+    - Sends reminder emails with meeting details and ICS attachment
+    - Marks bookings as `reminder_sent=true` after successful send
+    - Graceful start/stop with sync.WaitGroup
+  - Wired up ReminderService in main.go to start on server boot and stop on shutdown
+- Files changed:
+  - `migrations/002_add_reminder_sent.up.sql` - PostgreSQL migration adding reminder_sent column and index
+  - `migrations/sqlite/002_add_reminder_sent.up.sql` - SQLite migration adding reminder_sent column and index
+  - `internal/models/models.go` - Added ReminderSent field to Booking struct
+  - `internal/repository/repository.go` - Updated all booking queries and added GetBookingsNeedingReminder, MarkReminderSent
+  - `internal/services/email.go` - Added SendBookingReminder and defaultReminderBody functions
+  - `internal/services/reminder.go` - New file with ReminderService background job implementation
+  - `internal/services/services.go` - Added Reminder field to Services struct and initialization
+  - `cmd/server/main.go` - Added svc.Reminder.Start() and defer svc.Reminder.Stop()
+- **Learnings for future iterations:**
+  - SQLite uses INTEGER for booleans (0/1), while PostgreSQL uses BOOLEAN - migrations need to be separate for each driver
+  - The reminder window is 23-25 hours to ensure bookings don't slip through the 15-minute check intervals
+  - Using COALESCE(reminder_sent, 0) in queries handles NULL values from existing rows before migration
+  - Background services should use sync.WaitGroup for graceful shutdown to ensure clean exit
+  - The SendBookingReminder follows the same pattern as sendInviteeConfirmation - check for custom template, render placeholders, fall back to default
+
+---
