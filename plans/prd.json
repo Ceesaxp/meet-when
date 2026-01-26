@@ -330,8 +330,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 20,
-      "passes": false,
-      "notes": "booking_status.html exists but could be improved"
+      "passes": true,
+      "notes": "Implemented improved booking status page with status badges, detailed meeting info with icons, Add to Calendar button (ICS download), prominent reschedule/cancel actions, and clear pending approval notice"
     }
   ]
 }

@@ -571,3 +571,32 @@ The following features from the requirements document are already fully implemen
   - The `errors.Is(syncErr, ErrCalendarAuth)` pattern allows custom error messages for auth failures
 
 ---
+
+## 2026-01-26 - US-020 - Add booking confirmation page improvements
+- What was implemented:
+  - Completely redesigned `booking_status.html` with improved UX and visual design
+  - Added status badges (Awaiting Approval, Confirmed, Cancelled, Declined) with color-coded styling
+  - Added detailed meeting information with icons: date/time, duration, location (with different icons for phone/video/in-person), and host
+  - Location display now shows "Join Google Meet"/"Join Zoom Meeting" links for confirmed video calls
+  - Added prominent "Add to Calendar" button that downloads ICS file
+  - Created new ICS download endpoint `GET /booking/{token}/calendar.ics`
+  - Added `GenerateICS` public method to EmailService (wraps private `generateICS`)
+  - Added `DownloadICS` handler in PublicHandler to serve calendar files
+  - Added pending notice box explaining "The host needs to approve this booking before it's confirmed"
+  - Reorganized action buttons: primary "Add to Calendar" button at top, secondary "Reschedule" and "Cancel" buttons below
+  - Added extensive CSS styles: status badges, booking detail items with icons, button variants (outline, danger-outline), pending notice styling
+- Files changed:
+  - `internal/services/email.go` - Added public `GenerateICS` wrapper method
+  - `internal/handlers/public.go` - Added `DownloadICS` handler
+  - `cmd/server/main.go` - Registered `GET /booking/{token}/calendar.ics` route
+  - `templates/pages/booking_status.html` - Complete redesign with improved UX
+  - `static/css/style.css` - Added ~200 lines of new styles for booking confirmation page
+- **Learnings for future iterations:**
+  - The private `generateICS` method in EmailService was already well-implemented - just needed a public wrapper for HTTP download
+  - SVG icons inline in templates provide flexibility without external dependencies (using Feather Icons style)
+  - Status badges with rgba backgrounds create subtle, readable indicators that complement the status icons
+  - Separating primary and secondary actions improves visual hierarchy - "Add to Calendar" is most common action
+  - The `download` attribute on anchor tags triggers file download instead of navigation
+  - Different location types (phone, google_meet, zoom, custom) need different display logic in templates
+
+---

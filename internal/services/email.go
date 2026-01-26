@@ -668,6 +668,11 @@ END:VCALENDAR`,
 	return ics
 }
 
+// GenerateICS creates an ICS calendar file content for a booking (public wrapper)
+func (s *EmailService) GenerateICS(details *BookingWithDetails) string {
+	return s.generateICS(details)
+}
+
 // sendEmail sends an email (supports both SMTP and Mailgun)
 func (s *EmailService) sendEmail(to, subject, body, icsAttachment string) error {
 	if s.cfg.Email.Provider == "mailgun" {

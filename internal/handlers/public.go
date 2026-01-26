@@ -377,6 +377,32 @@ func (h *PublicHandler) CancelBooking(w http.ResponseWriter, r *http.Request) {
 	h.handlers.redirect(w, r, "/booking/"+token+"?cancelled=true")
 }
 
+// DownloadICS serves an ICS calendar file for a booking
+func (h *PublicHandler) DownloadICS(w http.ResponseWriter, r *http.Request) {
+	token := r.PathValue("token")
+
+	details, err := h.handlers.services.Booking.GetBookingByToken(r.Context(), token)
+	if err != nil {
+		h.handlers.error(w, r, http.StatusNotFound, "Booking not found")
+		return
+	}
+
+	// Only allow ICS download for confirmed or pending bookings
+	if details.Booking.Status != models.BookingStatusConfirmed && details.Booking.Status != models.BookingStatusPending {
+		h.handlers.error(w, r, http.StatusBadRequest, "Cannot download calendar for this booking")
+		return
+	}
+
+	// Generate ICS content
+	ics := h.handlers.services.Email.GenerateICS(details)
+
+	// Set headers for ICS file download
+	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"meeting.ics\"")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(ics))
+}
+
 // ReschedulePage shows the reschedule page
 func (h *PublicHandler) ReschedulePage(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")

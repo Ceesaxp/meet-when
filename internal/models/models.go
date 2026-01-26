@@ -128,10 +128,10 @@ type CalendarConnection struct {
 	RefreshToken string           `json:"-" db:"refresh_token"`
 	TokenExpiry  *SQLiteTime      `json:"-" db:"token_expiry"`
 	// CalDAV specific
-	CalDAVURL      string     `json:"-" db:"caldav_url"`
-	CalDAVUsername string     `json:"-" db:"caldav_username"`
-	CalDAVPassword string     `json:"-" db:"caldav_password"`
-	IsDefault      bool       `json:"is_default" db:"is_default"`
+	CalDAVURL      string `json:"-" db:"caldav_url"`
+	CalDAVUsername string `json:"-" db:"caldav_username"`
+	CalDAVPassword string `json:"-" db:"caldav_password"`
+	IsDefault      bool   `json:"is_default" db:"is_default"`
 	// Sync status tracking
 	LastSyncedAt *SQLiteTime        `json:"last_synced_at" db:"last_synced_at"`
 	SyncStatus   CalendarSyncStatus `json:"sync_status" db:"sync_status"`
