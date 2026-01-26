@@ -21,7 +21,15 @@
             <div class="meeting-details">
                 <div class="detail">
                     <strong>Duration:</strong>
-                    <span>{{index .Data.Template.Durations 0}} minutes</span>
+                    {{if gt (len .Data.Template.Durations) 1}}
+                    <select id="duration" onchange="loadSlots()">
+                        {{range .Data.Template.Durations}}
+                        <option value="{{.}}">{{.}} minutes</option>
+                        {{end}}
+                    </select>
+                    {{else}}
+                    <span id="duration-display">{{index .Data.Template.Durations 0}} minutes</span>
+                    {{end}}
                 </div>
                 <div class="detail">
                     <strong>Location:</strong>
@@ -56,9 +64,6 @@
                 </select></p>
 
                 <div id="slots-container"
-                     hx-get="/m/{{.Tenant.Slug}}/{{.Host.Slug}}/{{.Data.Template.Slug}}/slots"
-                     hx-trigger="load"
-                     hx-vals='{"timezone": "UTC", "duration": "{{index .Data.Template.Durations 0}}"}'
                      hx-swap="innerHTML">
                     <div class="loading">Loading available times...</div>
                 </div>
@@ -69,6 +74,7 @@
                 <form method="POST" action="/m/{{.Tenant.Slug}}/{{.Host.Slug}}/{{.Data.Template.Slug}}/book" class="booking-form">
                     <input type="hidden" name="start_time" id="selected_start_time">
                     <input type="hidden" name="timezone" id="form_timezone">
+                    <input type="hidden" name="duration" id="form_duration">
 
                     <div class="selected-time" id="selected-time-display"></div>
 
@@ -105,6 +111,16 @@
     </div>
 
     <script>
+        // Get the selected duration (from dropdown if multiple, or use first duration)
+        function getSelectedDuration() {
+            var durationSelect = document.getElementById('duration');
+            if (durationSelect) {
+                return durationSelect.value;
+            }
+            // Single duration - use the first one from the template
+            return '{{index .Data.Template.Durations 0}}';
+        }
+
         // Detect user timezone
         try {
             var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -119,13 +135,14 @@
 
         function loadSlots() {
             var tz = document.getElementById('timezone').value;
-            var container = document.getElementById('slots-container');
-            htmx.ajax('GET', '/m/{{.Tenant.Slug}}/{{.Host.Slug}}/{{.Data.Template.Slug}}/slots?timezone=' + tz + '&duration={{index .Data.Template.Durations 0}}', {target: '#slots-container'});
+            var duration = getSelectedDuration();
+            htmx.ajax('GET', '/m/{{.Tenant.Slug}}/{{.Host.Slug}}/{{.Data.Template.Slug}}/slots?timezone=' + tz + '&duration=' + duration, {target: '#slots-container'});
         }
 
         function selectSlot(startTime, displayTime) {
             document.getElementById('selected_start_time').value = startTime;
             document.getElementById('form_timezone').value = document.getElementById('timezone').value;
+            document.getElementById('form_duration').value = getSelectedDuration();
             document.getElementById('selected-time-display').textContent = displayTime;
             showStep(2);
         }

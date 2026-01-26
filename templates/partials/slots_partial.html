@@ -38,7 +38,8 @@ function navigateWeek(direction) {
     date.setDate(date.getDate() + (direction * 7));
     var newDate = date.toISOString().split('T')[0];
     var tz = document.getElementById('timezone').value;
-    htmx.ajax('GET', window.location.pathname + '/slots?date=' + newDate + '&timezone=' + tz + '&duration={{.Duration}}', {target: '#slots-container'});
+    var duration = getSelectedDuration();
+    htmx.ajax('GET', window.location.pathname + '/slots?date=' + newDate + '&timezone=' + tz + '&duration=' + duration, {target: '#slots-container'});
 }
 </script>
 {{end}}

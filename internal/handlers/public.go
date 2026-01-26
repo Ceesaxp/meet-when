@@ -3,6 +3,7 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/meet-when/meet-when/internal/models"
@@ -145,18 +146,21 @@ func (h *PublicHandler) GetSlots(w http.ResponseWriter, r *http.Request) {
 	// Calculate date range (show one week at a time)
 	endDate := startDate.AddDate(0, 0, 7)
 
-	// Parse duration
+	// Parse duration - validate against allowed template durations
 	duration := 30
+	if len(template.Durations) > 0 {
+		duration = template.Durations[0] // Default to first duration
+	}
 	if durationStr != "" {
-		for _, d := range template.Durations {
-			if durationStr == string(rune(d)) {
-				duration = d
-				break
+		if parsedDuration, err := strconv.Atoi(durationStr); err == nil {
+			// Validate that the requested duration is allowed for this template
+			for _, d := range template.Durations {
+				if d == parsedDuration {
+					duration = parsedDuration
+					break
+				}
 			}
 		}
-	}
-	if len(template.Durations) > 0 {
-		duration = template.Durations[0]
 	}
 
 	// Get available slots
@@ -229,9 +233,21 @@ func (h *PublicHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Parse duration from form, validate against template durations
 	duration := 30
 	if len(template.Durations) > 0 {
-		duration = template.Durations[0]
+		duration = template.Durations[0] // Default to first duration
+	}
+	if durationStr := r.FormValue("duration"); durationStr != "" {
+		if parsedDuration, err := strconv.Atoi(durationStr); err == nil {
+			// Validate that the requested duration is allowed for this template
+			for _, d := range template.Durations {
+				if d == parsedDuration {
+					duration = parsedDuration
+					break
+				}
+			}
+		}
 	}
 
 	// Parse additional guests
