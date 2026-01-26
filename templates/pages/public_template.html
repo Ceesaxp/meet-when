@@ -50,18 +50,77 @@
 
             <div id="booking-step-1" class="booking-step">
                 <h3>Select a Date & Time</h3>
-                <p>Timezone: <select id="timezone" onchange="loadSlots()">
-                    <option value="UTC">UTC</option>
-                    <option value="America/New_York">Eastern Time</option>
-                    <option value="America/Chicago">Central Time</option>
-                    <option value="America/Denver">Mountain Time</option>
-                    <option value="America/Los_Angeles">Pacific Time</option>
-                    <option value="Europe/London">London</option>
-                    <option value="Europe/Paris">Paris</option>
-                    <option value="Europe/Berlin">Berlin</option>
-                    <option value="Asia/Tokyo">Tokyo</option>
-                    <option value="Australia/Sydney">Sydney</option>
-                </select></p>
+                <div class="timezone-selector">
+                    <span class="timezone-display">
+                        <span id="timezone-label">Detecting timezone...</span>
+                        <a href="#" id="timezone-change-link" class="timezone-change" onclick="showTimezoneSelector(event)">Change</a>
+                    </span>
+                    <div id="timezone-dropdown" class="timezone-dropdown" style="display: none;">
+                        <select id="timezone" onchange="updateTimezone()">
+                            <optgroup label="Common">
+                                <option value="UTC">UTC</option>
+                                <option value="America/New_York">Eastern Time (US)</option>
+                                <option value="America/Chicago">Central Time (US)</option>
+                                <option value="America/Denver">Mountain Time (US)</option>
+                                <option value="America/Los_Angeles">Pacific Time (US)</option>
+                                <option value="America/Anchorage">Alaska</option>
+                                <option value="Pacific/Honolulu">Hawaii</option>
+                            </optgroup>
+                            <optgroup label="Europe">
+                                <option value="Europe/London">London</option>
+                                <option value="Europe/Paris">Paris</option>
+                                <option value="Europe/Berlin">Berlin</option>
+                                <option value="Europe/Amsterdam">Amsterdam</option>
+                                <option value="Europe/Rome">Rome</option>
+                                <option value="Europe/Madrid">Madrid</option>
+                                <option value="Europe/Stockholm">Stockholm</option>
+                                <option value="Europe/Moscow">Moscow</option>
+                                <option value="Europe/Athens">Athens</option>
+                                <option value="Europe/Warsaw">Warsaw</option>
+                                <option value="Europe/Bucharest">Bucharest</option>
+                            </optgroup>
+                            <optgroup label="Asia">
+                                <option value="Asia/Tokyo">Tokyo</option>
+                                <option value="Asia/Seoul">Seoul</option>
+                                <option value="Asia/Shanghai">Shanghai / Beijing</option>
+                                <option value="Asia/Hong_Kong">Hong Kong</option>
+                                <option value="Asia/Singapore">Singapore</option>
+                                <option value="Asia/Kolkata">India (IST)</option>
+                                <option value="Asia/Dubai">Dubai</option>
+                                <option value="Asia/Bangkok">Bangkok</option>
+                                <option value="Asia/Jakarta">Jakarta</option>
+                                <option value="Asia/Manila">Manila</option>
+                                <option value="Asia/Taipei">Taipei</option>
+                            </optgroup>
+                            <optgroup label="Pacific">
+                                <option value="Australia/Sydney">Sydney</option>
+                                <option value="Australia/Melbourne">Melbourne</option>
+                                <option value="Australia/Brisbane">Brisbane</option>
+                                <option value="Australia/Perth">Perth</option>
+                                <option value="Pacific/Auckland">Auckland</option>
+                                <option value="Pacific/Fiji">Fiji</option>
+                            </optgroup>
+                            <optgroup label="Americas">
+                                <option value="America/Toronto">Toronto</option>
+                                <option value="America/Vancouver">Vancouver</option>
+                                <option value="America/Mexico_City">Mexico City</option>
+                                <option value="America/Bogota">Bogota</option>
+                                <option value="America/Lima">Lima</option>
+                                <option value="America/Sao_Paulo">São Paulo</option>
+                                <option value="America/Buenos_Aires">Buenos Aires</option>
+                                <option value="America/Santiago">Santiago</option>
+                            </optgroup>
+                            <optgroup label="Africa / Middle East">
+                                <option value="Africa/Cairo">Cairo</option>
+                                <option value="Africa/Johannesburg">Johannesburg</option>
+                                <option value="Africa/Lagos">Lagos</option>
+                                <option value="Africa/Nairobi">Nairobi</option>
+                                <option value="Asia/Jerusalem">Jerusalem</option>
+                                <option value="Asia/Riyadh">Riyadh</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                </div>
 
                 <div id="slots-container"
                      hx-swap="innerHTML">
@@ -152,6 +211,9 @@
     </div>
 
     <script>
+        // Current timezone value
+        var currentTimezone = 'UTC';
+
         // Get the selected duration (from dropdown if multiple, or use first duration)
         function getSelectedDuration() {
             var durationSelect = document.getElementById('duration');
@@ -162,27 +224,111 @@
             return '{{index .Data.Template.Durations 0}}';
         }
 
-        // Detect user timezone
-        try {
-            var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        // Get display name for a timezone
+        function getTimezoneDisplayName(tz) {
             var select = document.getElementById('timezone');
             for (var i = 0; i < select.options.length; i++) {
                 if (select.options[i].value === tz) {
-                    select.selectedIndex = i;
-                    break;
+                    return select.options[i].text;
                 }
             }
-        } catch (e) {}
+            // If not found in list, try to format it nicely
+            return tz.replace(/_/g, ' ').replace(/\//g, ' - ');
+        }
+
+        // Update the timezone label display
+        function updateTimezoneLabel() {
+            var label = document.getElementById('timezone-label');
+            var displayName = getTimezoneDisplayName(currentTimezone);
+            // Get current offset for the timezone
+            try {
+                var now = new Date();
+                var options = { timeZone: currentTimezone, timeZoneName: 'short' };
+                var formatter = new Intl.DateTimeFormat('en-US', options);
+                var parts = formatter.formatToParts(now);
+                var tzAbbr = '';
+                for (var i = 0; i < parts.length; i++) {
+                    if (parts[i].type === 'timeZoneName') {
+                        tzAbbr = parts[i].value;
+                        break;
+                    }
+                }
+                if (tzAbbr) {
+                    label.textContent = displayName + ' (' + tzAbbr + ')';
+                } else {
+                    label.textContent = displayName;
+                }
+            } catch (e) {
+                label.textContent = displayName;
+            }
+        }
+
+        // Show/hide timezone dropdown
+        function showTimezoneSelector(event) {
+            if (event) event.preventDefault();
+            var dropdown = document.getElementById('timezone-dropdown');
+            var isVisible = dropdown.style.display !== 'none';
+            dropdown.style.display = isVisible ? 'none' : 'block';
+            if (!isVisible) {
+                document.getElementById('timezone').focus();
+            }
+        }
+
+        // Called when user selects a new timezone
+        function updateTimezone() {
+            var select = document.getElementById('timezone');
+            currentTimezone = select.value;
+            updateTimezoneLabel();
+            document.getElementById('timezone-dropdown').style.display = 'none';
+            loadSlots();
+        }
+
+        // Detect user timezone on page load
+        function detectTimezone() {
+            try {
+                var detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                if (detectedTz) {
+                    currentTimezone = detectedTz;
+                    // Try to select it in the dropdown
+                    var select = document.getElementById('timezone');
+                    var found = false;
+                    for (var i = 0; i < select.options.length; i++) {
+                        if (select.options[i].value === detectedTz) {
+                            select.selectedIndex = i;
+                            found = true;
+                            break;
+                        }
+                    }
+                    // If not in the list, add it as the first option
+                    if (!found) {
+                        var displayName = detectedTz.replace(/_/g, ' ').replace(/\//g, ' - ');
+                        var option = document.createElement('option');
+                        option.value = detectedTz;
+                        option.text = displayName + ' (Detected)';
+                        // Insert at the beginning of the first optgroup
+                        var firstOptgroup = select.querySelector('optgroup');
+                        if (firstOptgroup) {
+                            firstOptgroup.insertBefore(option, firstOptgroup.firstChild);
+                        } else {
+                            select.insertBefore(option, select.firstChild);
+                        }
+                        select.selectedIndex = 0;
+                    }
+                }
+            } catch (e) {
+                console.log('Could not detect timezone:', e);
+            }
+            updateTimezoneLabel();
+        }
 
         function loadSlots() {
-            var tz = document.getElementById('timezone').value;
             var duration = getSelectedDuration();
-            htmx.ajax('GET', '/m/{{.Tenant.Slug}}/{{.Host.Slug}}/{{.Data.Template.Slug}}/slots?timezone=' + tz + '&duration=' + duration, {target: '#slots-container'});
+            htmx.ajax('GET', '/m/{{.Tenant.Slug}}/{{.Host.Slug}}/{{.Data.Template.Slug}}/slots?timezone=' + encodeURIComponent(currentTimezone) + '&duration=' + duration, {target: '#slots-container'});
         }
 
         function selectSlot(startTime, displayTime) {
             document.getElementById('selected_start_time').value = startTime;
-            document.getElementById('form_timezone').value = document.getElementById('timezone').value;
+            document.getElementById('form_timezone').value = currentTimezone;
             document.getElementById('form_duration').value = getSelectedDuration();
             document.getElementById('selected-time-display').textContent = displayTime;
             showStep(2);
@@ -193,10 +339,17 @@
             document.getElementById('booking-step-2').style.display = step === 2 ? 'block' : 'none';
         }
 
-        // Load slots on timezone change
-        document.getElementById('timezone').addEventListener('change', loadSlots);
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            var dropdown = document.getElementById('timezone-dropdown');
+            var changeLink = document.getElementById('timezone-change-link');
+            if (!dropdown.contains(event.target) && event.target !== changeLink) {
+                dropdown.style.display = 'none';
+            }
+        });
 
-        // Load initial slots
+        // Initialize timezone detection and load slots
+        detectTimezone();
         loadSlots();
     </script>
 </body>
