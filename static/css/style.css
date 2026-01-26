@@ -1031,6 +1031,49 @@ a:hover {
     color: var(--text-light);
 }
 
+/* Availability Rules Builder */
+.availability-days {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.availability-day {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background-color: var(--bg-color);
+    border-radius: 0.375rem;
+}
+
+.availability-day .checkbox-label {
+    font-weight: 500;
+}
+
+.day-time-ranges {
+    padding-left: 1.5rem;
+}
+
+.time-range {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.time-range input[type="time"] {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+}
+
+.time-range span {
+    color: var(--text-light);
+    font-size: 0.875rem;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .dashboard {

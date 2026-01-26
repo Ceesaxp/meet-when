@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"time"
 
@@ -116,10 +117,16 @@ func (s *AvailabilityService) GetAvailableSlots(ctx context.Context, input GetAv
 
 	var availableSlots []models.TimeSlot
 
+	// Parse template availability rules
+	var templateRules *TemplateAvailabilityRules
+	if template.AvailabilityRules != nil {
+		templateRules = parseAvailabilityRules(template.AvailabilityRules)
+	}
+
 	// Iterate through each day
 	current := input.StartDate.Truncate(24 * time.Hour)
 	for current.Before(input.EndDate) {
-		daySlots := s.getSlotsForDay(current, workingHours, hostLoc, duration, slotIncrement, busySlots, earliestStart, input.EndDate)
+		daySlots := s.getSlotsForDay(current, workingHours, hostLoc, duration, slotIncrement, busySlots, earliestStart, input.EndDate, templateRules)
 		availableSlots = append(availableSlots, daySlots...)
 		current = current.AddDate(0, 0, 1)
 	}
@@ -133,6 +140,60 @@ func (s *AvailabilityService) GetAvailableSlots(ctx context.Context, input GetAv
 	return availableSlots, nil
 }
 
+// TemplateAvailabilityRules represents parsed availability rules from a template
+type TemplateAvailabilityRules struct {
+	Enabled bool
+	Days    map[int]DayAvailability
+}
+
+// DayAvailability represents availability for a specific day
+type DayAvailability struct {
+	Enabled bool
+	Start   string // HH:MM format
+	End     string // HH:MM format
+}
+
+// parseAvailabilityRules parses JSONMap availability rules into a structured format
+func parseAvailabilityRules(rules models.JSONMap) *TemplateAvailabilityRules {
+	if rules == nil {
+		return nil
+	}
+
+	result := &TemplateAvailabilityRules{
+		Days: make(map[int]DayAvailability),
+	}
+
+	// Parse enabled flag
+	if enabled, ok := rules["enabled"].(bool); ok {
+		result.Enabled = enabled
+	}
+
+	// Parse days
+	if days, ok := rules["days"].(map[string]interface{}); ok {
+		for dayStr, dayData := range days {
+			var dayNum int
+			if _, err := fmt.Sscanf(dayStr, "%d", &dayNum); err != nil {
+				continue
+			}
+			if dayMap, ok := dayData.(map[string]interface{}); ok {
+				dayAvail := DayAvailability{}
+				if enabled, ok := dayMap["enabled"].(bool); ok {
+					dayAvail.Enabled = enabled
+				}
+				if start, ok := dayMap["start"].(string); ok {
+					dayAvail.Start = start
+				}
+				if end, ok := dayMap["end"].(string); ok {
+					dayAvail.End = end
+				}
+				result.Days[dayNum] = dayAvail
+			}
+		}
+	}
+
+	return result
+}
+
 // getSlotsForDay returns available slots for a specific day
 func (s *AvailabilityService) getSlotsForDay(
 	day time.Time,
@@ -143,11 +204,44 @@ func (s *AvailabilityService) getSlotsForDay(
 	busySlots []models.TimeSlot,
 	earliestStart time.Time,
 	latestEnd time.Time,
+	templateRules *TemplateAvailabilityRules,
 ) []models.TimeSlot {
 	// Get day of week (0=Sunday)
 	dayOfWeek := int(day.In(hostLoc).Weekday())
 
-	// Find working hours for this day
+	// If template has custom availability rules, use those instead of working hours
+	if templateRules != nil && templateRules.Enabled {
+		// Check if this day is enabled in template rules
+		dayRule, dayExists := templateRules.Days[dayOfWeek]
+		if !dayExists || !dayRule.Enabled {
+			return nil
+		}
+
+		// Use template's time range for this day
+		startTime, err := time.ParseInLocation("15:04", dayRule.Start, hostLoc)
+		if err != nil {
+			return nil
+		}
+		endTime, err := time.ParseInLocation("15:04", dayRule.End, hostLoc)
+		if err != nil {
+			return nil
+		}
+
+		// Create full datetime for this day
+		dayInHostTz := day.In(hostLoc)
+		workStart := time.Date(
+			dayInHostTz.Year(), dayInHostTz.Month(), dayInHostTz.Day(),
+			startTime.Hour(), startTime.Minute(), 0, 0, hostLoc,
+		)
+		workEnd := time.Date(
+			dayInHostTz.Year(), dayInHostTz.Month(), dayInHostTz.Day(),
+			endTime.Hour(), endTime.Minute(), 0, 0, hostLoc,
+		)
+
+		return s.generateSlotsInRange(workStart, workEnd, duration, increment, busySlots, earliestStart, latestEnd)
+	}
+
+	// Fall back to working hours
 	var dayWorkingHours []*models.WorkingHours
 	for _, wh := range workingHours {
 		if wh.DayOfWeek == dayOfWeek && wh.IsEnabled {
@@ -183,27 +277,40 @@ func (s *AvailabilityService) getSlotsForDay(
 			endTime.Hour(), endTime.Minute(), 0, 0, hostLoc,
 		)
 
-		// Generate slots within working hours
-		slotStart := workStart
-		for slotStart.Add(duration).Before(workEnd) || slotStart.Add(duration).Equal(workEnd) {
-			slotEnd := slotStart.Add(duration)
+		slots = append(slots, s.generateSlotsInRange(workStart, workEnd, duration, increment, busySlots, earliestStart, latestEnd)...)
+	}
 
-			// Check constraints
-			if slotStart.Before(earliestStart) || slotEnd.After(latestEnd) {
-				slotStart = slotStart.Add(increment)
-				continue
-			}
+	return slots
+}
 
-			// Check if slot overlaps with any busy time
-			if !slotOverlapsBusy(slotStart, slotEnd, busySlots) {
-				slots = append(slots, models.TimeSlot{
-					Start: slotStart.UTC(),
-					End:   slotEnd.UTC(),
-				})
-			}
+// generateSlotsInRange generates available slots within a time range
+func (s *AvailabilityService) generateSlotsInRange(
+	workStart, workEnd time.Time,
+	duration, increment time.Duration,
+	busySlots []models.TimeSlot,
+	earliestStart, latestEnd time.Time,
+) []models.TimeSlot {
+	var slots []models.TimeSlot
 
+	slotStart := workStart
+	for slotStart.Add(duration).Before(workEnd) || slotStart.Add(duration).Equal(workEnd) {
+		slotEnd := slotStart.Add(duration)
+
+		// Check constraints
+		if slotStart.Before(earliestStart) || slotEnd.After(latestEnd) {
 			slotStart = slotStart.Add(increment)
+			continue
 		}
+
+		// Check if slot overlaps with any busy time
+		if !slotOverlapsBusy(slotStart, slotEnd, busySlots) {
+			slots = append(slots, models.TimeSlot{
+				Start: slotStart.UTC(),
+				End:   slotEnd.UTC(),
+			})
+		}
+
+		slotStart = slotStart.Add(increment)
 	}
 
 	return slots

@@ -232,6 +232,14 @@ func (h *DashboardHandler) CreateTemplate(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	// Parse availability rules
+	var availabilityRules models.JSONMap
+	if rulesJSON := r.FormValue("availability_rules"); rulesJSON != "" {
+		if err := json.Unmarshal([]byte(rulesJSON), &availabilityRules); err != nil {
+			log.Printf("[TEMPLATE] Failed to parse availability_rules: %v", err)
+		}
+	}
+
 	input := services.CreateTemplateInput{
 		HostID:            host.Host.ID,
 		TenantID:          host.Tenant.ID,
@@ -247,6 +255,7 @@ func (h *DashboardHandler) CreateTemplate(w http.ResponseWriter, r *http.Request
 		MaxScheduleDays:   parseIntOrDefault(r.FormValue("max_schedule_days"), 14),
 		PreBufferMinutes:  parseIntOrDefault(r.FormValue("pre_buffer_minutes"), 0),
 		PostBufferMinutes: parseIntOrDefault(r.FormValue("post_buffer_minutes"), 0),
+		AvailabilityRules: availabilityRules,
 		InviteeQuestions:  inviteeQuestions,
 	}
 
@@ -333,6 +342,14 @@ func (h *DashboardHandler) UpdateTemplate(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	// Parse availability rules
+	var availabilityRules models.JSONMap
+	if rulesJSON := r.FormValue("availability_rules"); rulesJSON != "" {
+		if err := json.Unmarshal([]byte(rulesJSON), &availabilityRules); err != nil {
+			log.Printf("[TEMPLATE] Failed to parse availability_rules: %v", err)
+		}
+	}
+
 	input := services.UpdateTemplateInput{
 		ID:                templateID,
 		HostID:            host.Host.ID,
@@ -349,6 +366,7 @@ func (h *DashboardHandler) UpdateTemplate(w http.ResponseWriter, r *http.Request
 		MaxScheduleDays:   parseIntOrDefault(r.FormValue("max_schedule_days"), 14),
 		PreBufferMinutes:  parseIntOrDefault(r.FormValue("pre_buffer_minutes"), 0),
 		PostBufferMinutes: parseIntOrDefault(r.FormValue("post_buffer_minutes"), 0),
+		AvailabilityRules: availabilityRules,
 		InviteeQuestions:  inviteeQuestions,
 		IsActive:          r.FormValue("is_active") == "on",
 	}

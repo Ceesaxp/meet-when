@@ -155,6 +155,115 @@
     </div>
 
     <div class="form-section">
+        <h3>Availability</h3>
+        <p class="form-section-description">Restrict availability for this meeting type beyond your working hours. Leave unchecked to use your default working hours.</p>
+
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="use_custom_availability" onchange="toggleCustomAvailability()">
+                Use custom availability for this template
+            </label>
+        </div>
+
+        <div id="availability-rules-container" style="display: none;">
+            <div class="availability-days">
+                <div class="availability-day" data-day="0">
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="day-enabled" data-day="0" onchange="updateAvailabilityRules()">
+                        <span>Sunday</span>
+                    </label>
+                    <div class="day-time-ranges" style="display: none;">
+                        <div class="time-range">
+                            <input type="time" class="day-start" data-day="0" value="09:00" onchange="updateAvailabilityRules()">
+                            <span>to</span>
+                            <input type="time" class="day-end" data-day="0" value="17:00" onchange="updateAvailabilityRules()">
+                        </div>
+                    </div>
+                </div>
+                <div class="availability-day" data-day="1">
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="day-enabled" data-day="1" onchange="updateAvailabilityRules()">
+                        <span>Monday</span>
+                    </label>
+                    <div class="day-time-ranges" style="display: none;">
+                        <div class="time-range">
+                            <input type="time" class="day-start" data-day="1" value="09:00" onchange="updateAvailabilityRules()">
+                            <span>to</span>
+                            <input type="time" class="day-end" data-day="1" value="17:00" onchange="updateAvailabilityRules()">
+                        </div>
+                    </div>
+                </div>
+                <div class="availability-day" data-day="2">
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="day-enabled" data-day="2" onchange="updateAvailabilityRules()">
+                        <span>Tuesday</span>
+                    </label>
+                    <div class="day-time-ranges" style="display: none;">
+                        <div class="time-range">
+                            <input type="time" class="day-start" data-day="2" value="09:00" onchange="updateAvailabilityRules()">
+                            <span>to</span>
+                            <input type="time" class="day-end" data-day="2" value="17:00" onchange="updateAvailabilityRules()">
+                        </div>
+                    </div>
+                </div>
+                <div class="availability-day" data-day="3">
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="day-enabled" data-day="3" onchange="updateAvailabilityRules()">
+                        <span>Wednesday</span>
+                    </label>
+                    <div class="day-time-ranges" style="display: none;">
+                        <div class="time-range">
+                            <input type="time" class="day-start" data-day="3" value="09:00" onchange="updateAvailabilityRules()">
+                            <span>to</span>
+                            <input type="time" class="day-end" data-day="3" value="17:00" onchange="updateAvailabilityRules()">
+                        </div>
+                    </div>
+                </div>
+                <div class="availability-day" data-day="4">
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="day-enabled" data-day="4" onchange="updateAvailabilityRules()">
+                        <span>Thursday</span>
+                    </label>
+                    <div class="day-time-ranges" style="display: none;">
+                        <div class="time-range">
+                            <input type="time" class="day-start" data-day="4" value="09:00" onchange="updateAvailabilityRules()">
+                            <span>to</span>
+                            <input type="time" class="day-end" data-day="4" value="17:00" onchange="updateAvailabilityRules()">
+                        </div>
+                    </div>
+                </div>
+                <div class="availability-day" data-day="5">
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="day-enabled" data-day="5" onchange="updateAvailabilityRules()">
+                        <span>Friday</span>
+                    </label>
+                    <div class="day-time-ranges" style="display: none;">
+                        <div class="time-range">
+                            <input type="time" class="day-start" data-day="5" value="09:00" onchange="updateAvailabilityRules()">
+                            <span>to</span>
+                            <input type="time" class="day-end" data-day="5" value="17:00" onchange="updateAvailabilityRules()">
+                        </div>
+                    </div>
+                </div>
+                <div class="availability-day" data-day="6">
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="day-enabled" data-day="6" onchange="updateAvailabilityRules()">
+                        <span>Saturday</span>
+                    </label>
+                    <div class="day-time-ranges" style="display: none;">
+                        <div class="time-range">
+                            <input type="time" class="day-start" data-day="6" value="09:00" onchange="updateAvailabilityRules()">
+                            <span>to</span>
+                            <input type="time" class="day-end" data-day="6" value="17:00" onchange="updateAvailabilityRules()">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <input type="hidden" name="availability_rules" id="availability_rules_json">
+    </div>
+
+    <div class="form-section">
         <h3>Custom Questions</h3>
         <p class="form-section-description">Add questions that invitees must answer when booking.</p>
 
@@ -283,14 +392,112 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
-    renderQuestions();
-});
-
 // Update hidden input before form submission
 document.querySelector('form').addEventListener('submit', function() {
     updateHiddenInput();
+    updateAvailabilityHiddenInput();
+});
+
+// Availability Rules Builder
+var availabilityRules = null;
+
+// Initialize availability rules from template data
+{{if .Data.Template}}{{if .Data.Template.AvailabilityRules}}
+try {
+    availabilityRules = {{.Data.Template.AvailabilityRules}};
+} catch (e) {
+    availabilityRules = null;
+}
+{{end}}{{end}}
+
+function toggleCustomAvailability() {
+    var checkbox = document.getElementById('use_custom_availability');
+    var container = document.getElementById('availability-rules-container');
+
+    if (checkbox.checked) {
+        container.style.display = 'block';
+        // Initialize default rules if none exist
+        if (!availabilityRules || !availabilityRules.days) {
+            availabilityRules = { enabled: true, days: {} };
+        }
+        availabilityRules.enabled = true;
+    } else {
+        container.style.display = 'none';
+        if (availabilityRules) {
+            availabilityRules.enabled = false;
+        }
+    }
+    updateAvailabilityHiddenInput();
+}
+
+function updateAvailabilityRules() {
+    if (!availabilityRules) {
+        availabilityRules = { enabled: true, days: {} };
+    }
+
+    var days = {};
+    for (var day = 0; day <= 6; day++) {
+        var enabledCheckbox = document.querySelector('.day-enabled[data-day="' + day + '"]');
+        var startInput = document.querySelector('.day-start[data-day="' + day + '"]');
+        var endInput = document.querySelector('.day-end[data-day="' + day + '"]');
+        var timeRangesDiv = enabledCheckbox.closest('.availability-day').querySelector('.day-time-ranges');
+
+        if (enabledCheckbox.checked) {
+            timeRangesDiv.style.display = 'block';
+            days[day] = {
+                enabled: true,
+                start: startInput.value,
+                end: endInput.value
+            };
+        } else {
+            timeRangesDiv.style.display = 'none';
+        }
+    }
+
+    availabilityRules.days = days;
+    updateAvailabilityHiddenInput();
+}
+
+function updateAvailabilityHiddenInput() {
+    var input = document.getElementById('availability_rules_json');
+    var checkbox = document.getElementById('use_custom_availability');
+
+    if (checkbox.checked && availabilityRules) {
+        input.value = JSON.stringify(availabilityRules);
+    } else {
+        input.value = '';
+    }
+}
+
+function initializeAvailabilityRules() {
+    if (availabilityRules && availabilityRules.enabled && availabilityRules.days) {
+        // Enable custom availability checkbox
+        document.getElementById('use_custom_availability').checked = true;
+        document.getElementById('availability-rules-container').style.display = 'block';
+
+        // Set up each day
+        for (var day in availabilityRules.days) {
+            var dayData = availabilityRules.days[day];
+            if (dayData.enabled) {
+                var enabledCheckbox = document.querySelector('.day-enabled[data-day="' + day + '"]');
+                var startInput = document.querySelector('.day-start[data-day="' + day + '"]');
+                var endInput = document.querySelector('.day-end[data-day="' + day + '"]');
+                var timeRangesDiv = enabledCheckbox.closest('.availability-day').querySelector('.day-time-ranges');
+
+                enabledCheckbox.checked = true;
+                startInput.value = dayData.start || '09:00';
+                endInput.value = dayData.end || '17:00';
+                timeRangesDiv.style.display = 'block';
+            }
+        }
+    }
+    updateAvailabilityHiddenInput();
+}
+
+// Initialize availability on page load (after renderQuestions)
+document.addEventListener('DOMContentLoaded', function() {
+    renderQuestions();
+    initializeAvailabilityRules();
 });
 </script>
 {{end}}
