@@ -21,6 +21,7 @@ type Handlers struct {
 	Public     *PublicHandler
 	Dashboard  *DashboardHandler
 	Onboarding *OnboardingHandler
+	API        *APIHandler
 }
 
 // New creates all handlers
@@ -38,6 +39,7 @@ func New(cfg *config.Config, svc *services.Services) *Handlers {
 	h.Public = &PublicHandler{handlers: h}
 	h.Dashboard = &DashboardHandler{handlers: h}
 	h.Onboarding = &OnboardingHandler{handlers: h}
+	h.API = &APIHandler{handlers: h}
 
 	return h
 }

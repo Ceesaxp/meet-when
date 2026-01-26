@@ -137,6 +137,9 @@ func main() {
 	mux.Handle("/dashboard/", middleware.RequireAuth(svc.Session)(dashboard))
 	mux.Handle("/onboarding/", middleware.RequireAuth(svc.Session)(dashboard))
 
+	// API routes
+	mux.HandleFunc("GET /api/timezones", h.API.GetTimezones)
+
 	// Health check
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

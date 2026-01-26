@@ -17,6 +17,7 @@ type Services struct {
 	Email        *EmailService
 	AuditLog     *AuditLogService
 	Reminder     *ReminderService
+	Timezone     *TimezoneService
 }
 
 // New creates all services
@@ -33,6 +34,8 @@ func New(cfg *config.Config, repos *repository.Repositories) *Services {
 	authSvc := NewAuthService(cfg, repos, sessionSvc, auditLogSvc)
 	reminderSvc := NewReminderService(repos, emailSvc)
 
+	timezoneSvc := NewTimezoneService()
+
 	return &Services{
 		Auth:         authSvc,
 		Session:      sessionSvc,
@@ -44,5 +47,6 @@ func New(cfg *config.Config, repos *repository.Repositories) *Services {
 		Email:        emailSvc,
 		AuditLog:     auditLogSvc,
 		Reminder:     reminderSvc,
+		Timezone:     timezoneSvc,
 	}
 }
