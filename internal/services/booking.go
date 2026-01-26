@@ -340,6 +340,120 @@ func (s *BookingService) GetPendingBookings(ctx context.Context, hostID string) 
 	return s.repos.Booking.GetByHostID(ctx, hostID, &status)
 }
 
+// RescheduleBookingInput represents the input for rescheduling a booking
+type RescheduleBookingInput struct {
+	Token        string
+	NewStartTime time.Time
+	NewDuration  int
+}
+
+// RescheduleBooking reschedules an existing booking to a new time
+func (s *BookingService) RescheduleBooking(ctx context.Context, input RescheduleBookingInput) (*BookingWithDetails, time.Time, error) {
+	// Get the existing booking by token
+	oldBooking, err := s.repos.Booking.GetByToken(ctx, input.Token)
+	if err != nil || oldBooking == nil {
+		return nil, time.Time{}, ErrBookingNotFound
+	}
+
+	// Can't reschedule a cancelled or rejected booking
+	if oldBooking.Status == models.BookingStatusCancelled || oldBooking.Status == models.BookingStatusRejected {
+		return nil, time.Time{}, ErrBookingCancelled
+	}
+
+	// Store old start time for email notification
+	oldStartTime := oldBooking.StartTime.Time
+
+	// Get template to validate duration and get settings
+	template, err := s.repos.Template.GetByID(ctx, oldBooking.TemplateID)
+	if err != nil || template == nil {
+		return nil, time.Time{}, ErrTemplateNotFound
+	}
+
+	// Validate duration against allowed template durations
+	validDuration := false
+	for _, d := range template.Durations {
+		if d == input.NewDuration {
+			validDuration = true
+			break
+		}
+	}
+	if !validDuration && len(template.Durations) > 0 {
+		input.NewDuration = template.Durations[0]
+	}
+
+	// Calculate new end time
+	newEndTime := input.NewStartTime.Add(time.Duration(input.NewDuration) * time.Minute)
+
+	// Validate time is in the future with minimum notice
+	minNotice := time.Duration(template.MinNoticeMinutes) * time.Minute
+	if input.NewStartTime.Before(time.Now().Add(minNotice)) {
+		return nil, time.Time{}, ErrInvalidBookingTime
+	}
+
+	// Delete old calendar event if it exists
+	if oldBooking.CalendarEventID != "" {
+		_ = s.calendar.DeleteEvent(ctx, oldBooking.HostID, template.CalendarID, oldBooking.CalendarEventID)
+	}
+
+	// Update booking with new times
+	oldBooking.StartTime = models.NewSQLiteTime(input.NewStartTime.UTC())
+	oldBooking.EndTime = models.NewSQLiteTime(newEndTime.UTC())
+	oldBooking.Duration = input.NewDuration
+	oldBooking.UpdatedAt = models.Now()
+	oldBooking.CalendarEventID = "" // Will be set when new event is created
+	oldBooking.ConferenceLink = ""  // Will be regenerated if needed
+
+	if err := s.repos.Booking.Update(ctx, oldBooking); err != nil {
+		return nil, time.Time{}, err
+	}
+
+	// Get host and tenant
+	host, _ := s.repos.Host.GetByID(ctx, oldBooking.HostID)
+	tenant, _ := s.repos.Tenant.GetByID(ctx, host.TenantID)
+
+	details := &BookingWithDetails{
+		Booking:  oldBooking,
+		Template: template,
+		Host:     host,
+		Tenant:   tenant,
+	}
+
+	// If booking was confirmed, recreate calendar event and conference link
+	if oldBooking.Status == models.BookingStatusConfirmed {
+		// Create new conference link if needed
+		if template.LocationType == models.ConferencingProviderGoogleMeet ||
+			template.LocationType == models.ConferencingProviderZoom {
+			link, err := s.conferencing.CreateMeeting(ctx, details)
+			if err != nil {
+				log.Printf("[RESCHEDULE] Error creating conference link: %v", err)
+			} else if link != "" {
+				details.Booking.ConferenceLink = link
+			}
+		}
+
+		// Create new calendar event
+		eventID, err := s.calendar.CreateEvent(ctx, details)
+		if err != nil {
+			log.Printf("[RESCHEDULE] Error creating calendar event: %v", err)
+		} else if eventID != "" {
+			details.Booking.CalendarEventID = eventID
+		}
+
+		// Update booking with new conference link and event ID
+		if err := s.repos.Booking.Update(ctx, details.Booking); err != nil {
+			log.Printf("[RESCHEDULE] Error updating booking: %v", err)
+		}
+	}
+
+	// Audit log
+	s.auditLog.Log(ctx, tenant.ID, nil, "booking.rescheduled", "booking", oldBooking.ID, models.JSONMap{
+		"old_start_time": oldStartTime.Format(time.RFC3339),
+		"new_start_time": input.NewStartTime.Format(time.RFC3339),
+	}, "")
+
+	return details, oldStartTime, nil
+}
+
 // processConfirmedBooking handles post-confirmation actions
 func (s *BookingService) processConfirmedBooking(ctx context.Context, details *BookingWithDetails) error {
 	log.Printf("[BOOKING] processConfirmedBooking: booking=%s template=%s calendar=%s",

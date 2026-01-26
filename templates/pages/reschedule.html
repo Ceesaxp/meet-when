@@ -4,35 +4,162 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reschedule | Meet When</title>
+    <title>Reschedule | {{.Data.Template.Name}} | Meet When</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
-<body class="public-page">
-    <div class="reschedule-container">
-        <h1>Reschedule Your Booking</h1>
-        <p>To reschedule, please cancel your current booking and create a new one.</p>
+<body class="public-page booking-page">
+    <div class="booking-container">
+        <div class="booking-sidebar">
+            <a href="/booking/{{.Data.Booking.Token}}" class="back-link">&larr; Back to Booking</a>
+            <h1>{{.Host.Name}}</h1>
+            <h2>Reschedule: {{.Data.Template.Name}}</h2>
 
-        <div class="booking-details-card">
-            <h3>Current Booking</h3>
-            <div class="booking-detail">
-                <strong>Meeting:</strong> {{.Data.Template.Name}}
+            <div class="booking-details-card">
+                <h4>Current Booking</h4>
+                <div class="booking-detail">
+                    <strong>When:</strong> {{formatDateTime .Data.Booking.StartTime}}
+                </div>
+                <div class="booking-detail">
+                    <strong>Duration:</strong> {{.Data.Booking.Duration}} minutes
+                </div>
             </div>
-            <div class="booking-detail">
-                <strong>With:</strong> {{.Host.Name}}
-            </div>
-            <div class="booking-detail">
-                <strong>When:</strong> {{formatDateTime .Data.Booking.StartTime}}
+
+            <div class="meeting-details">
+                <div class="detail">
+                    <strong>New Duration:</strong>
+                    {{if gt (len .Data.Template.Durations) 1}}
+                    <select id="duration" onchange="loadSlots()">
+                        {{range .Data.Template.Durations}}
+                        <option value="{{.}}" {{if eq . $.Data.Booking.Duration}}selected{{end}}>{{.}} minutes</option>
+                        {{end}}
+                    </select>
+                    {{else}}
+                    <span id="duration-display">{{index .Data.Template.Durations 0}} minutes</span>
+                    {{end}}
+                </div>
+                <div class="detail">
+                    <strong>Location:</strong>
+                    <span>
+                        {{if eq .Data.Template.LocationType "google_meet"}}Google Meet{{end}}
+                        {{if eq .Data.Template.LocationType "zoom"}}Zoom{{end}}
+                        {{if eq .Data.Template.LocationType "phone"}}Phone{{end}}
+                        {{if eq .Data.Template.LocationType "custom"}}{{.Data.Template.CustomLocation}}{{end}}
+                    </span>
+                </div>
             </div>
         </div>
 
-        <div class="reschedule-actions">
-            <form action="/booking/{{.Data.Booking.Token}}/cancel" method="POST">
-                <input type="hidden" name="reason" value="Rescheduling">
-                <button type="submit" class="btn btn-primary">Cancel & Book New Time</button>
-            </form>
-            <a href="/booking/{{.Data.Booking.Token}}" class="btn">Keep Current Booking</a>
+        <div class="booking-main">
+            {{if .Flash}}
+            <div class="alert alert-{{.Flash.Type}}">{{.Flash.Message}}</div>
+            {{end}}
+
+            <div id="reschedule-step-1" class="booking-step">
+                <h3>Select a New Date & Time</h3>
+                <p>Timezone: <select id="timezone" onchange="loadSlots()">
+                    <option value="UTC">UTC</option>
+                    <option value="America/New_York">Eastern Time</option>
+                    <option value="America/Chicago">Central Time</option>
+                    <option value="America/Denver">Mountain Time</option>
+                    <option value="America/Los_Angeles">Pacific Time</option>
+                    <option value="Europe/London">London</option>
+                    <option value="Europe/Paris">Paris</option>
+                    <option value="Europe/Berlin">Berlin</option>
+                    <option value="Asia/Tokyo">Tokyo</option>
+                    <option value="Australia/Sydney">Sydney</option>
+                </select></p>
+
+                <div id="slots-container" hx-swap="innerHTML">
+                    <div class="loading">Loading available times...</div>
+                </div>
+            </div>
+
+            <div id="reschedule-step-2" class="booking-step" style="display:none">
+                <h3>Confirm New Time</h3>
+                <form method="POST" action="/booking/{{.Data.Booking.Token}}/reschedule" class="booking-form">
+                    <input type="hidden" name="start_time" id="selected_start_time">
+                    <input type="hidden" name="timezone" id="form_timezone">
+                    <input type="hidden" name="duration" id="form_duration">
+
+                    <div class="reschedule-summary">
+                        <div class="summary-row">
+                            <span class="label">Name:</span>
+                            <span class="value">{{.Data.Booking.InviteeName}}</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="label">Email:</span>
+                            <span class="value">{{.Data.Booking.InviteeEmail}}</span>
+                        </div>
+                        <div class="summary-row old-time">
+                            <span class="label">Previous Time:</span>
+                            <span class="value">{{formatDateTime .Data.Booking.StartTime}}</span>
+                        </div>
+                        <div class="summary-row new-time">
+                            <span class="label">New Time:</span>
+                            <span class="value" id="selected-time-display"></span>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" onclick="showStep(1)" class="btn">Back</button>
+                        <button type="submit" class="btn btn-primary">Confirm Reschedule</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
+
+    <script>
+        var rescheduleToken = '{{.Data.Booking.Token}}';
+        var inviteeTimezone = '{{.Data.Booking.InviteeTimezone}}';
+
+        // Get the selected duration
+        function getSelectedDuration() {
+            var durationSelect = document.getElementById('duration');
+            if (durationSelect) {
+                return durationSelect.value;
+            }
+            return '{{.Data.Booking.Duration}}';
+        }
+
+        // Detect user timezone or use invitee's saved timezone
+        try {
+            var tz = inviteeTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+            var select = document.getElementById('timezone');
+            for (var i = 0; i < select.options.length; i++) {
+                if (select.options[i].value === tz) {
+                    select.selectedIndex = i;
+                    break;
+                }
+            }
+        } catch (e) {}
+
+        function loadSlots() {
+            var tz = document.getElementById('timezone').value;
+            var duration = getSelectedDuration();
+            htmx.ajax('GET', '/booking/' + rescheduleToken + '/reschedule/slots?timezone=' + tz + '&duration=' + duration, {target: '#slots-container'});
+        }
+
+        function selectSlot(startTime, displayTime) {
+            document.getElementById('selected_start_time').value = startTime;
+            document.getElementById('form_timezone').value = document.getElementById('timezone').value;
+            document.getElementById('form_duration').value = getSelectedDuration();
+            document.getElementById('selected-time-display').textContent = displayTime;
+            showStep(2);
+        }
+
+        function showStep(step) {
+            document.getElementById('reschedule-step-1').style.display = step === 1 ? 'block' : 'none';
+            document.getElementById('reschedule-step-2').style.display = step === 2 ? 'block' : 'none';
+        }
+
+        // Load slots on timezone change
+        document.getElementById('timezone').addEventListener('change', loadSlots);
+
+        // Load initial slots
+        loadSlots();
+    </script>
 </body>
 </html>
 {{end}}

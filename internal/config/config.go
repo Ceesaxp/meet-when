@@ -73,11 +73,11 @@ type EmailConfig struct {
 
 // AppConfig holds application-specific configuration
 type AppConfig struct {
-	Environment         string
-	MaxSchedulingDays   int
-	SessionDuration     time.Duration
-	DefaultTimezone     string
-	EncryptionKey       string
+	Environment       string
+	MaxSchedulingDays int
+	SessionDuration   time.Duration
+	DefaultTimezone   string
+	EncryptionKey     string
 }
 
 // ConnectionString returns the database connection string

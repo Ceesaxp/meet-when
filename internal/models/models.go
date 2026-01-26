@@ -150,27 +150,27 @@ type ConferencingConnection struct {
 
 // MeetingTemplate represents a bookable meeting type
 type MeetingTemplate struct {
-	ID                 string               `json:"id" db:"id"`
-	HostID             string               `json:"host_id" db:"host_id"`
-	Slug               string               `json:"slug" db:"slug"`
-	Name               string               `json:"name" db:"name"`
-	Description        string               `json:"description" db:"description"`
-	Durations          IntSlice             `json:"durations" db:"durations"` // Minutes, e.g., [30, 60]
-	LocationType       ConferencingProvider `json:"location_type" db:"location_type"`
-	CustomLocation     string               `json:"custom_location" db:"custom_location"`
-	CalendarID         string               `json:"calendar_id" db:"calendar_id"` // Which calendar to write to
-	RequiresApproval   bool                 `json:"requires_approval" db:"requires_approval"`
-	MinNoticeMinutes   int                  `json:"min_notice_minutes" db:"min_notice_minutes"`
-	MaxScheduleDays    int                  `json:"max_schedule_days" db:"max_schedule_days"`
-	PreBufferMinutes   int                  `json:"pre_buffer_minutes" db:"pre_buffer_minutes"`
-	PostBufferMinutes  int                  `json:"post_buffer_minutes" db:"post_buffer_minutes"`
-	AvailabilityRules  JSONMap              `json:"availability_rules" db:"availability_rules"`
-	InviteeQuestions   JSONArray            `json:"invitee_questions" db:"invitee_questions"`
-	ConfirmationEmail  string               `json:"confirmation_email" db:"confirmation_email"`
-	ReminderEmail      string               `json:"reminder_email" db:"reminder_email"`
-	IsActive           bool                 `json:"is_active" db:"is_active"`
-	CreatedAt          SQLiteTime           `json:"created_at" db:"created_at"`
-	UpdatedAt          SQLiteTime           `json:"updated_at" db:"updated_at"`
+	ID                string               `json:"id" db:"id"`
+	HostID            string               `json:"host_id" db:"host_id"`
+	Slug              string               `json:"slug" db:"slug"`
+	Name              string               `json:"name" db:"name"`
+	Description       string               `json:"description" db:"description"`
+	Durations         IntSlice             `json:"durations" db:"durations"` // Minutes, e.g., [30, 60]
+	LocationType      ConferencingProvider `json:"location_type" db:"location_type"`
+	CustomLocation    string               `json:"custom_location" db:"custom_location"`
+	CalendarID        string               `json:"calendar_id" db:"calendar_id"` // Which calendar to write to
+	RequiresApproval  bool                 `json:"requires_approval" db:"requires_approval"`
+	MinNoticeMinutes  int                  `json:"min_notice_minutes" db:"min_notice_minutes"`
+	MaxScheduleDays   int                  `json:"max_schedule_days" db:"max_schedule_days"`
+	PreBufferMinutes  int                  `json:"pre_buffer_minutes" db:"pre_buffer_minutes"`
+	PostBufferMinutes int                  `json:"post_buffer_minutes" db:"post_buffer_minutes"`
+	AvailabilityRules JSONMap              `json:"availability_rules" db:"availability_rules"`
+	InviteeQuestions  JSONArray            `json:"invitee_questions" db:"invitee_questions"`
+	ConfirmationEmail string               `json:"confirmation_email" db:"confirmation_email"`
+	ReminderEmail     string               `json:"reminder_email" db:"reminder_email"`
+	IsActive          bool                 `json:"is_active" db:"is_active"`
+	CreatedAt         SQLiteTime           `json:"created_at" db:"created_at"`
+	UpdatedAt         SQLiteTime           `json:"updated_at" db:"updated_at"`
 }
 
 // BookingStatus represents the status of a booking
@@ -185,26 +185,26 @@ const (
 
 // Booking represents a scheduled meeting
 type Booking struct {
-	ID              string        `json:"id" db:"id"`
-	TemplateID      string        `json:"template_id" db:"template_id"`
-	HostID          string        `json:"host_id" db:"host_id"`
-	Token           string        `json:"token" db:"token"` // For public access/cancel links
-	Status          BookingStatus `json:"status" db:"status"`
-	StartTime       SQLiteTime    `json:"start_time" db:"start_time"`
-	EndTime         SQLiteTime    `json:"end_time" db:"end_time"`
-	Duration        int           `json:"duration" db:"duration"` // Minutes
-	InviteeName     string        `json:"invitee_name" db:"invitee_name"`
-	InviteeEmail    string        `json:"invitee_email" db:"invitee_email"`
-	InviteeTimezone string        `json:"invitee_timezone" db:"invitee_timezone"`
-	InviteePhone    string        `json:"invitee_phone" db:"invitee_phone"`
-	AdditionalGuests StringSlice  `json:"additional_guests" db:"additional_guests"`
-	Answers         JSONMap       `json:"answers" db:"answers"`
-	ConferenceLink  string        `json:"conference_link" db:"conference_link"`
-	CalendarEventID string        `json:"calendar_event_id" db:"calendar_event_id"`
-	CancelledBy     string        `json:"cancelled_by" db:"cancelled_by"` // host or invitee
-	CancelReason    string        `json:"cancel_reason" db:"cancel_reason"`
-	CreatedAt       SQLiteTime    `json:"created_at" db:"created_at"`
-	UpdatedAt       SQLiteTime    `json:"updated_at" db:"updated_at"`
+	ID               string        `json:"id" db:"id"`
+	TemplateID       string        `json:"template_id" db:"template_id"`
+	HostID           string        `json:"host_id" db:"host_id"`
+	Token            string        `json:"token" db:"token"` // For public access/cancel links
+	Status           BookingStatus `json:"status" db:"status"`
+	StartTime        SQLiteTime    `json:"start_time" db:"start_time"`
+	EndTime          SQLiteTime    `json:"end_time" db:"end_time"`
+	Duration         int           `json:"duration" db:"duration"` // Minutes
+	InviteeName      string        `json:"invitee_name" db:"invitee_name"`
+	InviteeEmail     string        `json:"invitee_email" db:"invitee_email"`
+	InviteeTimezone  string        `json:"invitee_timezone" db:"invitee_timezone"`
+	InviteePhone     string        `json:"invitee_phone" db:"invitee_phone"`
+	AdditionalGuests StringSlice   `json:"additional_guests" db:"additional_guests"`
+	Answers          JSONMap       `json:"answers" db:"answers"`
+	ConferenceLink   string        `json:"conference_link" db:"conference_link"`
+	CalendarEventID  string        `json:"calendar_event_id" db:"calendar_event_id"`
+	CancelledBy      string        `json:"cancelled_by" db:"cancelled_by"` // host or invitee
+	CancelReason     string        `json:"cancel_reason" db:"cancel_reason"`
+	CreatedAt        SQLiteTime    `json:"created_at" db:"created_at"`
+	UpdatedAt        SQLiteTime    `json:"updated_at" db:"updated_at"`
 }
 
 // Session represents a user session

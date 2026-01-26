@@ -66,6 +66,8 @@ func main() {
 	mux.HandleFunc("GET /booking/{token}", h.Public.BookingStatus)
 	mux.HandleFunc("POST /booking/{token}/cancel", h.Public.CancelBooking)
 	mux.HandleFunc("GET /booking/{token}/reschedule", h.Public.ReschedulePage)
+	mux.HandleFunc("GET /booking/{token}/reschedule/slots", h.Public.GetRescheduleSlots)
+	mux.HandleFunc("POST /booking/{token}/reschedule", h.Public.RescheduleBooking)
 
 	// Auth routes
 	mux.HandleFunc("GET /auth/login", h.Auth.LoginPage)

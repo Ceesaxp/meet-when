@@ -335,14 +335,20 @@ func (h *PublicHandler) BookingStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("[BOOKING-STATUS] Booking found: id=%s status=%s", details.Booking.ID, details.Booking.Status)
 
+	// Check for action notifications from query params
+	rescheduled := r.URL.Query().Get("rescheduled") == "true"
+	cancelled := r.URL.Query().Get("cancelled") == "true"
+
 	h.handlers.render(w, "booking_status.html", PageData{
 		Title:   "Booking " + string(details.Booking.Status),
 		Host:    details.Host,
 		Tenant:  details.Tenant,
 		BaseURL: h.handlers.cfg.Server.BaseURL,
 		Data: map[string]interface{}{
-			"Booking":  details.Booking,
-			"Template": details.Template,
+			"Booking":     details.Booking,
+			"Template":    details.Template,
+			"Rescheduled": rescheduled,
+			"Cancelled":   cancelled,
 		},
 	})
 }
@@ -382,6 +388,11 @@ func (h *PublicHandler) ReschedulePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if details.Booking.Status == models.BookingStatusRejected {
+		h.handlers.error(w, r, http.StatusBadRequest, "This booking has been rejected")
+		return
+	}
+
 	h.handlers.render(w, "reschedule.html", PageData{
 		Title:   "Reschedule Booking",
 		Host:    details.Host,
@@ -392,6 +403,177 @@ func (h *PublicHandler) ReschedulePage(w http.ResponseWriter, r *http.Request) {
 			"Template": details.Template,
 		},
 	})
+}
+
+// GetRescheduleSlots returns available time slots for rescheduling (HTMX endpoint)
+func (h *PublicHandler) GetRescheduleSlots(w http.ResponseWriter, r *http.Request) {
+	token := r.PathValue("token")
+
+	// Get booking details
+	details, err := h.handlers.services.Booking.GetBookingByToken(r.Context(), token)
+	if err != nil {
+		http.Error(w, "Booking not found", http.StatusNotFound)
+		return
+	}
+
+	// Parse query parameters
+	dateStr := r.URL.Query().Get("date")
+	timezone := r.URL.Query().Get("timezone")
+	durationStr := r.URL.Query().Get("duration")
+
+	if timezone == "" {
+		timezone = details.Booking.InviteeTimezone
+	}
+	if timezone == "" {
+		timezone = "UTC"
+	}
+
+	// Parse date
+	var startDate time.Time
+	if dateStr != "" {
+		startDate, _ = time.Parse("2006-01-02", dateStr)
+	}
+	if startDate.IsZero() {
+		startDate = time.Now()
+	}
+
+	// Calculate date range (show one week at a time)
+	endDate := startDate.AddDate(0, 0, 7)
+
+	// Parse duration - validate against allowed template durations
+	duration := details.Booking.Duration // Default to current booking duration
+	if durationStr != "" {
+		if parsedDuration, err := strconv.Atoi(durationStr); err == nil {
+			// Validate that the requested duration is allowed for this template
+			for _, d := range details.Template.Durations {
+				if d == parsedDuration {
+					duration = parsedDuration
+					break
+				}
+			}
+		}
+	}
+
+	// Get available slots
+	slots, err := h.handlers.services.Availability.GetAvailableSlots(r.Context(), services.GetAvailableSlotsInput{
+		HostID:     details.Host.ID,
+		TemplateID: details.Template.ID,
+		StartDate:  startDate,
+		EndDate:    endDate,
+		Duration:   duration,
+		Timezone:   timezone,
+	})
+	if err != nil {
+		http.Error(w, "Failed to load availability", http.StatusInternalServerError)
+		return
+	}
+
+	// Group slots by date
+	slotsByDate := make(map[string][]models.TimeSlot)
+	for _, slot := range slots {
+		dateKey := slot.Start.Format("2006-01-02")
+		slotsByDate[dateKey] = append(slotsByDate[dateKey], slot)
+	}
+
+	h.handlers.renderPartial(w, "reschedule_slots_partial.html", map[string]interface{}{
+		"Slots":     slotsByDate,
+		"StartDate": startDate,
+		"EndDate":   endDate,
+		"Duration":  duration,
+		"Timezone":  timezone,
+		"Token":     token,
+	})
+}
+
+// RescheduleBooking handles reschedule form submission
+func (h *PublicHandler) RescheduleBooking(w http.ResponseWriter, r *http.Request) {
+	token := r.PathValue("token")
+
+	if err := r.ParseForm(); err != nil {
+		h.handlers.error(w, r, http.StatusBadRequest, "Invalid form data")
+		return
+	}
+
+	// Get booking details for error display
+	details, err := h.handlers.services.Booking.GetBookingByToken(r.Context(), token)
+	if err != nil {
+		h.handlers.error(w, r, http.StatusNotFound, "Booking not found")
+		return
+	}
+
+	// Parse form data
+	startTimeStr := r.FormValue("start_time")
+	startTime, err := time.Parse(time.RFC3339, startTimeStr)
+	if err != nil {
+		h.handlers.render(w, "reschedule.html", PageData{
+			Title:   "Reschedule Booking",
+			Host:    details.Host,
+			Tenant:  details.Tenant,
+			BaseURL: h.handlers.cfg.Server.BaseURL,
+			Flash:   &FlashMessage{Type: "error", Message: "Invalid time format"},
+			Data: map[string]interface{}{
+				"Booking":  details.Booking,
+				"Template": details.Template,
+			},
+		})
+		return
+	}
+
+	// Parse duration
+	duration := details.Booking.Duration
+	if durationStr := r.FormValue("duration"); durationStr != "" {
+		if parsedDuration, err := strconv.Atoi(durationStr); err == nil {
+			// Validate against template durations
+			for _, d := range details.Template.Durations {
+				if d == parsedDuration {
+					duration = parsedDuration
+					break
+				}
+			}
+		}
+	}
+
+	log.Printf("[RESCHEDULE] Rescheduling booking: token=%s new_time=%s duration=%d", token, startTime, duration)
+
+	// Reschedule the booking
+	newDetails, oldStartTime, err := h.handlers.services.Booking.RescheduleBooking(r.Context(), services.RescheduleBookingInput{
+		Token:        token,
+		NewStartTime: startTime,
+		NewDuration:  duration,
+	})
+	if err != nil {
+		log.Printf("[RESCHEDULE] Error rescheduling booking: %v", err)
+		message := "Failed to reschedule booking"
+		switch err {
+		case services.ErrSlotNotAvailable:
+			message = "This time slot is no longer available"
+		case services.ErrInvalidBookingTime:
+			message = "Invalid booking time - please select a time further in the future"
+		case services.ErrBookingCancelled:
+			message = "This booking has been cancelled and cannot be rescheduled"
+		}
+		h.handlers.render(w, "reschedule.html", PageData{
+			Title:   "Reschedule Booking",
+			Host:    details.Host,
+			Tenant:  details.Tenant,
+			BaseURL: h.handlers.cfg.Server.BaseURL,
+			Flash:   &FlashMessage{Type: "error", Message: message},
+			Data: map[string]interface{}{
+				"Booking":  details.Booking,
+				"Template": details.Template,
+			},
+		})
+		return
+	}
+
+	log.Printf("[RESCHEDULE] Booking rescheduled successfully: id=%s old_time=%s new_time=%s",
+		newDetails.Booking.ID, oldStartTime, newDetails.Booking.StartTime)
+
+	// Send reschedule notification emails
+	h.handlers.services.Email.SendBookingRescheduled(r.Context(), newDetails, oldStartTime)
+
+	// Redirect to booking status page with success message
+	h.handlers.redirect(w, r, "/booking/"+token+"?rescheduled=true")
 }
 
 // splitEmails splits a string of emails by comma, semicolon, or newline

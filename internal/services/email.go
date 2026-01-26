@@ -295,6 +295,126 @@ Meet When`,
 	}()
 }
 
+// SendBookingRescheduled sends reschedule notification to both host and invitee
+func (s *EmailService) SendBookingRescheduled(ctx context.Context, details *BookingWithDetails, oldStartTime time.Time) {
+	// Send to invitee
+	s.sendInviteeRescheduleNotification(ctx, details, oldStartTime)
+
+	// Send to host
+	s.sendHostRescheduleNotification(ctx, details, oldStartTime)
+}
+
+func (s *EmailService) sendInviteeRescheduleNotification(ctx context.Context, details *BookingWithDetails, oldStartTime time.Time) {
+	subject := fmt.Sprintf("Rescheduled: %s with %s", details.Template.Name, details.Host.Name)
+
+	// Format times in invitee's timezone
+	inviteeLoc, _ := time.LoadLocation(details.Booking.InviteeTimezone)
+	if inviteeLoc == nil {
+		inviteeLoc = time.UTC
+	}
+	oldTimeFormatted := oldStartTime.In(inviteeLoc).Format("Monday, January 2, 2006 at 3:04 PM MST")
+	newTimeFormatted := details.Booking.StartTime.In(inviteeLoc).Format("Monday, January 2, 2006 at 3:04 PM MST")
+
+	location := "To be determined"
+	if details.Booking.ConferenceLink != "" {
+		location = details.Booking.ConferenceLink
+	} else if details.Template.CustomLocation != "" {
+		location = details.Template.CustomLocation
+	}
+
+	body := fmt.Sprintf(`Hello %s,
+
+Your meeting has been rescheduled.
+
+Meeting: %s
+With: %s
+
+Previous time: %s
+New time: %s
+Duration: %d minutes
+Location: %s
+
+Need to make changes?
+Cancel: %s/booking/%s
+Reschedule: %s/booking/%s/reschedule
+
+Best regards,
+Meet When`,
+		details.Booking.InviteeName,
+		details.Template.Name,
+		details.Host.Name,
+		oldTimeFormatted,
+		newTimeFormatted,
+		details.Booking.Duration,
+		location,
+		s.cfg.Server.BaseURL,
+		details.Booking.Token,
+		s.cfg.Server.BaseURL,
+		details.Booking.Token,
+	)
+
+	// Generate ICS attachment with updated time
+	ics := s.generateICS(details)
+
+	go func() {
+		if err := s.sendEmail(details.Booking.InviteeEmail, subject, body, ics); err != nil {
+			log.Printf("Error sending reschedule email to invitee %s: %v", details.Booking.InviteeEmail, err)
+		}
+	}()
+}
+
+func (s *EmailService) sendHostRescheduleNotification(ctx context.Context, details *BookingWithDetails, oldStartTime time.Time) {
+	subject := fmt.Sprintf("Meeting rescheduled: %s with %s", details.Template.Name, details.Booking.InviteeName)
+
+	// Format times in host's timezone
+	hostLoc, _ := time.LoadLocation(details.Host.Timezone)
+	if hostLoc == nil {
+		hostLoc = time.UTC
+	}
+	oldTimeFormatted := oldStartTime.In(hostLoc).Format("Monday, January 2, 2006 at 3:04 PM MST")
+	newTimeFormatted := details.Booking.StartTime.In(hostLoc).Format("Monday, January 2, 2006 at 3:04 PM MST")
+
+	location := "To be determined"
+	if details.Booking.ConferenceLink != "" {
+		location = details.Booking.ConferenceLink
+	} else if details.Template.CustomLocation != "" {
+		location = details.Template.CustomLocation
+	}
+
+	body := fmt.Sprintf(`Hello %s,
+
+A meeting has been rescheduled.
+
+Meeting: %s
+With: %s (%s)
+
+Previous time: %s
+New time: %s
+Duration: %d minutes
+Location: %s
+
+View all bookings: %s/dashboard/bookings
+
+Best regards,
+Meet When`,
+		details.Host.Name,
+		details.Template.Name,
+		details.Booking.InviteeName,
+		details.Booking.InviteeEmail,
+		oldTimeFormatted,
+		newTimeFormatted,
+		details.Booking.Duration,
+		location,
+		s.cfg.Server.BaseURL,
+	)
+
+	go func() {
+		if err := s.sendEmail(details.Host.Email, subject, body, ""); err != nil {
+			log.Printf("Error sending reschedule email to host %s: %v", details.Host.Email, err)
+		}
+	}()
+}
+
 // generateICS creates an ICS calendar attachment
 func (s *EmailService) generateICS(details *BookingWithDetails) string {
 	location := ""

@@ -38,9 +38,9 @@ func NewCalendarService(cfg *config.Config, repos *repository.Repositories) *Cal
 
 // GoogleCalendarConnectInput represents input for connecting Google Calendar
 type GoogleCalendarConnectInput struct {
-	HostID       string
-	AuthCode     string
-	RedirectURI  string
+	HostID      string
+	AuthCode    string
+	RedirectURI string
 }
 
 // ConnectGoogleCalendar connects a Google Calendar using OAuth

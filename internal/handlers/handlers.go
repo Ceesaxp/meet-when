@@ -152,13 +152,13 @@ func (h *Handlers) Landing(w http.ResponseWriter, r *http.Request) {
 // templateFuncs returns custom template functions
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{
-		"formatDate": formatDate,
-		"formatTime": formatTime,
+		"formatDate":     formatDate,
+		"formatTime":     formatTime,
 		"formatDateTime": formatDateTime,
-		"add": func(a, b int) int { return a + b },
-		"sub": func(a, b int) int { return a - b },
-		"mul": func(a, b int) int { return a * b },
-		"div": func(a, b int) int { return a / b },
+		"add":            func(a, b int) int { return a + b },
+		"sub":            func(a, b int) int { return a - b },
+		"mul":            func(a, b int) int { return a * b },
+		"div":            func(a, b int) int { return a / b },
 		"seq": func(start, end int) []int {
 			var result []int
 			for i := start; i <= end; i++ {

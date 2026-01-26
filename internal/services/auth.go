@@ -25,10 +25,10 @@ var (
 
 // AuthService handles authentication operations
 type AuthService struct {
-	cfg        *config.Config
-	repos      *repository.Repositories
-	session    *SessionService
-	auditLog   *AuditLogService
+	cfg      *config.Config
+	repos    *repository.Repositories
+	session  *SessionService
+	auditLog *AuditLogService
 }
 
 // NewAuthService creates a new auth service

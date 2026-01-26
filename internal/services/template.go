@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	ErrTemplateNotFound = errors.New("meeting template not found")
+	ErrTemplateNotFound   = errors.New("meeting template not found")
 	ErrTemplateSlugExists = errors.New("template slug already exists")
 )
 

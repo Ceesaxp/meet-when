@@ -9,6 +9,13 @@
 </head>
 <body class="public-page">
     <div class="booking-status-container">
+        {{if .Data.Rescheduled}}
+        <div class="alert alert-success">Your booking has been successfully rescheduled!</div>
+        {{end}}
+        {{if .Data.Cancelled}}
+        <div class="alert alert-info">Your booking has been cancelled.</div>
+        {{end}}
+
         {{if eq .Data.Booking.Status "pending"}}
         <div class="status-icon status-pending">&#9203;</div>
         <h1>Booking Requested</h1>
