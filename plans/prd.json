@@ -147,8 +147,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 9,
-      "passes": false,
-      "notes": "confirmation_email and reminder_email fields exist but not used"
+      "passes": true,
+      "notes": "Implemented Email Templates section with subject/body fields for confirmation and reminder emails. Supports placeholders: {{invitee_name}}, {{host_name}}, {{meeting_name}}, {{meeting_time}}, {{duration}}, {{location}}, {{cancel_link}}, {{reschedule_link}}. EmailService parses custom templates from JSON and renders with placeholder substitution."
     },
     {
       "id": "US-010",

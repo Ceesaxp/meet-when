@@ -234,3 +234,31 @@ The following features from the requirements document are already fully implemen
   - When custom availability is disabled (checkbox unchecked), the hidden input is cleared to ensure rules aren't persisted
 
 ---
+
+## 2026-01-26 - US-009 - Implement editable email templates
+- What was implemented:
+  - Added 'Email Templates' section to template form with confirmation and reminder email fields
+  - Each email type has subject and body fields with placeholder hints
+  - Supported placeholders: `{{invitee_name}}`, `{{host_name}}`, `{{meeting_name}}`, `{{meeting_time}}`, `{{duration}}`, `{{location}}`, `{{cancel_link}}`, `{{reschedule_link}}`
+  - Templates stored as JSON in `confirmation_email` and `reminder_email` fields (structure: `{subject: string, body: string}`)
+  - Added `EmailTemplate` and `EmailTemplateData` types to email service
+  - Added `parseEmailTemplate()` function to parse JSON template strings
+  - Added `renderEmailTemplate()` function to replace placeholders with actual values
+  - Added `buildEmailTemplateData()` helper to construct template data from booking details
+  - Added `defaultInviteeConfirmationBody()` helper for fallback email body
+  - Modified `sendInviteeConfirmation()` to use custom templates when available
+  - Updated `CreateTemplateInput` and `UpdateTemplateInput` with `ConfirmationEmail` and `ReminderEmail` fields
+  - Dashboard handlers extract email template fields from form and pass to service
+- Files changed:
+  - `templates/pages/dashboard_template_form.html` - Added Email Templates section with JS to bundle subject/body into JSON
+  - `internal/services/email.go` - Added EmailTemplate types, parsing, rendering, and custom template support in sendInviteeConfirmation
+  - `internal/services/template.go` - Added ConfirmationEmail and ReminderEmail to input structs and template creation/update
+  - `internal/handlers/dashboard.go` - Added ConfirmationEmail and ReminderEmail to CreateTemplate and UpdateTemplate inputs
+- **Learnings for future iterations:**
+  - The `confirmation_email` and `reminder_email` fields were already in the MeetingTemplate model - just needed to wire them up
+  - Using simple string placeholder replacement (strings.ReplaceAll) is sufficient for basic templating - no need for Go's html/template complexity
+  - Email templates are stored as JSON (`{"subject":"...", "body":"..."}`) which allows separate customization of subject and body
+  - The custom template only replaces the default if parsed successfully and has content - empty strings fall back to defaults
+  - JavaScript bundles subject+body into hidden JSON field on form submit, similar to pattern used for custom questions and availability rules
+
+---
