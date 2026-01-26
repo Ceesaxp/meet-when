@@ -174,5 +174,11 @@ func templateFuncs() template.FuncMap {
 			}
 			return false
 		},
+		"toMap": func(v interface{}) map[string]interface{} {
+			if m, ok := v.(map[string]interface{}); ok {
+				return m
+			}
+			return nil
+		},
 	}
 }

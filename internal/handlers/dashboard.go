@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"strconv"
@@ -223,6 +224,14 @@ func (h *DashboardHandler) CreateTemplate(w http.ResponseWriter, r *http.Request
 		durations = []int{30}
 	}
 
+	// Parse invitee questions
+	var inviteeQuestions models.JSONArray
+	if questionsJSON := r.FormValue("invitee_questions"); questionsJSON != "" {
+		if err := json.Unmarshal([]byte(questionsJSON), &inviteeQuestions); err != nil {
+			log.Printf("[TEMPLATE] Failed to parse invitee_questions: %v", err)
+		}
+	}
+
 	input := services.CreateTemplateInput{
 		HostID:            host.Host.ID,
 		TenantID:          host.Tenant.ID,
@@ -238,6 +247,7 @@ func (h *DashboardHandler) CreateTemplate(w http.ResponseWriter, r *http.Request
 		MaxScheduleDays:   parseIntOrDefault(r.FormValue("max_schedule_days"), 14),
 		PreBufferMinutes:  parseIntOrDefault(r.FormValue("pre_buffer_minutes"), 0),
 		PostBufferMinutes: parseIntOrDefault(r.FormValue("post_buffer_minutes"), 0),
+		InviteeQuestions:  inviteeQuestions,
 	}
 
 	_, err := h.handlers.services.Template.CreateTemplate(r.Context(), input)
@@ -315,6 +325,14 @@ func (h *DashboardHandler) UpdateTemplate(w http.ResponseWriter, r *http.Request
 		durations = []int{30}
 	}
 
+	// Parse invitee questions
+	var inviteeQuestions models.JSONArray
+	if questionsJSON := r.FormValue("invitee_questions"); questionsJSON != "" {
+		if err := json.Unmarshal([]byte(questionsJSON), &inviteeQuestions); err != nil {
+			log.Printf("[TEMPLATE] Failed to parse invitee_questions: %v", err)
+		}
+	}
+
 	input := services.UpdateTemplateInput{
 		ID:                templateID,
 		HostID:            host.Host.ID,
@@ -331,6 +349,7 @@ func (h *DashboardHandler) UpdateTemplate(w http.ResponseWriter, r *http.Request
 		MaxScheduleDays:   parseIntOrDefault(r.FormValue("max_schedule_days"), 14),
 		PreBufferMinutes:  parseIntOrDefault(r.FormValue("pre_buffer_minutes"), 0),
 		PostBufferMinutes: parseIntOrDefault(r.FormValue("post_buffer_minutes"), 0),
+		InviteeQuestions:  inviteeQuestions,
 		IsActive:          r.FormValue("is_active") == "on",
 	}
 

@@ -154,6 +154,18 @@
         {{end}}
     </div>
 
+    <div class="form-section">
+        <h3>Custom Questions</h3>
+        <p class="form-section-description">Add questions that invitees must answer when booking.</p>
+
+        <div id="questions-container">
+            <!-- Questions will be rendered here by JavaScript -->
+        </div>
+
+        <button type="button" onclick="addQuestion()" class="btn btn-sm">+ Add Question</button>
+        <input type="hidden" name="invitee_questions" id="invitee_questions_json">
+    </div>
+
     <div class="form-actions">
         <a href="/dashboard/templates" class="btn">Cancel</a>
         <button type="submit" class="btn btn-primary">{{if .Data.IsNew}}Create Meeting Type{{else}}Save Changes{{end}}</button>
@@ -168,6 +180,117 @@ document.getElementById('location_type').addEventListener('change', function() {
     } else {
         customGroup.style.display = 'none';
     }
+});
+
+// Custom Questions Builder
+var questions = [];
+
+// Initialize questions from template data
+{{if .Data.Template}}{{if .Data.Template.InviteeQuestions}}
+try {
+    questions = {{.Data.Template.InviteeQuestions}};
+} catch (e) {
+    questions = [];
+}
+{{end}}{{end}}
+
+function renderQuestions() {
+    var container = document.getElementById('questions-container');
+    container.innerHTML = '';
+
+    questions.forEach(function(q, index) {
+        var div = document.createElement('div');
+        div.className = 'question-item';
+        div.innerHTML = `
+            <div class="question-header">
+                <span class="question-number">Question ${index + 1}</span>
+                <button type="button" onclick="removeQuestion(${index})" class="btn btn-sm btn-danger">Remove</button>
+            </div>
+            <div class="form-group">
+                <label>Question Label *</label>
+                <input type="text" value="${escapeHtml(q.label || '')}" onchange="updateQuestion(${index}, 'label', this.value)" placeholder="e.g., What company are you from?" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Field Name *</label>
+                    <input type="text" value="${escapeHtml(q.field || '')}" onchange="updateQuestion(${index}, 'field', this.value)" placeholder="e.g., company_name" pattern="[a-z0-9_]+" required>
+                    <small>Lowercase letters, numbers, underscores only</small>
+                </div>
+                <div class="form-group">
+                    <label>Type</label>
+                    <select onchange="updateQuestion(${index}, 'type', this.value)">
+                        <option value="text" ${q.type === 'text' ? 'selected' : ''}>Text (single line)</option>
+                        <option value="textarea" ${q.type === 'textarea' ? 'selected' : ''}>Textarea (multi-line)</option>
+                        <option value="select" ${q.type === 'select' ? 'selected' : ''}>Dropdown</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group" id="options-group-${index}" style="${q.type === 'select' ? '' : 'display:none'}">
+                <label>Options (one per line)</label>
+                <textarea rows="3" onchange="updateQuestion(${index}, 'options', this.value.split('\\n').filter(o => o.trim()))" placeholder="Option 1\nOption 2\nOption 3">${(q.options || []).join('\\n')}</textarea>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" ${q.required ? 'checked' : ''} onchange="updateQuestion(${index}, 'required', this.checked)">
+                    Required
+                </label>
+            </div>
+        `;
+        container.appendChild(div);
+    });
+
+    updateHiddenInput();
+}
+
+function addQuestion() {
+    questions.push({
+        id: 'q' + Date.now(),
+        field: '',
+        label: '',
+        type: 'text',
+        required: false,
+        options: []
+    });
+    renderQuestions();
+}
+
+function removeQuestion(index) {
+    questions.splice(index, 1);
+    renderQuestions();
+}
+
+function updateQuestion(index, key, value) {
+    questions[index][key] = value;
+
+    // Show/hide options field for select type
+    if (key === 'type') {
+        var optionsGroup = document.getElementById('options-group-' + index);
+        if (optionsGroup) {
+            optionsGroup.style.display = value === 'select' ? '' : 'none';
+        }
+    }
+
+    updateHiddenInput();
+}
+
+function updateHiddenInput() {
+    document.getElementById('invitee_questions_json').value = JSON.stringify(questions);
+}
+
+function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(text));
+    return div.innerHTML;
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    renderQuestions();
+});
+
+// Update hidden input before form submission
+document.querySelector('form').addEventListener('submit', function() {
+    updateHiddenInput();
 });
 </script>
 {{end}}

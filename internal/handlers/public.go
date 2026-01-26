@@ -268,7 +268,7 @@ func (h *PublicHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 		for i, q := range template.InviteeQuestions {
 			if qMap, ok := q.(map[string]interface{}); ok {
 				if fieldName, ok := qMap["field"].(string); ok {
-					answers[fieldName] = r.FormValue("question_" + string(rune(i)))
+					answers[fieldName] = r.FormValue("question_" + strconv.Itoa(i))
 				}
 			}
 		}

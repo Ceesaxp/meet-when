@@ -105,6 +105,41 @@
                                   placeholder="What would you like to discuss?"></textarea>
                     </div>
 
+                    {{if .Data.Template.InviteeQuestions}}
+                    <div class="custom-questions-section">
+                        <h4>Additional Information</h4>
+                        {{range $index, $question := .Data.Template.InviteeQuestions}}
+                        {{$qMap := toMap $question}}
+                        {{if $qMap}}
+                        <div class="form-group">
+                            <label for="question_{{$index}}">
+                                {{index $qMap "label"}}
+                                {{if index $qMap "required"}}*{{end}}
+                            </label>
+                            {{if eq (index $qMap "type") "textarea"}}
+                            <textarea id="question_{{$index}}" name="question_{{$index}}" rows="3"
+                                      {{if index $qMap "required"}}required{{end}}></textarea>
+                            {{else if eq (index $qMap "type") "select"}}
+                            <select id="question_{{$index}}" name="question_{{$index}}"
+                                    {{if index $qMap "required"}}required{{end}}>
+                                <option value="">Select an option</option>
+                                {{$options := index $qMap "options"}}
+                                {{if $options}}
+                                {{range $options}}
+                                <option value="{{.}}">{{.}}</option>
+                                {{end}}
+                                {{end}}
+                            </select>
+                            {{else}}
+                            <input type="text" id="question_{{$index}}" name="question_{{$index}}"
+                                   {{if index $qMap "required"}}required{{end}}>
+                            {{end}}
+                        </div>
+                        {{end}}
+                        {{end}}
+                    </div>
+                    {{end}}
+
                     <div class="form-actions">
                         <button type="button" onclick="showStep(1)" class="btn">Back</button>
                         <button type="submit" class="btn btn-primary">
