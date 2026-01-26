@@ -153,7 +153,8 @@ func (s *ConferencingService) exchangeZoomAuthCode(code, redirectURI string) (*z
 }
 
 func (s *ConferencingService) refreshZoomToken(conn *models.ConferencingConnection) error {
-	if conn.TokenExpiry == nil || time.Now().Before(conn.TokenExpiry.Add(-5*time.Minute)) {
+	// Only skip refresh if we have a valid, unexpired token with >5 min remaining
+	if conn.TokenExpiry != nil && time.Now().Before(conn.TokenExpiry.Add(-5*time.Minute)) {
 		return nil
 	}
 
