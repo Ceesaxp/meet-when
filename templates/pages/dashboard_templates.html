@@ -9,6 +9,22 @@
 </div>
 
 {{if .Data.Templates}}
+<script>
+function copyTemplateLink(btn, url) {
+    navigator.clipboard.writeText(url).then(function() {
+        var originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.add('btn-copied');
+        setTimeout(function() {
+            btn.textContent = originalText;
+            btn.classList.remove('btn-copied');
+        }, 2000);
+    }).catch(function(err) {
+        console.error('Failed to copy: ', err);
+        alert('Failed to copy link');
+    });
+}
+</script>
 <div class="template-grid">
     {{range .Data.Templates}}
     <div class="template-card {{if not .IsActive}}inactive{{end}}">
@@ -24,6 +40,7 @@
             <span>{{.LocationType}}</span>
         </div>
         <div class="template-actions">
+            <button type="button" class="btn btn-sm btn-copy" onclick="copyTemplateLink(this, '{{$.BaseURL}}/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}')">Copy Link</button>
             <a href="/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}" target="_blank" class="btn btn-sm">Preview</a>
             <a href="/dashboard/templates/{{.ID}}" class="btn btn-sm">Edit</a>
             <form action="/dashboard/templates/{{.ID}}" method="POST" style="display:inline">

@@ -23,7 +23,7 @@
     <div class="stat-card">
         <h3>Your Booking Link</h3>
         <p class="booking-link">{{$.BaseURL}}/m/{{.Tenant.Slug}}/{{.Host.Slug}}</p>
-        <button onclick="copyLink()" class="btn btn-sm">Copy Link</button>
+        <button id="copyLinkBtn" onclick="copyLink(this)" class="btn btn-sm btn-copy">Copy Link</button>
     </div>
 </div>
 
@@ -72,9 +72,19 @@
 </div>
 
 <script>
-function copyLink() {
-    navigator.clipboard.writeText('{{$.BaseURL}}/m/{{.Tenant.Slug}}/{{.Host.Slug}}');
-    alert('Link copied to clipboard!');
+function copyLink(btn) {
+    navigator.clipboard.writeText('{{$.BaseURL}}/m/{{.Tenant.Slug}}/{{.Host.Slug}}').then(function() {
+        var originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.add('btn-copied');
+        setTimeout(function() {
+            btn.textContent = originalText;
+            btn.classList.remove('btn-copied');
+        }, 2000);
+    }).catch(function(err) {
+        console.error('Failed to copy: ', err);
+        alert('Failed to copy link');
+    });
 }
 </script>
 {{end}}

@@ -96,6 +96,23 @@ a:hover {
     color: white;
 }
 
+.btn-copy {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+    transition: all 0.2s ease;
+}
+
+.btn-copy:hover {
+    background-color: #4338ca;
+    border-color: #4338ca;
+}
+
+.btn-copied {
+    background-color: var(--success-color);
+    border-color: var(--success-color);
+}
+
 /* Forms */
 .form-group {
     margin-bottom: 1rem;
