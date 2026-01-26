@@ -1,0 +1,239 @@
+{{define "landing.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meet When - Simple Scheduling for Busy People</title>
+    <meta name="description" content="Schedule meetings effortlessly. Share your availability, let others book time with you, and eliminate the back-and-forth.">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .landing-page {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #f9fafb 0%, #eef2ff 100%);
+        }
+
+        .landing-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .landing-logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .landing-nav-links {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .landing-hero {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 4rem 2rem 6rem;
+            text-align: center;
+        }
+
+        .landing-hero h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--text-color);
+            margin-bottom: 1.5rem;
+            line-height: 1.2;
+        }
+
+        .landing-hero h1 span {
+            color: var(--primary-color);
+        }
+
+        .landing-hero p {
+            font-size: 1.25rem;
+            color: var(--text-light);
+            max-width: 600px;
+            margin: 0 auto 2.5rem;
+            line-height: 1.6;
+        }
+
+        .landing-cta {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .landing-cta .btn {
+            padding: 0.875rem 2rem;
+            font-size: 1rem;
+        }
+
+        .landing-features {
+            background-color: var(--card-bg);
+            padding: 5rem 2rem;
+        }
+
+        .features-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .features-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .features-header h2 {
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .features-header p {
+            color: var(--text-light);
+            font-size: 1.125rem;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            padding: 2rem;
+            background-color: var(--bg-color);
+            border-radius: 0.75rem;
+            text-align: center;
+        }
+
+        .feature-icon {
+            width: 3.5rem;
+            height: 3.5rem;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin: 0 auto 1.25rem;
+        }
+
+        .feature-card h3 {
+            font-size: 1.125rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-card p {
+            color: var(--text-light);
+            font-size: 0.9375rem;
+            line-height: 1.5;
+        }
+
+        .landing-footer {
+            background-color: var(--sidebar-bg);
+            color: var(--sidebar-text);
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+
+        .landing-footer p {
+            opacity: 0.7;
+            font-size: 0.875rem;
+        }
+
+        .landing-footer a {
+            color: var(--sidebar-text);
+            opacity: 0.9;
+        }
+
+        .landing-footer a:hover {
+            opacity: 1;
+        }
+
+        @media (max-width: 768px) {
+            .landing-hero h1 {
+                font-size: 2rem;
+            }
+
+            .landing-hero p {
+                font-size: 1rem;
+            }
+
+            .landing-nav {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body class="landing-page">
+    <nav class="landing-nav">
+        <div class="landing-logo">Meet When</div>
+        <div class="landing-nav-links">
+            <a href="/auth/login" class="btn">Sign In</a>
+            <a href="/auth/register" class="btn btn-primary">Get Started</a>
+        </div>
+    </nav>
+
+    <section class="landing-hero">
+        <h1>Scheduling Made <span>Simple</span></h1>
+        <p>Share your availability, let others book time with you, and eliminate the endless back-and-forth of finding a meeting time.</p>
+        <div class="landing-cta">
+            <a href="/auth/register" class="btn btn-primary">Create Free Account</a>
+            <a href="/auth/login" class="btn">Sign In</a>
+        </div>
+    </section>
+
+    <section class="landing-features">
+        <div class="features-container">
+            <div class="features-header">
+                <h2>Everything You Need</h2>
+                <p>Powerful features to streamline your scheduling workflow</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">&#128197;</div>
+                    <h3>Calendar Sync</h3>
+                    <p>Connect your Google Calendar to automatically show your real availability and prevent double bookings.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">&#128279;</div>
+                    <h3>Shareable Links</h3>
+                    <p>Create custom booking pages for different meeting types and share them with anyone.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">&#127760;</div>
+                    <h3>Timezone Smart</h3>
+                    <p>Times are automatically converted to your invitee's timezone. No confusion, no missed meetings.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">&#128249;</div>
+                    <h3>Video Conferencing</h3>
+                    <p>Automatically generate Google Meet or Zoom links for your virtual meetings.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">&#9989;</div>
+                    <h3>Booking Approval</h3>
+                    <p>Require approval for bookings or let invitees book instantly based on your preferences.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">&#128231;</div>
+                    <h3>Email Notifications</h3>
+                    <p>Automatic confirmations, reminders, and calendar invites sent to all participants.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="landing-footer">
+        <p>&copy; {{.Year}} Meet When. <a href="/legal/privacy">Privacy</a> &middot; <a href="/legal/terms">Terms</a></p>
+    </footer>
+</body>
+</html>
+{{end}}

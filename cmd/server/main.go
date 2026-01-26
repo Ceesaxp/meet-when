@@ -55,6 +55,9 @@ func main() {
 	// Static files
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
+	// Landing page
+	mux.HandleFunc("GET /{$}", h.Landing)
+
 	// Public routes (booking pages) - prefixed with /m/ to avoid route conflicts
 	mux.HandleFunc("GET /m/{tenant}/{host}", h.Public.HostPage)
 	mux.HandleFunc("GET /m/{tenant}/{host}/{template}", h.Public.TemplatePage)

@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"time"
 
 	"github.com/meet-when/meet-when/internal/config"
 	"github.com/meet-when/meet-when/internal/services"
@@ -138,6 +139,13 @@ func (h *Handlers) error(w http.ResponseWriter, r *http.Request, status int, mes
 	h.render(w, "error.html", map[string]interface{}{
 		"Status":  status,
 		"Message": message,
+	})
+}
+
+// Landing renders the landing page
+func (h *Handlers) Landing(w http.ResponseWriter, r *http.Request) {
+	h.render(w, "landing.html", map[string]interface{}{
+		"Year": time.Now().Year(),
 	})
 }
 
