@@ -185,3 +185,28 @@ The following features from the requirements document are already fully implemen
   - Always initialize the answers map even if no custom questions, to ensure agenda can be stored
 
 ---
+
+## 2026-01-26 - US-007 - Add custom questions builder to template form
+- What was implemented:
+  - Added 'Custom Questions' section to template form with dynamic JavaScript-based add/remove UI
+  - Support for three question types: text (single line), textarea (multi-line), and select (dropdown)
+  - Each question has: label, field name (unique identifier), type, required flag, and options (for dropdowns)
+  - Questions saved to `invitee_questions` JSON field in MeetingTemplate
+  - Questions rendered dynamically on public booking form using Go templates
+  - Custom answers stored in `booking.answers` JSON field with field name as key
+  - Fixed bug in CreateBooking: changed `string(rune(i))` to `strconv.Itoa(i)` for question indices > 9
+  - Added `toMap` template function to convert interface{} to map[string]interface{} for template access
+- Files changed:
+  - `templates/pages/dashboard_template_form.html` - Added Custom Questions section with JS builder
+  - `internal/handlers/dashboard.go` - Added JSON parsing for invitee_questions in CreateTemplate and UpdateTemplate
+  - `internal/handlers/handlers.go` - Added toMap template function
+  - `internal/handlers/public.go` - Fixed question index parsing bug
+  - `templates/pages/public_template.html` - Added dynamic question rendering
+  - `static/css/style.css` - Added styles for question builder and display
+- **Learnings for future iterations:**
+  - Go templates can't directly access map[string]interface{} from interface{} - need a helper function like `toMap`
+  - The `{{.Data.Template.InviteeQuestions}}` directly outputs valid JSON in JavaScript when template data is JSONArray
+  - When rendering form elements dynamically in templates, use `question_{{$index}}` naming convention
+  - The CreateBooking handler already had logic to parse questions but the bug with `string(rune(i))` was noted in progress.md - this was the same pattern causing issues
+
+---

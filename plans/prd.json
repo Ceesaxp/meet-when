@@ -113,8 +113,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 7,
-      "passes": false,
-      "notes": "Parsing exists in CreateBooking but no UI to define questions"
+      "passes": true,
+      "notes": "Implemented custom questions builder with support for text, textarea, and dropdown types. Questions stored in invitee_questions JSON field, rendered on public booking form, answers stored in booking.answers. Fixed bug in CreateBooking using strconv.Itoa for question indices."
     },
     {
       "id": "US-008",
