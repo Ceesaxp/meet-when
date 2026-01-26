@@ -6,15 +6,63 @@
 <div class="page-header">
     <h1>Agenda</h1>
     <div class="page-header-subtitle">
+        {{if eq .Data.View "week"}}
+        Week of {{formatDate (index .Data.DayGroups 0).Date}}
+        {{else}}
         {{formatDate .Data.Today}}
+        {{end}}
     </div>
 </div>
 
 <div class="filter-bar">
-    <a href="/dashboard/agenda" class="btn btn-sm btn-primary">Today</a>
-    <a href="/dashboard/agenda?view=week" class="btn btn-sm">This Week</a>
+    <a href="/dashboard/agenda" class="btn btn-sm {{if eq .Data.View "today"}}btn-primary{{end}}">Today</a>
+    <a href="/dashboard/agenda?view=week" class="btn btn-sm {{if eq .Data.View "week"}}btn-primary{{end}}">This Week</a>
 </div>
 
+{{if eq .Data.View "week"}}
+{{/* Week view - events grouped by day */}}
+<div class="agenda-week">
+    {{range .Data.DayGroups}}
+    <div class="agenda-day-group">
+        <div class="day-header">
+            <span class="day-name">{{.Date.Weekday}}</span>
+            <span class="day-date">{{formatDate .Date}}</span>
+        </div>
+        {{if .Events}}
+        <table class="table agenda-table">
+            <tbody>
+                {{range .Events}}
+                <tr class="agenda-event {{if .IsAllDay}}all-day-event{{end}}">
+                    <td class="event-time">
+                        {{if .IsAllDay}}
+                        <span class="all-day-badge">All Day</span>
+                        {{else}}
+                        {{formatTime .Start}} - {{formatTime .End}}
+                        {{end}}
+                    </td>
+                    <td class="event-title">
+                        {{if .Title}}{{.Title}}{{else}}<em>No title</em>{{end}}
+                    </td>
+                    <td class="event-duration">
+                        {{if not .IsAllDay}}
+                        {{duration .Start .End}}
+                        {{end}}
+                    </td>
+                    <td class="event-calendar">
+                        <span class="calendar-badge">{{.CalendarName}}</span>
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{else}}
+        <p class="no-events-day">No events</p>
+        {{end}}
+    </div>
+    {{end}}
+</div>
+{{else}}
+{{/* Today view */}}
 {{if .Data.Events}}
 <div class="agenda-list">
     <table class="table agenda-table">
@@ -65,6 +113,7 @@
     <h3>No events today</h3>
     <p>Your schedule is clear for today. Enjoy your free time!</p>
 </div>
+{{end}}
 {{end}}
 
 <style>
@@ -143,6 +192,52 @@
 
 .empty-state-icon svg {
     opacity: 0.5;
+}
+
+/* Week view styles */
+.agenda-week {
+    margin-top: 1rem;
+}
+
+.agenda-day-group {
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.day-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background-color: var(--bg-muted, #f9f9f9);
+    border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.day-name {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.day-date {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.agenda-day-group .agenda-table {
+    margin: 0;
+}
+
+.agenda-day-group .agenda-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.no-events-day {
+    padding: 0.75rem 1rem;
+    margin: 0;
+    color: var(--text-muted);
+    font-style: italic;
 }
 </style>
 {{end}}

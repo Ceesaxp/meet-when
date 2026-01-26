@@ -772,7 +772,13 @@ func (h *DashboardHandler) AuditLogs(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Agenda renders the agenda view with today's events
+// AgendaDayGroup represents a group of events for a single day
+type AgendaDayGroup struct {
+	Date   time.Time
+	Events []services.AgendaEvent
+}
+
+// Agenda renders the agenda view with today's or this week's events
 func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())
 	if host == nil {
@@ -790,11 +796,46 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 	// Get current time in host's timezone
 	now := time.Now().In(loc)
 
-	// Today: 00:00 to 23:59:59 in host's timezone
-	startDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-	endDate := startDate.AddDate(0, 0, 1)
+	// Check view parameter
+	view := r.URL.Query().Get("view")
+	if view != "week" {
+		view = "today"
+	}
 
-	// Fetch events from all calendars
+	var startDate, endDate time.Time
+	var dayGroups []AgendaDayGroup
+
+	if view == "week" {
+		// This Week: Monday to Sunday of current week
+		// Go's time.Weekday: Sunday=0, Monday=1, ..., Saturday=6
+		// We want to start on Monday
+		weekday := now.Weekday()
+		daysFromMonday := int(weekday) - 1
+		if weekday == time.Sunday {
+			daysFromMonday = 6 // Sunday is the end of the week
+		}
+		monday := time.Date(now.Year(), now.Month(), now.Day()-daysFromMonday, 0, 0, 0, 0, loc)
+		sunday := monday.AddDate(0, 0, 7) // End of Sunday (start of next Monday)
+
+		startDate = monday
+		endDate = sunday
+
+		// Fetch events for the week
+		events, fetchErr := h.handlers.services.Calendar.GetAgendaEvents(r.Context(), host.Host.ID, startDate, endDate)
+		if fetchErr != nil {
+			log.Printf("Error fetching agenda events: %v", fetchErr)
+			events = []services.AgendaEvent{}
+		}
+
+		// Group events by day
+		dayGroups = groupEventsByDay(events, monday, loc)
+	} else {
+		// Today: 00:00 to 23:59:59 in host's timezone
+		startDate = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+		endDate = startDate.AddDate(0, 0, 1)
+	}
+
+	// Fetch events (for today view or as fallback)
 	events, err := h.handlers.services.Calendar.GetAgendaEvents(r.Context(), host.Host.ID, startDate, endDate)
 	if err != nil {
 		log.Printf("Error fetching agenda events: %v", err)
@@ -806,10 +847,40 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 		Host:   host.Host,
 		Tenant: host.Tenant,
 		Data: map[string]interface{}{
-			"Events":   events,
-			"View":     "today",
-			"Today":    now,
-			"Timezone": host.Host.Timezone,
+			"Events":    events,
+			"DayGroups": dayGroups,
+			"View":      view,
+			"Today":     now,
+			"Timezone":  host.Host.Timezone,
 		},
 	})
+}
+
+// groupEventsByDay groups events by their date and returns a slice of day groups
+func groupEventsByDay(events []services.AgendaEvent, weekStart time.Time, loc *time.Location) []AgendaDayGroup {
+	// Create groups for each day of the week
+	groups := make([]AgendaDayGroup, 7)
+	for i := 0; i < 7; i++ {
+		groups[i] = AgendaDayGroup{
+			Date:   weekStart.AddDate(0, 0, i),
+			Events: []services.AgendaEvent{},
+		}
+	}
+
+	// Assign events to their respective days
+	for _, event := range events {
+		eventDate := event.Start.In(loc)
+		dayOfWeek := eventDate.Weekday()
+		// Convert to Monday=0 index
+		dayIndex := int(dayOfWeek) - 1
+		if dayOfWeek == time.Sunday {
+			dayIndex = 6
+		}
+
+		if dayIndex >= 0 && dayIndex < 7 {
+			groups[dayIndex].Events = append(groups[dayIndex].Events, event)
+		}
+	}
+
+	return groups
 }
