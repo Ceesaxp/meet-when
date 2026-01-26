@@ -1,0 +1,80 @@
+{{define "login_select_org.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Organization | Meet When</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .org-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+        }
+        .org-option {
+            display: block;
+            padding: 1rem 1.25rem;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .org-option:hover {
+            border-color: var(--primary-color);
+            background-color: rgba(79, 70, 229, 0.05);
+        }
+        .org-option-name {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text-color);
+            margin-bottom: 0.25rem;
+        }
+        .org-option-slug {
+            font-size: 0.75rem;
+            color: var(--text-light);
+        }
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 1.5rem;
+            font-size: 0.875rem;
+            color: var(--text-light);
+        }
+        .back-link a {
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+<body class="auth-page">
+    <div class="auth-container">
+        <h1>Meet When</h1>
+        <h2>Select your organization</h2>
+
+        <p style="color: var(--text-light); font-size: 0.875rem; margin-bottom: 0.5rem;">
+            Your email is associated with multiple organizations. Please select which one you'd like to sign in to.
+        </p>
+
+        <div class="org-list">
+            {{range .Data.AvailableOrgs}}
+            <form method="POST" action="/auth/select-org">
+                <input type="hidden" name="host_id" value="{{.HostID}}">
+                <input type="hidden" name="selection_token" value="{{.SelectionToken}}">
+                <button type="submit" class="org-option">
+                    <div class="org-option-name">{{.TenantName}}</div>
+                    <div class="org-option-slug">{{.TenantSlug}}</div>
+                </button>
+            </form>
+            {{end}}
+        </div>
+
+        <p class="back-link">
+            <a href="/auth/login">&larr; Back to login</a>
+        </p>
+    </div>
+</body>
+</html>
+{{end}}
