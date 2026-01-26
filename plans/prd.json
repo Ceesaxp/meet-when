@@ -265,8 +265,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 16,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented DuplicateTemplate service method with slug collision handling (-copy, -copy-2, etc.), Duplicate buttons on template list and edit pages, redirects to edit page for new template"
     },
     {
       "id": "US-017",

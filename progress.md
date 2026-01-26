@@ -459,3 +459,31 @@ The following features from the requirements document are already fully implemen
   - The `alert()` was replaced with in-place visual feedback for better UX
 
 ---
+
+## 2026-01-26 - US-016 - Add template duplication
+- What was implemented:
+  - Added `DuplicateTemplate` method to TemplateService that creates a copy of an existing template
+  - Copies all template settings: name, description, durations, location, calendar, scheduling rules, questions, email templates
+  - Appends "(Copy)" to the name and "-copy" suffix to the slug
+  - Handles slug collisions by adding incrementing counter suffix (-copy-2, -copy-3, etc.)
+  - New copies are inactive by default (is_active=false) per acceptance criteria
+  - Added `DuplicateTemplate` handler in DashboardHandler
+  - Registered route `POST /dashboard/templates/{id}/duplicate`
+  - Added "Duplicate" button to template list page (inline form in template-actions)
+  - Added "Duplicate" button to template edit page (uses hidden form triggered by button click)
+  - Redirects to edit page for newly created duplicate template
+  - Audit log records duplication with original template ID in details
+- Files changed:
+  - `internal/services/template.go` - Added DuplicateTemplate method (~70 lines)
+  - `internal/handlers/dashboard.go` - Added DuplicateTemplate handler (~20 lines)
+  - `cmd/server/main.go` - Added duplicate route
+  - `templates/pages/dashboard_templates.html` - Added Duplicate button in template card actions
+  - `templates/pages/dashboard_template_form.html` - Added Duplicate button and hidden form for edit page
+- **Learnings for future iterations:**
+  - Slug uniqueness check requires a loop since multiple duplicates of the same template may exist
+  - Using `strconv.Itoa()` for counter instead of string concatenation with counter directly
+  - The edit page needed a separate hidden form because the main form has a different action (update template)
+  - Inline forms with `style="display:inline"` work well for buttons in horizontal layouts
+  - Template repository already had `GetByHostAndSlug` which made collision detection easy
+
+---
