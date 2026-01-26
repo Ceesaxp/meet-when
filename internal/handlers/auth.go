@@ -217,3 +217,43 @@ func (h *AuthHandler) ZoomCallback(w http.ResponseWriter, r *http.Request) {
 
 	h.handlers.error(w, r, http.StatusBadRequest, "Invalid state")
 }
+
+// SelectOrg handles organization selection for multi-org users
+func (h *AuthHandler) SelectOrg(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		h.handlers.error(w, r, http.StatusBadRequest, "Invalid form data")
+		return
+	}
+
+	hostID := r.FormValue("host_id")
+	selectionToken := r.FormValue("selection_token")
+
+	if hostID == "" || selectionToken == "" {
+		h.handlers.redirect(w, r, "/auth/login?error=invalid_selection")
+		return
+	}
+
+	input := services.CompleteOrgSelectionInput{
+		HostID:         hostID,
+		SelectionToken: selectionToken,
+	}
+
+	_, sessionToken, err := h.handlers.services.Auth.CompleteOrgSelection(r.Context(), input)
+	if err != nil {
+		// Redirect to login with error message for invalid/expired token
+		h.handlers.redirect(w, r, "/auth/login?error=session_expired")
+		return
+	}
+
+	// Set session cookie and redirect to dashboard
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    sessionToken,
+		Path:     "/",
+		MaxAge:   int(24 * time.Hour / time.Second),
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	h.handlers.redirect(w, r, "/dashboard")
+}

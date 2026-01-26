@@ -82,6 +82,7 @@ func main() {
 	// Auth routes
 	mux.HandleFunc("GET /auth/login", h.Auth.LoginPage)
 	mux.HandleFunc("POST /auth/login", h.Auth.Login)
+	mux.HandleFunc("POST /auth/select-org", h.Auth.SelectOrg)
 	mux.HandleFunc("GET /auth/register", h.Auth.RegisterPage)
 	mux.HandleFunc("POST /auth/register", h.Auth.Register)
 	mux.HandleFunc("POST /auth/logout", h.Auth.Logout)
