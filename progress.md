@@ -687,3 +687,22 @@ The following features from the requirements document are already fully implemen
   - Using `padStart(2, '0')` ensures consistent time formatting
 
 ---
+
+## 2026-01-26 - US-005 - Implement interval overlap validation
+- What was implemented:
+  - Added `intervalsOverlap()` helper function using the canonical overlap formula: `A.start < B.end && A.end > B.start`
+  - Added `validateIntervals()` function that iterates through all enabled days and checks for overlapping interval pairs
+  - Error div added to each day in `renderAvailabilityDays()` for inline error display
+  - Form submission blocked via `e.preventDefault()` when overlaps are detected
+  - Validation runs on form submit AND on every interval time change for immediate user feedback
+  - CSS styles added for `.interval-error` class with red border and background
+- Files changed:
+  - `templates/pages/dashboard_template_form.html` - Added validation functions and error div rendering
+  - `static/css/style.css` - Added `.interval-error` styles
+- **Learnings for future iterations:**
+  - The overlap formula `A.start < B.end && A.end > B.start` works for string time comparisons in "HH:MM" format
+  - Using `querySelectorAll('.interval-error[style*="display: block"]')` to find visible error elements
+  - Running validation on every change provides immediate feedback, improving UX
+  - The implementation was already committed in `bcce2a8` but PRD wasn't updated - always update PRD after implementation
+
+---
