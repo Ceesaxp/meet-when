@@ -164,6 +164,29 @@ type LoginInput struct {
 	Password   string
 }
 
+// SimplifiedLoginInput represents the simplified login request (email + password only)
+type SimplifiedLoginInput struct {
+	Email    string
+	Password string
+}
+
+// OrgOption represents an organization option for multi-org users
+type OrgOption struct {
+	TenantID   string
+	TenantSlug string
+	TenantName string
+	HostID     string
+}
+
+// SimplifiedLoginResult represents the result of a simplified login attempt
+type SimplifiedLoginResult struct {
+	RequiresOrgSelection bool           // True if user has multiple orgs and must select one
+	AvailableOrgs        []OrgOption    // Populated when RequiresOrgSelection is true
+	SessionToken         string         // Populated when single org match (direct login)
+	Host                 *models.Host   // Populated when single org match
+	Tenant               *models.Tenant // Populated when single org match
+}
+
 // Login authenticates a user
 func (s *AuthService) Login(ctx context.Context, input LoginInput) (*HostWithTenant, string, error) {
 	// Get tenant
@@ -202,6 +225,94 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (*HostWithTen
 		Host:   host,
 		Tenant: tenant,
 	}, sessionToken, nil
+}
+
+// SimplifiedLogin authenticates a user with just email and password (no org required).
+// If the email exists in multiple organizations, it returns RequiresOrgSelection=true
+// with the list of available orgs. If single org, it creates a session directly.
+func (s *AuthService) SimplifiedLogin(ctx context.Context, input SimplifiedLoginInput) (*SimplifiedLoginResult, error) {
+	email := strings.ToLower(input.Email)
+
+	// Get all hosts with this email across all tenants
+	hosts, err := s.repos.Host.GetAllByEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+
+	// Timing attack prevention: always perform a bcrypt comparison even if no hosts found
+	// This ensures consistent response time regardless of whether the email exists
+	dummyHash := "$2a$10$dummy.hash.for.timing.attack.prevention.placeholder"
+	if len(hosts) == 0 {
+		bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(input.Password))
+		return nil, ErrInvalidCredentials
+	}
+
+	// Check password against each host and collect valid matches
+	var validHosts []*models.Host
+	for _, host := range hosts {
+		if err := bcrypt.CompareHashAndPassword([]byte(host.PasswordHash), []byte(input.Password)); err == nil {
+			validHosts = append(validHosts, host)
+		}
+	}
+
+	// No valid matches (wrong password for all accounts)
+	if len(validHosts) == 0 {
+		return nil, ErrInvalidCredentials
+	}
+
+	// Single valid match: create session and return directly
+	if len(validHosts) == 1 {
+		host := validHosts[0]
+
+		// Get tenant for this host
+		tenant, err := s.repos.Tenant.GetByID(ctx, host.TenantID)
+		if err != nil {
+			return nil, err
+		}
+		if tenant == nil {
+			return nil, ErrInvalidCredentials
+		}
+
+		// Create session
+		sessionToken, err := s.session.CreateSession(ctx, host.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		// Audit log
+		s.auditLog.Log(ctx, tenant.ID, &host.ID, "host.login", "host", host.ID, nil, "")
+
+		return &SimplifiedLoginResult{
+			RequiresOrgSelection: false,
+			SessionToken:         sessionToken,
+			Host:                 host,
+			Tenant:               tenant,
+		}, nil
+	}
+
+	// Multiple valid matches: return org selection required
+	var availableOrgs []OrgOption
+	for _, host := range validHosts {
+		tenant, err := s.repos.Tenant.GetByID(ctx, host.TenantID)
+		if err != nil {
+			return nil, err
+		}
+		if tenant == nil {
+			continue // Skip hosts with missing tenants
+		}
+
+		availableOrgs = append(availableOrgs, OrgOption{
+			TenantID:   tenant.ID,
+			TenantSlug: tenant.Slug,
+			TenantName: tenant.Name,
+			HostID:     host.ID,
+		})
+	}
+
+	return &SimplifiedLoginResult{
+		RequiresOrgSelection: true,
+		AvailableOrgs:        availableOrgs,
+	}, nil
 }
 
 // Helper functions
