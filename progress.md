@@ -210,3 +210,27 @@ The following features from the requirements document are already fully implemen
   - The CreateBooking handler already had logic to parse questions but the bug with `string(rune(i))` was noted in progress.md - this was the same pattern causing issues
 
 ---
+
+## 2026-01-26 - US-008 - Add template availability rules UI
+- What was implemented:
+  - Added 'Availability' section to template form with "Use custom availability" checkbox toggle
+  - Implemented weekday checkboxes (Sunday through Saturday) with time range inputs for each day
+  - Time ranges show/hide dynamically when day is enabled/disabled
+  - Rules stored in `availability_rules` JSON field with structure: `{enabled: bool, days: {0-6: {enabled: bool, start: "HH:MM", end: "HH:MM"}}}`
+  - Updated handlers (CreateTemplate, UpdateTemplate) to parse availability_rules from form submission
+  - AvailabilityService now checks template.AvailabilityRules before falling back to working hours
+  - Added `parseAvailabilityRules()` function to convert JSONMap to structured `TemplateAvailabilityRules` type
+  - Added `generateSlotsInRange()` helper to avoid code duplication between template rules and working hours paths
+  - CSS styles for availability builder UI (`.availability-days`, `.availability-day`, `.day-time-ranges`, `.time-range`)
+- Files changed:
+  - `templates/pages/dashboard_template_form.html` - Added Availability section with JS builder
+  - `internal/handlers/dashboard.go` - Added JSON parsing for availability_rules in CreateTemplate and UpdateTemplate
+  - `internal/services/availability.go` - Added template rules parsing and application logic
+  - `static/css/style.css` - Added styles for availability rules builder
+- **Learnings for future iterations:**
+  - Template availability rules override (replace) working hours entirely, not intersect - simpler to implement and explain to users
+  - JSON map keys from JavaScript are strings ("0", "1", ...) not integers, so need `fmt.Sscanf` to parse day numbers
+  - The existing `AvailabilityRules` field in MeetingTemplate was already defined as `JSONMap` - just needed UI and service logic
+  - When custom availability is disabled (checkbox unchecked), the hidden input is cleared to ensure rules aren't persisted
+
+---

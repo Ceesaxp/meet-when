@@ -130,8 +130,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 8,
-      "passes": false,
-      "notes": "Field exists but no UI or service logic to apply rules"
+      "passes": true,
+      "notes": "Implemented availability rules UI with weekday checkboxes and time ranges. Rules saved to availability_rules JSON field. AvailabilityService parses and applies template rules, overriding working hours when enabled."
     },
     {
       "id": "US-009",
