@@ -297,8 +297,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 18,
-      "passes": false,
-      "notes": "Currently relies on URL param, no UI to change"
+      "passes": true,
+      "notes": "Implemented timezone selector with auto-detection via Intl API, 'Change' link reveals dropdown with 50+ timezones grouped by region, unknown timezones dynamically added with '(Detected)' suffix, shows timezone abbreviation, reloads slots on change, persisted in form submission. Also updated reschedule page for consistency."
     },
     {
       "id": "US-019",

@@ -509,3 +509,27 @@ The following features from the requirements document are already fully implemen
   - The repository method accumulates counts by iterating rows, switching on status values to populate Pending/Confirmed fields
 
 ---
+
+## 2026-01-26 - US-018 - Add timezone selector to booking form
+- What was implemented:
+  - Added comprehensive timezone selector UI to public booking and reschedule pages
+  - Auto-detects timezone via JavaScript `Intl.DateTimeFormat().resolvedOptions().timeZone`
+  - Shows detected timezone with abbreviated offset (e.g., "Eastern Time (US) (EST)")
+  - "Change" link reveals full dropdown with 50+ timezones organized by region
+  - If detected timezone isn't in the predefined list, it's dynamically added with "(Detected)" suffix
+  - Selecting new timezone automatically reloads available time slots
+  - Selected timezone persisted in hidden form field for booking submission
+  - Dropdown closes when clicking outside or after selection
+  - Reschedule page prefers the invitee's saved timezone from the original booking
+- Files changed:
+  - `templates/pages/public_template.html` - Replaced simple dropdown with timezone selector UI and enhanced JavaScript
+  - `templates/pages/reschedule.html` - Same improvements for consistency across booking flows
+  - `static/css/style.css` - Added `.timezone-selector`, `.timezone-display`, `.timezone-dropdown` styles
+- **Learnings for future iterations:**
+  - `Intl.DateTimeFormat().resolvedOptions().timeZone` returns IANA timezone strings (e.g., "America/New_York")
+  - `Intl.DateTimeFormat('en-US', { timeZoneName: 'short' }).formatToParts()` can extract timezone abbreviation
+  - When timezone isn't in dropdown, dynamically create `<option>` and insert into first `<optgroup>`
+  - Use `encodeURIComponent()` when passing timezone to URL query params (some have "/" characters)
+  - Closing dropdown on outside click requires checking both the dropdown and trigger link with `event.target`
+
+---
