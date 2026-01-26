@@ -114,6 +114,9 @@ func main() {
 	// Bookings management
 	dashboard.HandleFunc("GET /dashboard/bookings", h.Dashboard.Bookings)
 	dashboard.HandleFunc("GET /dashboard/bookings/{id}/details", h.Dashboard.BookingDetails)
+
+	// Agenda view
+	dashboard.HandleFunc("GET /dashboard/agenda", h.Dashboard.Agenda)
 	dashboard.HandleFunc("POST /dashboard/bookings/{id}/approve", h.Dashboard.ApproveBooking)
 	dashboard.HandleFunc("POST /dashboard/bookings/{id}/reject", h.Dashboard.RejectBooking)
 	dashboard.HandleFunc("POST /dashboard/bookings/{id}/cancel", h.Dashboard.CancelBooking)

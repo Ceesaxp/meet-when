@@ -81,6 +81,38 @@ func timeAgo(t interface{}) string {
 	}
 }
 
+// duration calculates and formats the duration between two times
+func duration(start, end interface{}) string {
+	startTime := toTime(start)
+	endTime := toTime(end)
+
+	if startTime.IsZero() || endTime.IsZero() {
+		return ""
+	}
+
+	diff := endTime.Sub(startTime)
+	minutes := int(diff.Minutes())
+
+	if minutes < 60 {
+		return fmt.Sprintf("%d min", minutes)
+	}
+
+	hours := minutes / 60
+	remainingMins := minutes % 60
+
+	if remainingMins == 0 {
+		if hours == 1 {
+			return "1 hour"
+		}
+		return fmt.Sprintf("%d hours", hours)
+	}
+
+	if hours == 1 {
+		return fmt.Sprintf("1 hr %d min", remainingMins)
+	}
+	return fmt.Sprintf("%d hr %d min", hours, remainingMins)
+}
+
 // PageData represents common page data
 type PageData struct {
 	Title       string

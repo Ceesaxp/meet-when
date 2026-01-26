@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/meet-when/meet-when/internal/middleware"
@@ -767,6 +768,48 @@ func (h *DashboardHandler) AuditLogs(w http.ResponseWriter, r *http.Request) {
 			"TotalPages":   totalPages,
 			"TotalCount":   totalCount,
 			"ActionFilter": actionFilter,
+		},
+	})
+}
+
+// Agenda renders the agenda view with today's events
+func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	// Load host timezone
+	loc, err := time.LoadLocation(host.Host.Timezone)
+	if err != nil {
+		log.Printf("Invalid timezone %s, falling back to UTC: %v", host.Host.Timezone, err)
+		loc = time.UTC
+	}
+
+	// Get current time in host's timezone
+	now := time.Now().In(loc)
+
+	// Today: 00:00 to 23:59:59 in host's timezone
+	startDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	endDate := startDate.AddDate(0, 0, 1)
+
+	// Fetch events from all calendars
+	events, err := h.handlers.services.Calendar.GetAgendaEvents(r.Context(), host.Host.ID, startDate, endDate)
+	if err != nil {
+		log.Printf("Error fetching agenda events: %v", err)
+		events = []services.AgendaEvent{}
+	}
+
+	h.handlers.render(w, "dashboard_agenda.html", PageData{
+		Title:  "Agenda",
+		Host:   host.Host,
+		Tenant: host.Tenant,
+		Data: map[string]interface{}{
+			"Events":   events,
+			"View":     "today",
+			"Today":    now,
+			"Timezone": host.Host.Timezone,
 		},
 	})
 }

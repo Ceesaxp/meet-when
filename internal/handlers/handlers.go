@@ -160,6 +160,7 @@ func templateFuncs() template.FuncMap {
 		"formatTime":     formatTime,
 		"formatDateTime": formatDateTime,
 		"timeAgo":        timeAgo,
+		"duration":       duration,
 		"add":            func(a, b int) int { return a + b },
 		"sub":            func(a, b int) int { return a - b },
 		"mul":            func(a, b int) int { return a * b },
