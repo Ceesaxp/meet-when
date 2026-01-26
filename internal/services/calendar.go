@@ -544,24 +544,37 @@ func (s *CalendarService) validateCalDAVConnection(url, username, password strin
 }
 
 func (s *CalendarService) getCalDAVBusyTimes(ctx context.Context, cal *models.CalendarConnection, start, end time.Time) ([]models.TimeSlot, error) {
-	// CalDAV freebusy query
-	// This is a simplified implementation - production would need full CalDAV support
+	// Use calendar-query REPORT to fetch VEVENTs in the time range
+	// This is more widely supported than free-busy-query, especially on iCloud
 	query := fmt.Sprintf(`<?xml version="1.0" encoding="utf-8" ?>
-<C:free-busy-query xmlns:C="urn:ietf:params:xml:ns:caldav">
-  <C:time-range start="%s" end="%s"/>
-</C:free-busy-query>`,
+<C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <D:prop>
+    <D:getetag/>
+    <C:calendar-data/>
+  </D:prop>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VEVENT">
+        <C:time-range start="%s" end="%s"/>
+      </C:comp-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>`,
 		start.Format("20060102T150405Z"),
 		end.Format("20060102T150405Z"),
 	)
 
-	req, _ := http.NewRequest("REPORT", cal.CalDAVURL, strings.NewReader(query))
+	req, err := http.NewRequest("REPORT", cal.CalDAVURL, strings.NewReader(query))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
 	req.SetBasicAuth(cal.CalDAVUsername, cal.CalDAVPassword)
-	req.Header.Set("Content-Type", "application/xml")
+	req.Header.Set("Content-Type", "application/xml; charset=utf-8")
 	req.Header.Set("Depth", "1")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("CalDAV request failed: %w", err)
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
@@ -569,9 +582,307 @@ func (s *CalendarService) getCalDAVBusyTimes(ctx context.Context, cal *models.Ca
 		}
 	}()
 
-	// Parse response - simplified, would need proper XML parsing in production
-	// For MVP, we'll return empty if the query fails
-	return nil, nil
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, ErrCalendarAuth
+	}
+
+	// Read and parse the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	// Extract busy times from VCALENDAR data in the response
+	busyTimes := parseCalDAVResponse(string(body), start, end)
+	return busyTimes, nil
+}
+
+// parseCalDAVResponse extracts busy times from CalDAV XML response containing VCALENDAR data
+func parseCalDAVResponse(body string, rangeStart, rangeEnd time.Time) []models.TimeSlot {
+	var busyTimes []models.TimeSlot
+
+	// Find all calendar-data content (contains ICS data)
+	// The response wraps ICS in <cal:calendar-data> or <C:calendar-data> tags
+	calDataParts := extractCalendarData(body)
+
+	for _, icsData := range calDataParts {
+		events := parseVEvents(icsData, rangeStart, rangeEnd)
+		busyTimes = append(busyTimes, events...)
+	}
+
+	return busyTimes
+}
+
+// extractCalendarData extracts ICS content from CalDAV XML response
+func extractCalendarData(xmlBody string) []string {
+	var results []string
+
+	// Handle various XML namespace prefixes for calendar-data
+	// Common patterns: <cal:calendar-data>, <C:calendar-data>, <calendar-data>
+	patterns := []struct {
+		start string
+		end   string
+	}{
+		{"<cal:calendar-data>", "</cal:calendar-data>"},
+		{"<C:calendar-data>", "</C:calendar-data>"},
+		{"<calendar-data>", "</calendar-data>"},
+		{"<ns0:calendar-data>", "</ns0:calendar-data>"},
+		{"<ns1:calendar-data>", "</ns1:calendar-data>"},
+	}
+
+	for _, pattern := range patterns {
+		remaining := xmlBody
+		for {
+			startIdx := strings.Index(remaining, pattern.start)
+			if startIdx == -1 {
+				break
+			}
+			remaining = remaining[startIdx+len(pattern.start):]
+
+			endIdx := strings.Index(remaining, pattern.end)
+			if endIdx == -1 {
+				break
+			}
+
+			icsContent := remaining[:endIdx]
+			// Unescape XML entities that might be in the ICS data
+			icsContent = strings.ReplaceAll(icsContent, "&lt;", "<")
+			icsContent = strings.ReplaceAll(icsContent, "&gt;", ">")
+			icsContent = strings.ReplaceAll(icsContent, "&amp;", "&")
+			icsContent = strings.ReplaceAll(icsContent, "&#13;", "\r")
+
+			results = append(results, icsContent)
+			remaining = remaining[endIdx+len(pattern.end):]
+		}
+	}
+
+	return results
+}
+
+// parseVEvents extracts VEVENT start/end times from ICS data
+func parseVEvents(icsData string, rangeStart, rangeEnd time.Time) []models.TimeSlot {
+	var events []models.TimeSlot
+
+	// Split into lines and unfold (ICS allows long lines to be folded with leading space)
+	lines := unfoldICSLines(icsData)
+
+	var inEvent bool
+	var eventStart, eventEnd time.Time
+	var hasStart, hasEnd bool
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		if line == "BEGIN:VEVENT" {
+			inEvent = true
+			hasStart = false
+			hasEnd = false
+			eventStart = time.Time{}
+			eventEnd = time.Time{}
+			continue
+		}
+
+		if line == "END:VEVENT" {
+			if inEvent && hasStart && hasEnd {
+				// Check if event overlaps with our query range
+				if eventEnd.After(rangeStart) && eventStart.Before(rangeEnd) {
+					events = append(events, models.TimeSlot{
+						Start: eventStart,
+						End:   eventEnd,
+					})
+				}
+			}
+			inEvent = false
+			continue
+		}
+
+		if !inEvent {
+			continue
+		}
+
+		// Parse DTSTART
+		if strings.HasPrefix(line, "DTSTART") {
+			if t, ok := parseICSDateTime(line); ok {
+				eventStart = t
+				hasStart = true
+			}
+		}
+
+		// Parse DTEND
+		if strings.HasPrefix(line, "DTEND") {
+			if t, ok := parseICSDateTime(line); ok {
+				eventEnd = t
+				hasEnd = true
+			}
+		}
+
+		// Handle DURATION if DTEND is not present
+		if strings.HasPrefix(line, "DURATION") && hasStart && !hasEnd {
+			if d, ok := parseICSDuration(line); ok {
+				eventEnd = eventStart.Add(d)
+				hasEnd = true
+			}
+		}
+	}
+
+	return events
+}
+
+// unfoldICSLines handles ICS line folding (continuation lines start with space or tab)
+func unfoldICSLines(icsData string) []string {
+	// Normalize line endings
+	icsData = strings.ReplaceAll(icsData, "\r\n", "\n")
+	icsData = strings.ReplaceAll(icsData, "\r", "\n")
+
+	rawLines := strings.Split(icsData, "\n")
+	var result []string
+
+	for _, line := range rawLines {
+		if len(line) == 0 {
+			continue
+		}
+		// Continuation lines start with space or tab
+		if (line[0] == ' ' || line[0] == '\t') && len(result) > 0 {
+			// Append to previous line (removing the leading whitespace)
+			result[len(result)-1] += line[1:]
+		} else {
+			result = append(result, line)
+		}
+	}
+
+	return result
+}
+
+// parseICSDateTime parses various ICS date-time formats
+// Handles: DTSTART:20240115T100000Z, DTSTART;TZID=America/New_York:20240115T100000
+// Also handles VALUE=DATE for all-day events: DTSTART;VALUE=DATE:20240115
+func parseICSDateTime(line string) (time.Time, bool) {
+	// Split on colon to get the value part
+	colonIdx := strings.LastIndex(line, ":")
+	if colonIdx == -1 {
+		return time.Time{}, false
+	}
+
+	value := strings.TrimSpace(line[colonIdx+1:])
+	params := line[:colonIdx]
+
+	// Check if it's a date-only value (all-day event)
+	isDateOnly := strings.Contains(params, "VALUE=DATE")
+
+	if isDateOnly {
+		// Format: YYYYMMDD
+		if len(value) >= 8 {
+			t, err := time.Parse("20060102", value[:8])
+			if err == nil {
+				return t, true
+			}
+		}
+		return time.Time{}, false
+	}
+
+	// Try UTC format first: YYYYMMDDTHHMMSSZ
+	if strings.HasSuffix(value, "Z") {
+		t, err := time.Parse("20060102T150405Z", value)
+		if err == nil {
+			return t, true
+		}
+	}
+
+	// Try local format: YYYYMMDDTHHMMSS
+	// If TZID is specified, we should use it, but for simplicity we'll treat as UTC
+	// as busy times are typically converted anyway
+	if len(value) >= 15 {
+		t, err := time.Parse("20060102T150405", value[:15])
+		if err == nil {
+			// Check for TZID in params
+			if strings.Contains(params, "TZID=") {
+				// Extract timezone and try to load it
+				tzStart := strings.Index(params, "TZID=")
+				if tzStart != -1 {
+					tzPart := params[tzStart+5:]
+					tzEnd := strings.IndexAny(tzPart, ";:")
+					if tzEnd == -1 {
+						tzEnd = len(tzPart)
+					}
+					tzName := tzPart[:tzEnd]
+					if loc, err := time.LoadLocation(tzName); err == nil {
+						t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, loc)
+						return t.UTC(), true
+					}
+				}
+			}
+			// No timezone info, assume UTC
+			return t.UTC(), true
+		}
+	}
+
+	return time.Time{}, false
+}
+
+// parseICSDuration parses ICS DURATION format (RFC 5545)
+// Format: DURATION:P1DT2H30M (1 day, 2 hours, 30 minutes)
+func parseICSDuration(line string) (time.Duration, bool) {
+	colonIdx := strings.LastIndex(line, ":")
+	if colonIdx == -1 {
+		return 0, false
+	}
+
+	value := strings.TrimSpace(line[colonIdx+1:])
+	if !strings.HasPrefix(value, "P") {
+		return 0, false
+	}
+
+	value = value[1:] // Remove P prefix
+	var duration time.Duration
+
+	// Handle weeks
+	if idx := strings.Index(value, "W"); idx != -1 {
+		weeks := 0
+		if _, err := fmt.Sscanf(value[:idx], "%d", &weeks); err == nil {
+			duration += time.Duration(weeks) * 7 * 24 * time.Hour
+		}
+		value = value[idx+1:]
+	}
+
+	// Handle days
+	if idx := strings.Index(value, "D"); idx != -1 {
+		days := 0
+		if _, err := fmt.Sscanf(value[:idx], "%d", &days); err == nil {
+			duration += time.Duration(days) * 24 * time.Hour
+		}
+		value = value[idx+1:]
+	}
+
+	// T separates date and time parts
+	value = strings.TrimPrefix(value, "T")
+
+	// Handle hours
+	if idx := strings.Index(value, "H"); idx != -1 {
+		hours := 0
+		if _, err := fmt.Sscanf(value[:idx], "%d", &hours); err == nil {
+			duration += time.Duration(hours) * time.Hour
+		}
+		value = value[idx+1:]
+	}
+
+	// Handle minutes
+	if idx := strings.Index(value, "M"); idx != -1 {
+		mins := 0
+		if _, err := fmt.Sscanf(value[:idx], "%d", &mins); err == nil {
+			duration += time.Duration(mins) * time.Minute
+		}
+		value = value[idx+1:]
+	}
+
+	// Handle seconds
+	if idx := strings.Index(value, "S"); idx != -1 {
+		secs := 0
+		if _, err := fmt.Sscanf(value[:idx], "%d", &secs); err == nil {
+			duration += time.Duration(secs) * time.Second
+		}
+	}
+
+	return duration, duration > 0
 }
 
 func (s *CalendarService) createCalDAVEvent(ctx context.Context, cal *models.CalendarConnection, details *BookingWithDetails) (string, error) {
