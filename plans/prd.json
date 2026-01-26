@@ -80,8 +80,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": "ReschedulePage exists but lacks slot selection and submission"
+      "passes": true,
+      "notes": "Implemented full reschedule flow - same booking record is updated (not cancelled+new), preserves invitee info, calendar events recreated, emails sent to both parties"
     },
     {
       "id": "US-006",

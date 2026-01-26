@@ -137,3 +137,32 @@ The following features from the requirements document are already fully implemen
   - Single-duration templates skip the selector entirely (cleaner UX)
 
 ---
+
+## 2026-01-26 - US-005 - Complete reschedule booking flow
+- What was implemented:
+  - Full reschedule page with slot selection UI matching the booking flow pattern
+  - RescheduleBooking service method that updates the existing booking record (doesn't cancel+create new)
+  - Old calendar event is deleted, new one created with updated time
+  - Conference link is regenerated for Zoom/Google Meet templates
+  - Reschedule notification emails sent to both host and invitee
+  - Email shows both old and new times for clarity
+  - ICS attachment included with updated meeting details
+  - Success message shown on booking status page after reschedule
+  - Duration selector available on reschedule page (inherits booking's current duration by default)
+- Files changed:
+  - `internal/services/booking.go` - Added RescheduleBooking method and RescheduleBookingInput struct
+  - `internal/services/email.go` - Added SendBookingRescheduled with invitee and host notification functions
+  - `internal/handlers/public.go` - Added GetRescheduleSlots, RescheduleBooking handlers; updated BookingStatus for success messages
+  - `cmd/server/main.go` - Registered new routes: GET/POST /booking/{token}/reschedule/slots and POST /booking/{token}/reschedule
+  - `templates/pages/reschedule.html` - Rewrote from placeholder to full slot selection UI
+  - `templates/partials/reschedule_slots_partial.html` - New partial for reschedule slot loading via HTMX
+  - `templates/pages/booking_status.html` - Added rescheduled/cancelled success alerts
+  - `static/css/style.css` - Added reschedule summary styles
+- **Learnings for future iterations:**
+  - The acceptance criteria said "cancel old booking and create new one" but preserving the same booking record with updated times is cleaner
+  - Same booking token means the same links work before and after reschedule
+  - The SQLiteTime type embeds time.Time, so access the embedded value via `.Time` not `.Time()`
+  - Reschedule flow reuses the availability service - no need to duplicate slot calculation logic
+  - For confirmed bookings, need to delete old calendar event before creating new one to avoid duplicates
+
+---
