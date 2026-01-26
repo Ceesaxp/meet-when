@@ -321,3 +321,69 @@ The following features from the requirements document are already fully implemen
   - The conferencing service returns `CustomLocation` as `ConferenceLink` for phone/custom types, but UI should still format it as "Call [number]"
 
 ---
+
+## 2026-01-26 - US-012 - Add audit log viewer page
+- What was implemented:
+  - Added `AuditLogs` handler in `dashboard.go` with admin-only access control via `host.Host.IsAdmin` check
+  - Added `CountByTenantID` method to `AuditLogRepository` for pagination support
+  - Added `GetLogsCount` method to `AuditLogService` exposing the count functionality
+  - Created `dashboard_audit_logs.html` template with:
+    - Paginated table showing timestamp, action, entity type, details (expandable), IP address
+    - Filter buttons for action types (All, Create, Update, Delete)
+    - Pagination controls with page info
+  - Added route `GET /dashboard/audit-logs` in `main.go`
+  - Updated sidebar in `dashboard.html` to conditionally show "Audit Logs" link for admin users
+  - Added CSS styles for audit log details, pagination, and action badges
+- Files changed:
+  - `internal/handlers/dashboard.go` - Added AuditLogs handler (~50 lines)
+  - `internal/repository/repository.go` - Added CountByTenantID method
+  - `internal/services/audit.go` - Added GetLogsCount method
+  - `templates/pages/dashboard_audit_logs.html` - New template file
+  - `templates/layouts/dashboard.html` - Added conditional admin link
+  - `cmd/server/main.go` - Added audit-logs route
+  - `static/css/style.css` - Added audit log styles
+- **Learnings for future iterations:**
+  - The Handlers struct doesn't expose repos directly - use services layer (e.g., `h.handlers.services.AuditLog.GetLogs`)
+  - The first registered user in a tenant has `IsAdmin: true` set in `auth.go:129`
+  - Admin access check is done at handler level, not via middleware (could be refactored to middleware if more admin routes are added)
+  - Go templates support conditionals with `.Host.IsAdmin` directly in layout for conditional sidebar links
+  - Pagination pattern: `perPage`, `offset = (page - 1) * perPage`, `totalPages = (totalCount + perPage - 1) / perPage`
+
+---
+
+## 2026-01-26 - US-013 - Add booking details modal in dashboard
+- What was implemented:
+  - Added `BookingDetails` handler in `dashboard.go` to return booking details as partial HTML
+  - Added `GetBooking` method to `BookingService` for fetching single booking by ID
+  - Created `booking_details_partial.html` template with modal display:
+    - Meeting section: type, status, date, time, duration, conference link
+    - Guest information: name, email, phone, timezone
+    - Additional guests list (if any)
+    - Meeting details section with agenda and custom question answers
+    - Cancellation details (cancelled by, reason) when applicable
+    - Creation timestamp
+  - Updated `dashboard_bookings.html` with:
+    - Clickable booking rows (`onclick="openBookingModal('{{.ID}}')"`)
+    - Actions cell with `event.stopPropagation()` to prevent modal opening on action clicks
+    - Modal container div for HTMX-loaded content
+    - JavaScript functions: `openBookingModal()`, `closeBookingModal()`
+    - Escape key listener for closing modal
+  - Added modal CSS styles: overlay, content, header, close button, body, footer
+  - Added booking detail section styles for organized display
+  - Registered route `GET /dashboard/bookings/{id}/details` in `main.go`
+- Files changed:
+  - `internal/handlers/dashboard.go` - Added BookingDetails handler (~25 lines)
+  - `internal/services/booking.go` - Added GetBooking method
+  - `templates/partials/booking_details_partial.html` - New file (~110 lines)
+  - `templates/pages/dashboard_bookings.html` - Added modal trigger and JavaScript
+  - `static/css/style.css` - Added ~140 lines for modal and booking detail styles
+  - `cmd/server/main.go` - Added booking details route
+- **Learnings for future iterations:**
+  - Using `renderPartial()` for HTMX responses keeps modal content separate from full page templates
+  - The `Answers` field on Booking is `JSONMap` (map[string]interface{}) - can iterate with `range $key, $value`
+  - Special key "agenda" is used for the standard agenda field; other keys are custom question answers
+  - `event.stopPropagation()` on action cells prevents row click from triggering modal when clicking buttons
+  - Modal pattern: load partial via fetch, insert into container div, toggle body class for scroll lock
+  - BookingRepository already had `GetByID` method - just needed service layer wrapper
+
+---

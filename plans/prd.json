@@ -197,8 +197,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 12,
-      "passes": false,
-      "notes": "AuditLog table and repository exist, need UI"
+      "passes": true,
+      "notes": "Implemented audit log viewer with paginated table, action filter buttons, admin-only access, and sidebar link for admin users"
     },
     {
       "id": "US-013",
@@ -214,8 +214,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 13,
-      "passes": false,
-      "notes": "Current bookings page shows minimal info"
+      "passes": true,
+      "notes": "Implemented booking details modal with clickable table rows, full guest info display, additional guests list, custom answers, agenda, and cancellation details"
     },
     {
       "id": "US-014",
