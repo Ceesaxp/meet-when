@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/meet-when/meet-when/internal/models"
@@ -220,4 +221,70 @@ func (s *TemplateService) DeleteTemplate(ctx context.Context, hostID, tenantID, 
 	s.auditLog.Log(ctx, tenantID, &hostID, "template.deleted", "template", templateID, nil, "")
 
 	return nil
+}
+
+// DuplicateTemplate creates a copy of an existing template
+func (s *TemplateService) DuplicateTemplate(ctx context.Context, hostID, tenantID, templateID string) (*models.MeetingTemplate, error) {
+	// Get the original template
+	original, err := s.repos.Template.GetByID(ctx, templateID)
+	if err != nil {
+		return nil, err
+	}
+	if original == nil || original.HostID != hostID {
+		return nil, ErrTemplateNotFound
+	}
+
+	// Generate unique slug
+	baseSlug := original.Slug + "-copy"
+	slug := baseSlug
+	counter := 1
+
+	// Keep trying until we find a unique slug
+	for {
+		existing, err := s.repos.Template.GetByHostAndSlug(ctx, hostID, slug)
+		if err != nil {
+			return nil, err
+		}
+		if existing == nil {
+			break
+		}
+		counter++
+		slug = baseSlug + "-" + strconv.Itoa(counter)
+	}
+
+	now := models.Now()
+	duplicate := &models.MeetingTemplate{
+		ID:                uuid.New().String(),
+		HostID:            original.HostID,
+		Slug:              slug,
+		Name:              original.Name + " (Copy)",
+		Description:       original.Description,
+		Durations:         original.Durations,
+		LocationType:      original.LocationType,
+		CustomLocation:    original.CustomLocation,
+		CalendarID:        original.CalendarID,
+		RequiresApproval:  original.RequiresApproval,
+		MinNoticeMinutes:  original.MinNoticeMinutes,
+		MaxScheduleDays:   original.MaxScheduleDays,
+		PreBufferMinutes:  original.PreBufferMinutes,
+		PostBufferMinutes: original.PostBufferMinutes,
+		AvailabilityRules: original.AvailabilityRules,
+		InviteeQuestions:  original.InviteeQuestions,
+		ConfirmationEmail: original.ConfirmationEmail,
+		ReminderEmail:     original.ReminderEmail,
+		IsActive:          false, // New copies are inactive by default
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+
+	if err := s.repos.Template.Create(ctx, duplicate); err != nil {
+		return nil, err
+	}
+
+	// Audit log
+	s.auditLog.Log(ctx, tenantID, &hostID, "template.duplicated", "template", duplicate.ID, map[string]interface{}{
+		"original_id": original.ID,
+	}, "")
+
+	return duplicate, nil
 }

@@ -344,9 +344,16 @@ Best regards"></textarea>
 
     <div class="form-actions">
         <a href="/dashboard/templates" class="btn">Cancel</a>
+        {{if not .Data.IsNew}}
+        <button type="button" class="btn" onclick="document.getElementById('duplicate-form').submit()">Duplicate</button>
+        {{end}}
         <button type="submit" class="btn btn-primary">{{if .Data.IsNew}}Create Meeting Type{{else}}Save Changes{{end}}</button>
     </div>
 </form>
+
+{{if not .Data.IsNew}}
+<form id="duplicate-form" action="/dashboard/templates/{{.Data.Template.ID}}/duplicate" method="POST" style="display:none"></form>
+{{end}}
 
 <script>
 document.getElementById('location_type').addEventListener('change', function() {

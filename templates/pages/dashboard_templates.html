@@ -43,6 +43,9 @@ function copyTemplateLink(btn, url) {
             <button type="button" class="btn btn-sm btn-copy" onclick="copyTemplateLink(this, '{{$.BaseURL}}/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}')">Copy Link</button>
             <a href="/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}" target="_blank" class="btn btn-sm">Preview</a>
             <a href="/dashboard/templates/{{.ID}}" class="btn btn-sm">Edit</a>
+            <form action="/dashboard/templates/{{.ID}}/duplicate" method="POST" style="display:inline">
+                <button type="submit" class="btn btn-sm">Duplicate</button>
+            </form>
             <form action="/dashboard/templates/{{.ID}}" method="POST" style="display:inline">
                 <input type="hidden" name="_method" value="DELETE">
                 <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this meeting type?')">Delete</button>

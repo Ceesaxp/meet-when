@@ -398,6 +398,25 @@ func (h *DashboardHandler) DeleteTemplate(w http.ResponseWriter, r *http.Request
 	h.handlers.redirect(w, r, "/dashboard/templates")
 }
 
+// DuplicateTemplate handles template duplication
+func (h *DashboardHandler) DuplicateTemplate(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	templateID := r.PathValue("id")
+	duplicate, err := h.handlers.services.Template.DuplicateTemplate(r.Context(), host.Host.ID, host.Tenant.ID, templateID)
+	if err != nil {
+		h.handlers.redirect(w, r, "/dashboard/templates?error=duplicate_failed")
+		return
+	}
+
+	// Redirect to edit page for the new template
+	h.handlers.redirect(w, r, "/dashboard/templates/"+duplicate.ID)
+}
+
 // Bookings renders the bookings list
 func (h *DashboardHandler) Bookings(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())

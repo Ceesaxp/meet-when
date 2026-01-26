@@ -102,6 +102,7 @@ func main() {
 	dashboard.HandleFunc("GET /dashboard/templates/{id}", h.Dashboard.EditTemplatePage)
 	dashboard.HandleFunc("PUT /dashboard/templates/{id}", h.Dashboard.UpdateTemplate)
 	dashboard.HandleFunc("DELETE /dashboard/templates/{id}", h.Dashboard.DeleteTemplate)
+	dashboard.HandleFunc("POST /dashboard/templates/{id}/duplicate", h.Dashboard.DuplicateTemplate)
 
 	// Bookings management
 	dashboard.HandleFunc("GET /dashboard/bookings", h.Dashboard.Bookings)
