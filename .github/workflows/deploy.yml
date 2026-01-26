@@ -45,7 +45,7 @@ jobs:
             docker pull ${IMAGE}
 
             # Update and restart
-            cd ~/app
+            cd /opt/meet-when/mw-prod
             docker compose down
             docker compose up -d --remove-orphans
 
