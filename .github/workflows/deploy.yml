@@ -30,7 +30,9 @@ jobs:
 
           # Convert repository name to lowercase for GHCR
           IMAGE_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE="${{ env.REGISTRY }}/${IMAGE_NAME}:${{ github.event.workflow_run.head_sha }}"
+          # Use short SHA (7 chars) to match docker/metadata-action tags
+          SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
+          IMAGE="${{ env.REGISTRY }}/${IMAGE_NAME}:${SHORT_SHA}"
 
           # Deploy
           ssh -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" bash -s << DEPLOY_SCRIPT
