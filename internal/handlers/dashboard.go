@@ -105,12 +105,19 @@ func (h *DashboardHandler) ConnectCalDAV(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Determine provider from form field (defaults to caldav)
+	provider := models.CalendarProvider(r.FormValue("provider"))
+	if provider == "" {
+		provider = models.CalendarProviderCalDAV
+	}
+
 	input := services.CalDAVConnectInput{
 		HostID:   host.Host.ID,
 		Name:     r.FormValue("name"),
 		URL:      r.FormValue("url"),
 		Username: r.FormValue("username"),
 		Password: r.FormValue("password"),
+		Provider: provider,
 	}
 
 	_, err := h.handlers.services.Calendar.ConnectCalDAV(r.Context(), input)

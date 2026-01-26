@@ -1,0 +1,337 @@
+{
+  "project": "MeetWhen",
+  "branchName": "ralph/scheduling-system-completion",
+  "description": "Complete the self-hosted scheduling system with all PRD requirements - calendar integrations, booking flows, email notifications, and UI enhancements",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Implement CalDAV/iCloud busy time fetching",
+      "description": "As a host, I want my iCloud/CalDAV calendars to show accurate busy times so invitees see correct availability.",
+      "acceptanceCriteria": [
+        "Implement REPORT request with calendar-query in getCalDAVBusyTimes",
+        "Parse VCALENDAR response to extract VEVENT busy blocks",
+        "Handle iCloud-specific CalDAV endpoint (caldav.icloud.com)",
+        "Return actual busy times instead of nil",
+        "Typecheck passes",
+        "go test ./... passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Implemented with full VCALENDAR parsing - see calendar.go:546-888"
+    },
+    {
+      "id": "US-002",
+      "title": "Add iCloud calendar connection UI",
+      "description": "As a host, I want a dedicated iCloud connection form with app-specific password instructions.",
+      "acceptanceCriteria": [
+        "Add 'Connect iCloud' section on calendars page",
+        "Show instructions for generating app-specific password",
+        "Pre-fill CalDAV URL for iCloud (caldav.icloud.com)",
+        "Store with provider type 'icloud' for proper handling",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Implemented dedicated iCloud form with app-specific password instructions, pre-filled CalDAV URL, and provider type handling"
+    },
+    {
+      "id": "US-003",
+      "title": "Implement Zoom meeting creation API",
+      "description": "As a host, I want Zoom meetings auto-created when booking is approved with Zoom location type.",
+      "acceptanceCriteria": [
+        "Implement CreateZoomMeeting in ConferencingService",
+        "Call Zoom API POST /users/me/meetings with booking details",
+        "Store join_url in booking.conference_link",
+        "Handle token refresh for expired Zoom tokens",
+        "Typecheck passes",
+        "go test ./... passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Zoom OAuth callback exists but meeting creation needs implementation"
+    },
+    {
+      "id": "US-004",
+      "title": "Add duration selector to public booking form",
+      "description": "As an invitee, I want to choose meeting duration when multiple options are available.",
+      "acceptanceCriteria": [
+        "Show duration radio buttons/dropdown when template has multiple durations",
+        "Selected duration passed to GetSlots and CreateBooking",
+        "Slot times update when duration changes",
+        "Single duration templates skip the selector",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "Duration field exists in form but UI for selection is missing"
+    },
+    {
+      "id": "US-005",
+      "title": "Complete reschedule booking flow",
+      "description": "As an invitee, I want to select a new time and complete rescheduling via the reschedule page.",
+      "acceptanceCriteria": [
+        "Reschedule page shows available slots like booking page",
+        "Form submission cancels old booking and creates new one",
+        "New booking preserves invitee info from original",
+        "Both host and invitee receive reschedule notification emails",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "ReschedulePage exists but lacks slot selection and submission"
+    },
+    {
+      "id": "US-006",
+      "title": "Add agenda/subject field to booking form",
+      "description": "As an invitee, I want to provide a meeting agenda or subject when booking.",
+      "acceptanceCriteria": [
+        "Add 'Meeting subject/agenda' textarea to public booking form",
+        "Store in booking.answers with key 'agenda'",
+        "Display agenda in host notification email",
+        "Include agenda in calendar event description",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "PRD Section 6.3 requires free-text agenda field"
+    },
+    {
+      "id": "US-007",
+      "title": "Add custom questions builder to template form",
+      "description": "As a host, I want to add custom questions that invitees must answer when booking.",
+      "acceptanceCriteria": [
+        "Template form has 'Custom Questions' section",
+        "Can add/remove text questions dynamically",
+        "Questions saved to invitee_questions JSON field",
+        "Questions rendered on public booking form",
+        "Answers stored in booking.answers",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "Parsing exists in CreateBooking but no UI to define questions"
+    },
+    {
+      "id": "US-008",
+      "title": "Add template availability rules UI",
+      "description": "As a host, I want to restrict availability per template beyond my working hours.",
+      "acceptanceCriteria": [
+        "Template form has 'Availability' section",
+        "Can select allowed weekdays (checkboxes)",
+        "Can set time ranges per day that differ from global working hours",
+        "Rules saved to availability_rules JSON field",
+        "AvailabilityService applies template rules on top of working hours",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "Field exists but no UI or service logic to apply rules"
+    },
+    {
+      "id": "US-009",
+      "title": "Implement editable email templates",
+      "description": "As a host, I want to customize confirmation and reminder emails per meeting template.",
+      "acceptanceCriteria": [
+        "Template form has 'Email Templates' section",
+        "Can edit confirmation email subject and body",
+        "Can edit reminder email subject and body",
+        "Support placeholders: {{invitee_name}}, {{meeting_time}}, {{location}}, etc.",
+        "EmailService uses custom templates when available",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "confirmation_email and reminder_email fields exist but not used"
+    },
+    {
+      "id": "US-010",
+      "title": "Send booking reminder emails",
+      "description": "As an invitee, I want to receive a reminder email before my meeting.",
+      "acceptanceCriteria": [
+        "Add reminder_sent boolean field to bookings table",
+        "Create background job/cron to check upcoming bookings",
+        "Send reminder 24 hours before meeting start",
+        "Use template's reminder_email if customized",
+        "Include meeting details and reschedule/cancel links",
+        "Typecheck passes",
+        "go test ./... passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "PRD Section 9.3 mentions reminder emails"
+    },
+    {
+      "id": "US-011",
+      "title": "Add phone location type to templates",
+      "description": "As a host, I want to specify phone as meeting location with my number.",
+      "acceptanceCriteria": [
+        "Template form shows phone number input when 'Phone' location selected",
+        "Phone number stored in custom_location field",
+        "Public booking page shows 'Call [number]' as location",
+        "Phone number included in confirmation email and calendar invite",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "Phone provider constant exists but UI needs implementation"
+    },
+    {
+      "id": "US-012",
+      "title": "Add audit log viewer page",
+      "description": "As a tenant admin, I want to view audit logs for my organization.",
+      "acceptanceCriteria": [
+        "Add /dashboard/audit-log route",
+        "Show paginated list of audit events",
+        "Display: timestamp, action, entity type, user, details",
+        "Filter by action type and date range",
+        "Only visible to users with is_admin=true",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "AuditLog table and repository exist, need UI"
+    },
+    {
+      "id": "US-013",
+      "title": "Add booking details modal in dashboard",
+      "description": "As a host, I want to view full booking details including answers and guest list.",
+      "acceptanceCriteria": [
+        "Click booking row to open details modal/panel",
+        "Show all invitee info: name, email, phone, timezone",
+        "Show additional guests list",
+        "Show custom question answers",
+        "Show meeting subject/agenda if provided",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": "Current bookings page shows minimal info"
+    },
+    {
+      "id": "US-014",
+      "title": "Add host welcome/onboarding flow",
+      "description": "As a new host, I want guidance on setting up my scheduling after registration.",
+      "acceptanceCriteria": [
+        "After registration, redirect to onboarding page",
+        "Step 1: Set working hours",
+        "Step 2: Connect calendar (Google or iCloud)",
+        "Step 3: Create first meeting template",
+        "Show public booking link when complete",
+        "Allow skipping steps",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": "Currently redirects straight to dashboard"
+    },
+    {
+      "id": "US-015",
+      "title": "Add copy booking link button",
+      "description": "As a host, I want to easily copy my public booking URLs to share.",
+      "acceptanceCriteria": [
+        "Template list shows 'Copy Link' button for each template",
+        "Dashboard home shows quick-copy link for host's booking page",
+        "Click copies full URL to clipboard",
+        "Show brief 'Copied!' confirmation",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": "Quality of life feature for sharing"
+    },
+    {
+      "id": "US-016",
+      "title": "Add template duplication",
+      "description": "As a host, I want to duplicate an existing template to create variations.",
+      "acceptanceCriteria": [
+        "Add 'Duplicate' button on template list and edit page",
+        "Creates copy with '(Copy)' appended to name",
+        "New template has unique slug",
+        "All settings copied except is_active (defaults to false)",
+        "Redirect to edit page for new template",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Show booking count on templates",
+      "description": "As a host, I want to see how many bookings each template has received.",
+      "acceptanceCriteria": [
+        "Template list shows total booking count per template",
+        "Shows pending vs confirmed breakdown",
+        "Count updated when viewing template list",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "Add timezone selector to booking form",
+      "description": "As an invitee, I want to change the detected timezone if it's incorrect.",
+      "acceptanceCriteria": [
+        "Auto-detect timezone via JavaScript Intl API",
+        "Show detected timezone with 'Change' link",
+        "Clicking opens timezone selector dropdown",
+        "Selecting new timezone reloads slots in that timezone",
+        "Selected timezone persisted in form submission",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": "Currently relies on URL param, no UI to change"
+    },
+    {
+      "id": "US-019",
+      "title": "Add calendar sync status indicator",
+      "description": "As a host, I want to know when my calendar was last synced for availability.",
+      "acceptanceCriteria": [
+        "Calendar list shows last sync timestamp",
+        "Show warning icon if sync failed or token expired",
+        "Add 'Refresh' button to manually re-sync",
+        "Display sync errors with guidance to reconnect",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "Add booking confirmation page improvements",
+      "description": "As an invitee, I want clear confirmation after booking with all meeting details.",
+      "acceptanceCriteria": [
+        "Show clear status: Pending approval vs Confirmed",
+        "Display all meeting details: time, duration, location",
+        "Show 'Add to Calendar' button (downloads ICS)",
+        "Provide cancel and reschedule links prominently",
+        "For pending: explain host needs to approve",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": "booking_status.html exists but could be improved"
+    }
+  ]
+}

@@ -540,6 +540,43 @@ a:hover {
     max-width: 400px;
 }
 
+.icloud-instructions {
+    background: var(--bg-light);
+    padding: 1rem;
+    border-radius: var(--border-radius);
+    margin-bottom: 1rem;
+}
+
+.icloud-instructions p {
+    margin-bottom: 0.5rem;
+}
+
+.icloud-instructions ol {
+    margin: 0;
+    padding-left: 1.5rem;
+}
+
+.icloud-instructions li {
+    margin-bottom: 0.25rem;
+}
+
+.form-help {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.badge-google {
+    background: #4285f4;
+    color: white;
+}
+
+.badge-icloud {
+    background: #333;
+    color: white;
+}
+
 /* Working Hours Table */
 .working-hours-table {
     width: 100%;

@@ -17,7 +17,9 @@
         <div class="calendar-card">
             <div class="calendar-info">
                 <strong>{{.Name}}</strong>
-                <span class="badge">{{.Provider}}</span>
+                {{if eq (printf "%s" .Provider) "google"}}<span class="badge badge-google">Google Calendar</span>
+                {{else if eq (printf "%s" .Provider) "icloud"}}<span class="badge badge-icloud">iCloud</span>
+                {{else}}<span class="badge">CalDAV</span>{{end}}
                 {{if .IsDefault}}<span class="badge badge-primary">Default</span>{{end}}
             </div>
             <div class="calendar-actions">
@@ -43,9 +45,47 @@
             <a href="{{.Data.GoogleAuthURL}}" class="btn btn-google">Connect Google Calendar</a>
         </div>
 
-        <details class="caldav-form">
-            <summary>Connect CalDAV Calendar (iCloud, etc.)</summary>
+        <details class="caldav-form icloud-form">
+            <summary>Connect iCloud Calendar</summary>
+            <div class="icloud-instructions">
+                <p><strong>To connect iCloud Calendar, you'll need an app-specific password:</strong></p>
+                <ol>
+                    <li>Go to <a href="https://appleid.apple.com/account/manage" target="_blank" rel="noopener">appleid.apple.com</a></li>
+                    <li>Sign in with your Apple ID</li>
+                    <li>In the "Sign-In and Security" section, click "App-Specific Passwords"</li>
+                    <li>Click the "+" button to generate a new password</li>
+                    <li>Name it something like "Meet-When Calendar"</li>
+                    <li>Copy the generated password and paste it below</li>
+                </ol>
+            </div>
             <form method="POST" action="/dashboard/calendars/connect/caldav" class="form">
+                <input type="hidden" name="provider" value="icloud">
+                <div class="form-group">
+                    <label for="icloud_name">Calendar Name</label>
+                    <input type="text" id="icloud_name" name="name" required value="iCloud Calendar">
+                </div>
+                <div class="form-group">
+                    <label for="icloud_url">CalDAV URL</label>
+                    <input type="url" id="icloud_url" name="url" required value="https://caldav.icloud.com/">
+                    <small class="form-help">Default iCloud CalDAV URL. Usually no changes needed.</small>
+                </div>
+                <div class="form-group">
+                    <label for="icloud_username">Apple ID Email</label>
+                    <input type="email" id="icloud_username" name="username" required placeholder="your.email@icloud.com">
+                </div>
+                <div class="form-group">
+                    <label for="icloud_password">App-Specific Password</label>
+                    <input type="password" id="icloud_password" name="password" required placeholder="xxxx-xxxx-xxxx-xxxx">
+                    <small class="form-help">The app-specific password generated from Apple ID settings (not your Apple ID password).</small>
+                </div>
+                <button type="submit" class="btn btn-primary">Connect iCloud</button>
+            </form>
+        </details>
+
+        <details class="caldav-form">
+            <summary>Connect Other CalDAV Calendar</summary>
+            <form method="POST" action="/dashboard/calendars/connect/caldav" class="form">
+                <input type="hidden" name="provider" value="caldav">
                 <div class="form-group">
                     <label for="caldav_name">Calendar Name</label>
                     <input type="text" id="caldav_name" name="name" required placeholder="My Calendar">

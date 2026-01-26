@@ -94,6 +94,7 @@ type CalDAVConnectInput struct {
 	URL      string
 	Username string
 	Password string
+	Provider models.CalendarProvider // Optional: defaults to CalendarProviderCalDAV
 }
 
 // ConnectCalDAV connects a CalDAV calendar
@@ -103,11 +104,17 @@ func (s *CalendarService) ConnectCalDAV(ctx context.Context, input CalDAVConnect
 		return nil, fmt.Errorf("failed to validate CalDAV connection: %w", err)
 	}
 
+	// Default to CalDAV provider if not specified
+	provider := input.Provider
+	if provider == "" {
+		provider = models.CalendarProviderCalDAV
+	}
+
 	now := models.Now()
 	calendar := &models.CalendarConnection{
 		ID:             uuid.New().String(),
 		HostID:         input.HostID,
-		Provider:       models.CalendarProviderCalDAV,
+		Provider:       provider,
 		Name:           input.Name,
 		CalDAVURL:      input.URL,
 		CalDAVUsername: input.Username,
