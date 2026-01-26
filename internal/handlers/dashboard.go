@@ -615,6 +615,30 @@ func parseIntOrDefault(s string, defaultValue int) int {
 	return defaultValue
 }
 
+// BookingDetails returns booking details as a partial (for modal display)
+func (h *DashboardHandler) BookingDetails(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	bookingID := r.PathValue("id")
+	booking, err := h.handlers.services.Booking.GetBooking(r.Context(), bookingID)
+	if err != nil || booking == nil || booking.HostID != host.Host.ID {
+		http.Error(w, "Booking not found", http.StatusNotFound)
+		return
+	}
+
+	// Get template for meeting name
+	template, _ := h.handlers.services.Template.GetTemplate(r.Context(), host.Host.ID, booking.TemplateID)
+
+	h.handlers.renderPartial(w, "booking_details_partial.html", map[string]interface{}{
+		"Booking":  booking,
+		"Template": template,
+	})
+}
+
 // AuditLogs renders the audit log viewer page (admin only)
 func (h *DashboardHandler) AuditLogs(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())

@@ -1,0 +1,131 @@
+{{define "booking_details_partial.html"}}
+<div class="modal-overlay" onclick="closeBookingModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h2>Booking Details</h2>
+            <button type="button" class="modal-close" onclick="closeBookingModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            {{if .Booking}}
+            <div class="booking-detail-section">
+                <h3>Meeting</h3>
+                <div class="booking-detail-row">
+                    <span class="label">Type:</span>
+                    <span class="value">{{if .Template}}{{.Template.Name}}{{else}}Unknown{{end}}</span>
+                </div>
+                <div class="booking-detail-row">
+                    <span class="label">Status:</span>
+                    <span class="badge badge-{{.Booking.Status}}">{{.Booking.Status}}</span>
+                </div>
+                <div class="booking-detail-row">
+                    <span class="label">Date:</span>
+                    <span class="value">{{formatDate .Booking.StartTime}}</span>
+                </div>
+                <div class="booking-detail-row">
+                    <span class="label">Time:</span>
+                    <span class="value">{{formatTime .Booking.StartTime}} - {{formatTime .Booking.EndTime}}</span>
+                </div>
+                <div class="booking-detail-row">
+                    <span class="label">Duration:</span>
+                    <span class="value">{{.Booking.Duration}} minutes</span>
+                </div>
+                {{if .Booking.ConferenceLink}}
+                <div class="booking-detail-row">
+                    <span class="label">Meeting Link:</span>
+                    <span class="value"><a href="{{.Booking.ConferenceLink}}" target="_blank">Join Meeting</a></span>
+                </div>
+                {{end}}
+            </div>
+
+            <div class="booking-detail-section">
+                <h3>Guest Information</h3>
+                <div class="booking-detail-row">
+                    <span class="label">Name:</span>
+                    <span class="value">{{.Booking.InviteeName}}</span>
+                </div>
+                <div class="booking-detail-row">
+                    <span class="label">Email:</span>
+                    <span class="value"><a href="mailto:{{.Booking.InviteeEmail}}">{{.Booking.InviteeEmail}}</a></span>
+                </div>
+                {{if .Booking.InviteePhone}}
+                <div class="booking-detail-row">
+                    <span class="label">Phone:</span>
+                    <span class="value">{{.Booking.InviteePhone}}</span>
+                </div>
+                {{end}}
+                {{if .Booking.InviteeTimezone}}
+                <div class="booking-detail-row">
+                    <span class="label">Timezone:</span>
+                    <span class="value">{{.Booking.InviteeTimezone}}</span>
+                </div>
+                {{end}}
+            </div>
+
+            {{if .Booking.AdditionalGuests}}
+            {{if gt (len .Booking.AdditionalGuests) 0}}
+            <div class="booking-detail-section">
+                <h3>Additional Guests</h3>
+                <ul class="additional-guests-list">
+                    {{range .Booking.AdditionalGuests}}
+                    <li>{{.}}</li>
+                    {{end}}
+                </ul>
+            </div>
+            {{end}}
+            {{end}}
+
+            {{if .Booking.Answers}}
+            {{$answers := .Booking.Answers}}
+            {{if or (index $answers "agenda") (gt (len $answers) 1)}}
+            <div class="booking-detail-section">
+                <h3>Meeting Details</h3>
+                {{with index $answers "agenda"}}
+                <div class="booking-detail-row">
+                    <span class="label">Subject/Agenda:</span>
+                    <span class="value agenda-text">{{.}}</span>
+                </div>
+                {{end}}
+                {{range $key, $value := $answers}}
+                {{if ne $key "agenda"}}
+                <div class="booking-detail-row">
+                    <span class="label">{{$key}}:</span>
+                    <span class="value">{{$value}}</span>
+                </div>
+                {{end}}
+                {{end}}
+            </div>
+            {{end}}
+            {{end}}
+
+            {{if eq .Booking.Status "cancelled"}}
+            <div class="booking-detail-section">
+                <h3>Cancellation</h3>
+                <div class="booking-detail-row">
+                    <span class="label">Cancelled by:</span>
+                    <span class="value">{{if eq .Booking.CancelledBy "host"}}Host{{else}}Invitee{{end}}</span>
+                </div>
+                {{if .Booking.CancelReason}}
+                <div class="booking-detail-row">
+                    <span class="label">Reason:</span>
+                    <span class="value">{{.Booking.CancelReason}}</span>
+                </div>
+                {{end}}
+            </div>
+            {{end}}
+
+            <div class="booking-detail-section booking-meta">
+                <div class="booking-detail-row">
+                    <span class="label">Created:</span>
+                    <span class="value">{{formatDateTime .Booking.CreatedAt}}</span>
+                </div>
+            </div>
+            {{else}}
+            <p class="text-muted">Booking not found.</p>
+            {{end}}
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn" onclick="closeBookingModal()">Close</button>
+        </div>
+    </div>
+</div>
+{{end}}

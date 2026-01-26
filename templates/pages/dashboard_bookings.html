@@ -15,7 +15,7 @@
 </div>
 
 {{if .Data.Bookings}}
-<table class="table">
+<table class="table bookings-table">
     <thead>
         <tr>
             <th>Date & Time</th>
@@ -28,7 +28,7 @@
     </thead>
     <tbody>
         {{range .Data.Bookings}}
-        <tr>
+        <tr class="booking-row" data-booking-id="{{.ID}}" onclick="openBookingModal('{{.ID}}')">
             <td>
                 {{formatDate .StartTime}}<br>
                 <small>{{formatTime .StartTime}} - {{formatTime .EndTime}}</small>
@@ -45,7 +45,7 @@
             </td>
             <td>{{.Duration}} min</td>
             <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
-            <td>
+            <td class="actions-cell" onclick="event.stopPropagation()">
                 {{if eq .Status "pending"}}
                 <form action="/dashboard/bookings/{{.ID}}/approve" method="POST" style="display:inline">
                     <button type="submit" class="btn btn-sm btn-success">Approve</button>
@@ -68,6 +68,36 @@
         {{end}}
     </tbody>
 </table>
+
+<!-- Modal container -->
+<div id="booking-modal"></div>
+
+<script>
+function openBookingModal(bookingId) {
+    fetch('/dashboard/bookings/' + bookingId + '/details')
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById('booking-modal').innerHTML = html;
+            document.body.classList.add('modal-open');
+        })
+        .catch(error => {
+            console.error('Error loading booking details:', error);
+        });
+}
+
+function closeBookingModal(event) {
+    if (event && event.target !== event.currentTarget) return;
+    document.getElementById('booking-modal').innerHTML = '';
+    document.body.classList.remove('modal-open');
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeBookingModal();
+    }
+});
+</script>
 {{else}}
 <div class="empty-state">
     <h3>No bookings found</h3>

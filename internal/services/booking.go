@@ -329,6 +329,11 @@ func (s *BookingService) GetBookingByToken(ctx context.Context, token string) (*
 	}, nil
 }
 
+// GetBooking retrieves a single booking by ID
+func (s *BookingService) GetBooking(ctx context.Context, bookingID string) (*models.Booking, error) {
+	return s.repos.Booking.GetByID(ctx, bookingID)
+}
+
 // GetBookings retrieves bookings for a host
 func (s *BookingService) GetBookings(ctx context.Context, hostID string, status *models.BookingStatus) ([]*models.Booking, error) {
 	return s.repos.Booking.GetByHostID(ctx, hostID, status)
