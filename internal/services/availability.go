@@ -146,14 +146,21 @@ type TemplateAvailabilityRules struct {
 	Days    map[int]DayAvailability
 }
 
+// TimeInterval represents a single time interval with start and end times
+type TimeInterval struct {
+	Start string // HH:MM format
+	End   string // HH:MM format
+}
+
 // DayAvailability represents availability for a specific day
+// Supports multiple intervals per day (e.g., morning 9-12, afternoon 14-17)
 type DayAvailability struct {
-	Enabled bool
-	Start   string // HH:MM format
-	End     string // HH:MM format
+	Enabled   bool
+	Intervals []TimeInterval
 }
 
 // parseAvailabilityRules parses JSONMap availability rules into a structured format
+// Supports both old format (single start/end) and new format (intervals array) for backward compatibility
 func parseAvailabilityRules(rules models.JSONMap) *TemplateAvailabilityRules {
 	if rules == nil {
 		return nil
@@ -180,12 +187,37 @@ func parseAvailabilityRules(rules models.JSONMap) *TemplateAvailabilityRules {
 				if enabled, ok := dayMap["enabled"].(bool); ok {
 					dayAvail.Enabled = enabled
 				}
-				if start, ok := dayMap["start"].(string); ok {
-					dayAvail.Start = start
+
+				// Try new format first: intervals array
+				if intervals, ok := dayMap["intervals"].([]interface{}); ok {
+					for _, intervalData := range intervals {
+						if intervalMap, ok := intervalData.(map[string]interface{}); ok {
+							interval := TimeInterval{}
+							if start, ok := intervalMap["start"].(string); ok {
+								interval.Start = start
+							}
+							if end, ok := intervalMap["end"].(string); ok {
+								interval.End = end
+							}
+							if interval.Start != "" && interval.End != "" {
+								dayAvail.Intervals = append(dayAvail.Intervals, interval)
+							}
+						}
+					}
+				} else {
+					// Fall back to old format: single start/end
+					var start, end string
+					if s, ok := dayMap["start"].(string); ok {
+						start = s
+					}
+					if e, ok := dayMap["end"].(string); ok {
+						end = e
+					}
+					if start != "" && end != "" {
+						dayAvail.Intervals = []TimeInterval{{Start: start, End: end}}
+					}
 				}
-				if end, ok := dayMap["end"].(string); ok {
-					dayAvail.End = end
-				}
+
 				result.Days[dayNum] = dayAvail
 			}
 		}
@@ -213,32 +245,43 @@ func (s *AvailabilityService) getSlotsForDay(
 	if templateRules != nil && templateRules.Enabled {
 		// Check if this day is enabled in template rules
 		dayRule, dayExists := templateRules.Days[dayOfWeek]
-		if !dayExists || !dayRule.Enabled {
+		if !dayExists || !dayRule.Enabled || len(dayRule.Intervals) == 0 {
 			return nil
 		}
 
-		// Use template's time range for this day
-		startTime, err := time.ParseInLocation("15:04", dayRule.Start, hostLoc)
-		if err != nil {
-			return nil
-		}
-		endTime, err := time.ParseInLocation("15:04", dayRule.End, hostLoc)
-		if err != nil {
-			return nil
-		}
-
-		// Create full datetime for this day
+		var slots []models.TimeSlot
 		dayInHostTz := day.In(hostLoc)
-		workStart := time.Date(
-			dayInHostTz.Year(), dayInHostTz.Month(), dayInHostTz.Day(),
-			startTime.Hour(), startTime.Minute(), 0, 0, hostLoc,
-		)
-		workEnd := time.Date(
-			dayInHostTz.Year(), dayInHostTz.Month(), dayInHostTz.Day(),
-			endTime.Hour(), endTime.Minute(), 0, 0, hostLoc,
-		)
 
-		return s.generateSlotsInRange(workStart, workEnd, duration, increment, busySlots, earliestStart, latestEnd)
+		// Iterate through all intervals for this day
+		for _, interval := range dayRule.Intervals {
+			startTime, err := time.ParseInLocation("15:04", interval.Start, hostLoc)
+			if err != nil {
+				continue
+			}
+			endTime, err := time.ParseInLocation("15:04", interval.End, hostLoc)
+			if err != nil {
+				continue
+			}
+
+			// Create full datetime for this day
+			workStart := time.Date(
+				dayInHostTz.Year(), dayInHostTz.Month(), dayInHostTz.Day(),
+				startTime.Hour(), startTime.Minute(), 0, 0, hostLoc,
+			)
+			workEnd := time.Date(
+				dayInHostTz.Year(), dayInHostTz.Month(), dayInHostTz.Day(),
+				endTime.Hour(), endTime.Minute(), 0, 0, hostLoc,
+			)
+
+			slots = append(slots, s.generateSlotsInRange(workStart, workEnd, duration, increment, busySlots, earliestStart, latestEnd)...)
+		}
+
+		// Sort slots by start time (in case intervals were not in order)
+		sort.Slice(slots, func(i, j int) bool {
+			return slots[i].Start.Before(slots[j].Start)
+		})
+
+		return slots
 	}
 
 	// Fall back to working hours
