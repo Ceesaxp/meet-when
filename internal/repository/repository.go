@@ -137,6 +137,46 @@ func (r *HostRepository) GetByEmail(ctx context.Context, tenantID, email string)
 	return host, err
 }
 
+// GetAllByEmail returns all hosts with the given email across all tenants.
+// Used for simplified login flow where email may exist in multiple organizations.
+// Returns empty slice (not error) when no hosts found.
+func (r *HostRepository) GetAllByEmail(ctx context.Context, email string) ([]*models.Host, error) {
+	query := q(r.driver, `
+		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
+		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false), created_at, updated_at
+		FROM hosts WHERE email = $1
+	`)
+	rows, err := r.db.QueryContext(ctx, query, email)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var hosts []*models.Host
+	for rows.Next() {
+		host := &models.Host{}
+		err := rows.Scan(
+			&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
+			&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
+			&host.OnboardingCompleted, &host.CreatedAt, &host.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		hosts = append(hosts, host)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Return empty slice (not nil) when no hosts found
+	if hosts == nil {
+		hosts = []*models.Host{}
+	}
+
+	return hosts, nil
+}
+
 func (r *HostRepository) GetBySlug(ctx context.Context, tenantID, slug string) (*models.Host, error) {
 	host := &models.Host{}
 	query := q(r.driver, `
