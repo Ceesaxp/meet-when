@@ -144,11 +144,13 @@ func main() {
 	})
 
 	// Apply global middleware
+	// MethodOverride must be applied before route matching so PUT/DELETE form submissions work
 	handler := middleware.Chain(
 		mux,
 		middleware.Logger,
 		middleware.Recover,
 		middleware.RequestID,
+		middleware.MethodOverride,
 	)
 
 	// Create server

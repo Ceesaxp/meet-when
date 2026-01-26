@@ -70,6 +70,23 @@ func RequestID(next http.Handler) http.Handler {
 	})
 }
 
+// MethodOverride converts POST requests with _method form field to the specified HTTP method.
+// This allows HTML forms to submit PUT/DELETE requests since forms only support GET/POST.
+func MethodOverride(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			// Parse form to access _method field
+			if err := r.ParseForm(); err == nil {
+				method := r.FormValue("_method")
+				if method == http.MethodPut || method == http.MethodDelete {
+					r.Method = method
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // RequireAuth ensures the user is authenticated
 func RequireAuth(sessionService *services.SessionService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
