@@ -27,18 +27,20 @@
                     {{if eq (printf "%s" .SyncStatus) "synced"}}
                         <span class="sync-indicator sync-ok" title="Sync successful">&#10003;</span>
                         {{if .LastSyncedAt}}
-                        <span class="sync-time">Last synced: {{.LastSyncedAt.Format "Jan 2, 3:04 PM"}}</span>
+                        <span class="sync-time">Synced {{timeAgo .LastSyncedAt}}</span>
+                        {{else}}
+                        <span class="sync-time">Synced</span>
                         {{end}}
                     {{else if eq (printf "%s" .SyncStatus) "failed"}}
-                        <span class="sync-indicator sync-error" title="Sync failed">&#9888;</span>
-                        <span class="sync-time sync-error-text">Sync failed</span>
+                        <span class="sync-indicator sync-error" title="Sync failed - click for details" onclick="toggleCalendarError(this)">&#9888;</span>
+                        <span class="sync-time sync-error-text sync-error-clickable" onclick="toggleCalendarError(this)">Sync failed - click for details</span>
                     {{else}}
                         <span class="sync-indicator sync-unknown" title="Not synced yet">&#8635;</span>
-                        <span class="sync-time">Not synced yet</span>
+                        <span class="sync-time">Never synced</span>
                     {{end}}
                 </div>
                 {{if and (eq (printf "%s" .SyncStatus) "failed") .SyncError}}
-                <div class="calendar-error-message">
+                <div class="calendar-error-message" style="display: none;">
                     <span class="error-icon">&#9888;</span>
                     <span class="error-text">{{.SyncError}}</span>
                 </div>
@@ -170,4 +172,22 @@
         </div>
     </div>
 </div>
+
+<script>
+function toggleCalendarError(element) {
+    // Find the parent calendar-card and then the error message
+    var card = element.closest('.calendar-card');
+    if (!card) return;
+
+    var errorMsg = card.querySelector('.calendar-error-message');
+    if (!errorMsg) return;
+
+    // Toggle visibility
+    if (errorMsg.style.display === 'none') {
+        errorMsg.style.display = 'flex';
+    } else {
+        errorMsg.style.display = 'none';
+    }
+}
+</script>
 {{end}}

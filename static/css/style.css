@@ -674,6 +674,20 @@ a:hover {
     color: var(--danger-color);
 }
 
+.sync-error-clickable {
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+}
+
+.sync-error-clickable:hover {
+    text-decoration-style: solid;
+}
+
+.sync-indicator.sync-error {
+    cursor: pointer;
+}
+
 .calendar-error-message {
     display: flex;
     align-items: flex-start;
