@@ -5,6 +5,12 @@
 {{define "content"}}
 <div class="page-header">
     <h1>Bookings</h1>
+    {{if gt .Data.ArchivableCount 0}}
+    <button type="button" class="btn btn-outline"
+        onclick="confirmBulkArchive({{.Data.ArchivableCount}})">
+        Archive all cancelled/rejected ({{.Data.ArchivableCount}})
+    </button>
+    {{end}}
 </div>
 
 <div class="filter-bar">
@@ -31,6 +37,17 @@ function toggleArchived(checkbox) {
         url.searchParams.delete('archived');
     }
     window.location.href = url.toString();
+}
+
+function confirmBulkArchive(count) {
+    if (confirm('Archive ' + count + ' cancelled/rejected booking' + (count > 1 ? 's' : '') + '?')) {
+        // Create and submit a form
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/dashboard/bookings/archive-all';
+        document.body.appendChild(form);
+        form.submit();
+    }
 }
 </script>
 
@@ -83,7 +100,13 @@ function toggleArchived(checkbox) {
                     <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Cancel this booking?')">Cancel</button>
                 </form>
                 {{else if or (eq .Status "cancelled") (eq .Status "rejected")}}
-                {{if not .IsArchived}}
+                {{if .IsArchived}}
+                <button type="button" class="btn btn-sm btn-outline"
+                    hx-post="/dashboard/bookings/{{.ID}}/unarchive"
+                    hx-target="#booking-row-{{.ID}}"
+                    hx-swap="outerHTML"
+                    hx-confirm="Unarchive this booking?">Unarchive</button>
+                {{else}}
                 <button type="button" class="btn btn-sm btn-outline"
                     hx-post="/dashboard/bookings/{{.ID}}/archive"
                     hx-target="#booking-row-{{.ID}}"

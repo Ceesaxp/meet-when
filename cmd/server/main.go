@@ -121,6 +121,8 @@ func main() {
 	dashboard.HandleFunc("POST /dashboard/bookings/{id}/reject", h.Dashboard.RejectBooking)
 	dashboard.HandleFunc("POST /dashboard/bookings/{id}/cancel", h.Dashboard.CancelBooking)
 	dashboard.HandleFunc("POST /dashboard/bookings/{id}/archive", h.Dashboard.ArchiveBooking)
+	dashboard.HandleFunc("POST /dashboard/bookings/{id}/unarchive", h.Dashboard.UnarchiveBooking)
+	dashboard.HandleFunc("POST /dashboard/bookings/archive-all", h.Dashboard.BulkArchiveBookings)
 
 	// Settings
 	dashboard.HandleFunc("GET /dashboard/settings", h.Dashboard.Settings)

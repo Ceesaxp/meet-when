@@ -615,6 +615,70 @@ func (h *DashboardHandler) ArchiveBooking(w http.ResponseWriter, r *http.Request
 	h.handlers.redirect(w, r, "/dashboard/bookings")
 }
 
+// UnarchiveBooking restores an archived booking
+func (h *DashboardHandler) UnarchiveBooking(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	bookingID := r.PathValue("id")
+	err := h.handlers.services.Booking.UnarchiveBooking(r.Context(), host.Host.ID, host.Tenant.ID, bookingID)
+
+	// For HTMX requests, redirect to refresh the page (we need to reload to show updated row)
+	if r.Header.Get("HX-Request") == "true" {
+		if err != nil {
+			http.Error(w, "Failed to unarchive booking", http.StatusBadRequest)
+			return
+		}
+		// Return HX-Redirect header to reload the page
+		w.Header().Set("HX-Redirect", "/dashboard/bookings?archived=true")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// For regular requests, redirect
+	if err != nil {
+		h.handlers.redirect(w, r, "/dashboard/bookings?error=unarchive_failed&archived=true")
+		return
+	}
+
+	h.handlers.redirect(w, r, "/dashboard/bookings?archived=true")
+}
+
+// BulkArchiveBookings archives all cancelled and rejected bookings
+func (h *DashboardHandler) BulkArchiveBookings(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	count, err := h.handlers.services.Booking.BulkArchiveBookings(r.Context(), host.Host.ID, host.Tenant.ID)
+
+	// For HTMX requests, redirect to refresh the page
+	if r.Header.Get("HX-Request") == "true" {
+		if err != nil {
+			http.Error(w, "Failed to archive bookings", http.StatusBadRequest)
+			return
+		}
+		// Return HX-Redirect header to reload the page
+		w.Header().Set("HX-Redirect", "/dashboard/bookings")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// For regular requests, redirect
+	if err != nil {
+		h.handlers.redirect(w, r, "/dashboard/bookings?error=bulk_archive_failed")
+		return
+	}
+
+	log.Printf("[DASHBOARD] Bulk archived %d bookings for host %s", count, host.Host.ID)
+	h.handlers.redirect(w, r, "/dashboard/bookings")
+}
+
 // Settings renders the settings page
 func (h *DashboardHandler) Settings(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())

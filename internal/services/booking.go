@@ -488,6 +488,60 @@ func (s *BookingService) ArchiveBooking(ctx context.Context, hostID, tenantID, b
 	return nil
 }
 
+// UnarchiveBooking restores an archived booking
+func (s *BookingService) UnarchiveBooking(ctx context.Context, hostID, tenantID, bookingID string) error {
+	booking, err := s.repos.Booking.GetByID(ctx, bookingID)
+	if err != nil || booking == nil || booking.HostID != hostID {
+		return ErrBookingNotFound
+	}
+
+	if !booking.IsArchived {
+		return errors.New("booking is not archived")
+	}
+
+	booking.IsArchived = false
+
+	if err := s.repos.Booking.Update(ctx, booking); err != nil {
+		return err
+	}
+
+	// Audit log
+	s.auditLog.Log(ctx, tenantID, &hostID, "booking.unarchived", "booking", bookingID, nil, "")
+
+	return nil
+}
+
+// BulkArchiveBookings archives all cancelled and rejected bookings for a host
+func (s *BookingService) BulkArchiveBookings(ctx context.Context, hostID, tenantID string) (int, error) {
+	// Get all non-archived bookings
+	bookings, err := s.repos.Booking.GetByHostID(ctx, hostID, nil, false)
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	for _, booking := range bookings {
+		// Only archive cancelled or rejected bookings
+		if (booking.Status == models.BookingStatusCancelled || booking.Status == models.BookingStatusRejected) && !booking.IsArchived {
+			booking.IsArchived = true
+			if err := s.repos.Booking.Update(ctx, booking); err != nil {
+				log.Printf("[BOOKING] Failed to archive booking %s: %v", booking.ID, err)
+				continue
+			}
+			count++
+		}
+	}
+
+	// Audit log
+	if count > 0 {
+		s.auditLog.Log(ctx, tenantID, &hostID, "booking.bulk_archived", "booking", "", models.JSONMap{
+			"count": count,
+		}, "")
+	}
+
+	return count, nil
+}
+
 // processConfirmedBooking handles post-confirmation actions
 func (s *BookingService) processConfirmedBooking(ctx context.Context, details *BookingWithDetails) error {
 	log.Printf("[BOOKING] processConfirmedBooking: booking=%s template=%s calendar=%s",
