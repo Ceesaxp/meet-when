@@ -19,33 +19,43 @@ func (h *AuthHandler) LoginPage(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Login handles login form submission
+// Login handles login form submission using simplified login (email + password only)
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		h.handlers.error(w, r, http.StatusBadRequest, "Invalid form data")
 		return
 	}
 
-	input := services.LoginInput{
-		TenantSlug: r.FormValue("tenant"),
-		Email:      r.FormValue("email"),
-		Password:   r.FormValue("password"),
+	input := services.SimplifiedLoginInput{
+		Email:    r.FormValue("email"),
+		Password: r.FormValue("password"),
 	}
 
-	_, sessionToken, err := h.handlers.services.Auth.Login(r.Context(), input)
+	result, err := h.handlers.services.Auth.SimplifiedLogin(r.Context(), input)
 	if err != nil {
 		h.handlers.render(w, "login.html", PageData{
 			Title: "Login",
 			Flash: &FlashMessage{Type: "error", Message: "Invalid email or password"},
-			Data:  map[string]string{"tenant": input.TenantSlug, "email": input.Email},
+			Data:  map[string]string{"email": input.Email},
 		})
 		return
 	}
 
-	// Set session cookie
+	// Handle multi-org case: render org selection page
+	if result.RequiresOrgSelection {
+		h.handlers.render(w, "login_select_org.html", PageData{
+			Title: "Select Organization",
+			Data: map[string]interface{}{
+				"AvailableOrgs": result.AvailableOrgs,
+			},
+		})
+		return
+	}
+
+	// Single-org case: create session and redirect to dashboard
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
-		Value:    sessionToken,
+		Value:    result.SessionToken,
 		Path:     "/",
 		MaxAge:   int(24 * time.Hour / time.Second),
 		HttpOnly: true,
