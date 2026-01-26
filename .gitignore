@@ -54,3 +54,6 @@ temp/
 client_secr*
 *.db*
 *creds*
+.claude/skills
+plans/
+tasks/
