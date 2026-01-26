@@ -601,6 +601,10 @@ The following features from the requirements document are already fully implemen
 
 ---
 
+**ralph run 202601261518**
+
+---
+
 ## 2026-01-26 - US-002 - Update slot generation to use multiple intervals
 - What was implemented:
   - The slot generation logic was already implemented as part of US-001 (getSlotsForDay iterates through all intervals)
@@ -704,5 +708,45 @@ The following features from the requirements document are already fully implemen
   - Using `querySelectorAll('.interval-error[style*="display: block"]')` to find visible error elements
   - Running validation on every change provides immediate feedback, improving UX
   - The implementation was already committed in `bcce2a8` but PRD wasn't updated - always update PRD after implementation
+
+---
+
+**ralph run 202601261525**
+
+---
+
+## 2026-01-26 - US-001 - Add HTTP method override middleware
+- What was implemented:
+  - Created `MethodOverride` middleware in `internal/middleware/middleware.go`
+  - Middleware checks POST requests for `_method` form field
+  - If `_method` is PUT or DELETE, the request method is changed accordingly
+  - Original POST requests without `_method` continue to work normally
+  - Added `MethodOverride` to the global middleware chain in `cmd/server/main.go`
+- Files changed:
+  - `internal/middleware/middleware.go` - Added MethodOverride middleware function (~17 lines)
+  - `cmd/server/main.go` - Added MethodOverride to middleware.Chain call
+- **Learnings for future iterations:**
+  - The middleware chain in this codebase applies middlewares in reverse order via `Chain()` function
+  - `r.ParseForm()` must be called before accessing `r.FormValue()` to parse the request body
+  - The middleware only allows PUT and DELETE overrides for security (prevents arbitrary method spoofing)
+  - This middleware is foundational - it enables the settings form (US-002) and other PUT/DELETE form submissions to work
+
+---
+
+## 2026-01-26 - US-002 - Verify profile settings form works
+- What was implemented:
+  - Added flash message display support to the Settings page
+  - Settings handler now reads `success` and `error` query parameters after form submission
+  - Success message "Settings saved successfully" shown after successful update
+  - Error messages shown for: slug already taken, update failed, invalid form data
+  - Flash messages displayed using existing dashboard layout's Flash mechanism
+- Files changed:
+  - `internal/handlers/dashboard.go` - Updated Settings handler to parse query params and set Flash messages (~20 lines added)
+- **Learnings for future iterations:**
+  - The dashboard layout already has Flash message support via `{{if .Flash}}` in dashboard.html
+  - The UpdateSettings handler redirects with query params (?success=updated or ?error=...)
+  - The Settings GET handler must read these query params and populate the Flash field in PageData
+  - FlashMessage type has Type (success/error) and Message fields
+  - Pattern: handlers that redirect with ?success/error should have corresponding display logic in the GET handler
 
 ---

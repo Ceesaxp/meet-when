@@ -1,85 +1,288 @@
 {
     "project": "MeetWhen",
-    "branchName": "ralph/multiple-availability-intervals",
-    "description": "Multiple Time Intervals in Custom Availability - Allow hosts to define up to 2 time intervals per day (e.g., morning 9:00-12:00 and afternoon 14:00-17:00) for accommodating lunch breaks or split schedules",
+    "branchName": "ralph/dashboard-enhancements",
+    "description": "Dashboard Enhancements Bundle - Method override fix, timezone picker, timezone autodetect, calendar auto-refresh, agenda view, and archive meetings features",
     "userStories": [
         {
             "id": "US-001",
-            "title": "Update data structure for multiple intervals",
-            "description": "As a developer, I need to extend the availability rules data structure to support multiple intervals per day so that the backend can store and process them.",
+            "title": "Add HTTP method override middleware",
+            "description": "As a developer, I need middleware that converts POST requests with _method field to the specified HTTP method so that HTML forms can submit PUT/DELETE requests.",
             "acceptanceCriteria": [
-                "DayAvailability struct in availability.go supports a slice of intervals instead of single start/end",
-                "parseAvailabilityRules() handles both old format (single start/end) and new format (intervals array)",
-                "JSON structure supports: { \"days\": { \"1\": { \"enabled\": true, \"intervals\": [{\"start\": \"09:00\", \"end\": \"12:00\"}, {\"start\": \"14:00\", \"end\": \"17:00\"}] } } }",
-                "Existing templates with old format continue to work (backward compatible)",
+                "Middleware checks POST requests for _method form field",
+                "If _method is PUT or DELETE, request method is changed accordingly",
+                "Middleware is added to the middleware chain before route matching in cmd/server/main.go",
+                "Original POST requests without _method continue to work normally",
                 "Typecheck passes"
             ],
             "priority": 1,
             "passes": true,
-            "notes": "Implemented in commit 1942e30. Added TimeInterval struct, modified DayAvailability to use Intervals slice, and updated both parseAvailabilityRules() and getSlotsForDay() to handle multiple intervals per day while maintaining backward compatibility with old format."
+            "notes": ""
         },
         {
             "id": "US-002",
-            "title": "Update slot generation to use multiple intervals",
-            "description": "As a developer, I need to update the availability calculation to generate slots from all intervals so that bookings can be made in any defined time period.",
+            "title": "Verify profile settings form works",
+            "description": "As a host, I want to update my profile settings so that my name, timezone, and URL slug are saved correctly.",
             "acceptanceCriteria": [
-                "getSlotsForDay() iterates through all intervals for a day",
-                "Slots are generated within each interval independently",
-                "All slots are combined and returned sorted by start time",
-                "Unit tests cover: single interval, two intervals, empty intervals",
-                "Typecheck passes"
-            ],
-            "priority": 2,
-            "passes": true,
-            "notes": "Implementation was completed as part of US-001. Added comprehensive unit tests covering: single interval, two intervals, empty intervals, day disabled, working hours fallback, template rules disabled, busy time blocking, earliest start constraint, slot overlap detection, and time slot merging."
-        },
-        {
-            "id": "US-003",
-            "title": "Update UI to support multiple intervals per day",
-            "description": "As a host, I want to add a second time interval for each day so that I can block out lunch breaks or other unavailable periods.",
-            "acceptanceCriteria": [
-                "Each enabled day shows its current interval(s)",
-                "Add interval button appears when a day has fewer than 2 intervals",
-                "Remove button appears on each interval (except the first one when only one exists)",
-                "Time inputs for start/end on each interval",
-                "Maximum of 2 intervals per day enforced",
+                "POST to /dashboard/settings with _method=PUT successfully updates profile",
+                "Name, timezone, and slug fields are saved to database",
+                "User sees success message after save",
+                "Form retains updated values after page reload",
                 "Typecheck passes",
                 "Verify in browser using dev-browser skill"
             ],
-            "priority": 3,
+            "priority": 2,
             "passes": true,
-            "notes": "Implemented in commit aea68b7. Rewrote availability section to render days dynamically via JavaScript. Added 'Add interval' button, 'Remove' button, time inputs for each interval. Maximum 2 intervals enforced via MAX_INTERVALS_PER_DAY constant. Backward compatible with old single start/end format."
+            "notes": "Added flash message display for success/error notifications on settings page"
+        },
+        {
+            "id": "US-003",
+            "title": "Create timezone data endpoint",
+            "description": "As a developer, I need a complete list of IANA timezones accessible via API so the picker has accurate data to display.",
+            "acceptanceCriteria": [
+                "GET /api/timezones endpoint returns JSON array of all IANA timezones",
+                "Each timezone includes: id (e.g., America/New_York), display name, UTC offset",
+                "Timezones are grouped by region (Americas, Europe, Asia, Pacific, etc.)",
+                "Response is cached or static (no runtime file loading)",
+                "Typecheck passes"
+            ],
+            "priority": 3,
+            "passes": false,
+            "notes": ""
         },
         {
             "id": "US-004",
-            "title": "Implement smart defaults for second interval",
-            "description": "As a host, when I add a second interval, I want sensible default times so I don't have to manually set everything from scratch.",
+            "title": "Create searchable timezone dropdown component",
+            "description": "As a host, I want to search for my timezone by typing so I can quickly find and select it.",
             "acceptanceCriteria": [
-                "When first interval ends at or before 12:00, second interval defaults to 13:00-17:00",
-                "When first interval ends after 12:00, second interval defaults to first interval end time + 1 hour, for 3 hours duration",
-                "Default times are editable immediately after adding",
+                "Text input field that filters timezone list as user types",
+                "Search matches timezone ID, city name, and common abbreviations (PST, EST, etc.)",
+                "Dropdown shows filtered results below the input",
+                "Each result shows: timezone name, current time, UTC offset",
+                "Clicking a result selects it and closes dropdown",
+                "Keyboard navigation: arrow keys to move, Enter to select, Escape to close",
                 "Typecheck passes",
                 "Verify in browser using dev-browser skill"
             ],
             "priority": 4,
-            "passes": true,
-            "notes": "Already implemented in commit aea68b7 as part of US-003. The addInterval() JavaScript function in dashboard_template_form.html contains the smart defaults logic: if first interval ends <= 12:00, defaults to 13:00-17:00; otherwise starts 1 hour after first interval ends for 3 hours (capped at 23:00)."
+            "passes": false,
+            "notes": ""
         },
         {
             "id": "US-005",
-            "title": "Implement interval overlap validation",
-            "description": "As a host, I want to be prevented from saving overlapping intervals so that my availability is always valid.",
+            "title": "Integrate timezone picker into settings page",
+            "description": "As a host, I want to use the new timezone picker on the settings page so I can update my timezone.",
             "acceptanceCriteria": [
-                "Frontend validates intervals don't overlap before form submission",
-                "If intervals overlap, show inline error message below the day's intervals",
-                "Overlap check: interval A overlaps B if A.start < B.end AND A.end > B.start",
-                "Form submission is blocked if any day has overlapping intervals",
+                "Replace existing timezone select element with new searchable picker",
+                "Current timezone is pre-populated in the input",
+                "Selected timezone value is submitted with form",
+                "Works with existing form submission flow",
+                "Dropdown matches existing form input styles with max-height scroll",
                 "Typecheck passes",
                 "Verify in browser using dev-browser skill"
             ],
             "priority": 5,
-            "passes": true,
-            "notes": "Implemented in commit bcce2a8. Added intervalsOverlap() helper function using the formula A.start < B.end && A.end > B.start. Added validateIntervals() function that checks all interval pairs for each enabled day. Inline error messages displayed below day intervals with CSS styling. Form submission blocked via e.preventDefault() when overlaps detected. Validation runs on form submit and on every interval time change for immediate feedback."
+            "passes": false,
+            "notes": ""
+        },
+        {
+            "id": "US-006",
+            "title": "Auto-detect timezone during onboarding",
+            "description": "As a new user, I want my timezone to be automatically detected so I don't have to search for it manually.",
+            "acceptanceCriteria": [
+                "JavaScript uses Intl.DateTimeFormat().resolvedOptions().timeZone to get IANA timezone",
+                "Detection runs on page load of the onboarding/setup page",
+                "Detected timezone is pre-selected in the timezone picker",
+                "Detected timezone label shows (Detected) indicator",
+                "Falls back gracefully if API is unavailable (field left empty)",
+                "User can change the timezone before submitting",
+                "Typecheck passes",
+                "Verify in browser using dev-browser skill"
+            ],
+            "priority": 6,
+            "passes": false,
+            "notes": ""
+        },
+        {
+            "id": "US-007",
+            "title": "Add background calendar sync scheduler",
+            "description": "As a developer, I need a background job that refreshes calendar data every 15 minutes so availability stays current without user intervention.",
+            "acceptanceCriteria": [
+                "Background goroutine starts when server launches",
+                "Iterates through all calendar connections every 15 minutes",
+                "Calls existing calendar refresh logic for each connection",
+                "Updates last_synced_at timestamp on success",
+                "Updates sync_status to failed with error message on failure",
+                "Respects graceful shutdown (stops cleanly when server stops)",
+                "Typecheck passes"
+            ],
+            "priority": 7,
+            "passes": false,
+            "notes": ""
+        },
+        {
+            "id": "US-008",
+            "title": "Display last sync time and status on calendar list",
+            "description": "As a host, I want to see when my calendars were last synced and their status so I know if my availability is current.",
+            "acceptanceCriteria": [
+                "Each connected calendar shows Synced X minutes ago or Synced just now",
+                "If never synced, shows Never synced",
+                "Green dot/icon for synced status, red dot/icon for failed status",
+                "Clicking failed status shows error message",
+                "Typecheck passes",
+                "Verify in browser using dev-browser skill"
+            ],
+            "priority": 8,
+            "passes": false,
+            "notes": ""
+        },
+        {
+            "id": "US-009",
+            "title": "Add manual calendar refresh button with feedback",
+            "description": "As a host, I want to manually trigger a calendar refresh and see the result so I can ensure my latest events are captured.",
+            "acceptanceCriteria": [
+                "Refresh button next to each calendar connection",
+                "Button shows loading spinner while refreshing",
+                "On success, updates last synced time immediately",
+                "On failure, shows error message inline",
+                "Uses HTMX for seamless update without full page reload",
+                "Typecheck passes",
+                "Verify in browser using dev-browser skill"
+            ],
+            "priority": 9,
+            "passes": false,
+            "notes": ""
+        },
+        {
+            "id": "US-010",
+            "title": "Create agenda data fetching service",
+            "description": "As a developer, I need to fetch and aggregate events from all connected calendars so the agenda view has data to display.",
+            "acceptanceCriteria": [
+                "New service method GetAgendaEvents(hostID, startDate, endDate) in calendar.go",
+                "Fetches events from all connected calendars for the host",
+                "Returns unified list sorted by start time",
+                "Each event includes: title, start, end, calendar name, isAllDay",
+                "Handles calendar API errors gracefully (skip failed, show others)",
+                "Typecheck passes"
+            ],
+            "priority": 10,
+            "passes": false,
+            "notes": ""
+        },
+        {
+            "id": "US-011",
+            "title": "Create agenda page with Today view",
+            "description": "As a host, I want to see today's events so I can prepare for my meetings.",
+            "acceptanceCriteria": [
+                "New route GET /dashboard/agenda with handler in dashboard.go",
+                "Default view shows today's events (00:00 to 23:59 in host timezone)",
+                "Events displayed in chronological order",
+                "Each event shows: time, title, duration, source calendar",
+                "Empty state message when no events today",
+                "Typecheck passes",
+                "Verify in browser using dev-browser skill"
+            ],
+            "priority": 11,
+            "passes": false,
+            "notes": ""
+        },
+        {
+            "id": "US-012",
+            "title": "Add This Week tab to agenda view",
+            "description": "As a host, I want to see this week's events so I can plan ahead.",
+            "acceptanceCriteria": [
+                "Tab bar with Today and This Week options",
+                "This Week shows events from Monday to Sunday of current week",
+                "Events grouped by day with day headers",
+                "Active tab is visually highlighted",
+                "Tab selection updates URL (e.g., ?view=week)",
+                "Typecheck passes",
+                "Verify in browser using dev-browser skill"
+            ],
+            "priority": 12,
+            "passes": false,
+            "notes": ""
+        },
+        {
+            "id": "US-013",
+            "title": "Add Agenda link to dashboard sidebar",
+            "description": "As a host, I want to access the agenda view from the dashboard sidebar so I can easily navigate to it.",
+            "acceptanceCriteria": [
+                "Agenda link added to dashboard sidebar in dashboard.html layout",
+                "Positioned near Bookings link",
+                "Active state when on agenda page",
+                "Typecheck passes",
+                "Verify in browser using dev-browser skill"
+            ],
+            "priority": 13,
+            "passes": false,
+            "notes": ""
+        },
+        {
+            "id": "US-014",
+            "title": "Add archived flag to bookings table",
+            "description": "As a developer, I need to track which bookings are archived so they can be filtered from views.",
+            "acceptanceCriteria": [
+                "Add is_archived boolean column to bookings table (default: false)",
+                "Create and run database migration",
+                "Update Booking model with IsArchived field in models.go",
+                "Update repository GetByHostID to accept includeArchived parameter",
+                "Typecheck passes"
+            ],
+            "priority": 14,
+            "passes": false,
+            "notes": ""
+        },
+        {
+            "id": "US-015",
+            "title": "Add archive button to cancelled/rejected bookings",
+            "description": "As a host, I want to archive individual cancelled or rejected bookings so they don't clutter my view.",
+            "acceptanceCriteria": [
+                "Archive button appears on bookings with status cancelled or rejected",
+                "Button does not appear on pending or confirmed bookings",
+                "POST /dashboard/bookings/{id}/archive endpoint archives the booking",
+                "Clicking archive immediately moves booking out of view",
+                "Action uses HTMX for seamless update",
+                "Typecheck passes",
+                "Verify in browser using dev-browser skill"
+            ],
+            "priority": 15,
+            "passes": false,
+            "notes": ""
+        },
+        {
+            "id": "US-016",
+            "title": "Hide archived bookings by default and add Show archived toggle",
+            "description": "As a host, I want archived bookings hidden by default with a toggle to reveal them when needed.",
+            "acceptanceCriteria": [
+                "Default bookings list excludes archived items",
+                "Filter counts (All, Pending, Confirmed, Cancelled) exclude archived",
+                "Toggle/checkbox Show archived in bookings header",
+                "When enabled, archived bookings appear in the list with muted styling",
+                "Toggle state persists in URL parameter (?archived=true)",
+                "Typecheck passes",
+                "Verify in browser using dev-browser skill"
+            ],
+            "priority": 16,
+            "passes": false,
+            "notes": ""
+        },
+        {
+            "id": "US-017",
+            "title": "Add bulk archive and unarchive actions",
+            "description": "As a host, I want to archive all cancelled/rejected bookings at once and unarchive individual bookings if needed.",
+            "acceptanceCriteria": [
+                "Archive all cancelled/rejected button in bookings header",
+                "Button only appears when there are archivable bookings",
+                "Confirmation dialog before bulk archive showing count",
+                "Unarchive button appears on archived bookings when showing archived",
+                "POST /dashboard/bookings/{id}/unarchive endpoint restores booking",
+                "POST /dashboard/bookings/archive-all endpoint bulk archives",
+                "Typecheck passes",
+                "Verify in browser using dev-browser skill"
+            ],
+            "priority": 17,
+            "passes": false,
+            "notes": ""
         }
     ]
 }

@@ -558,10 +558,28 @@ func (h *DashboardHandler) Settings(w http.ResponseWriter, r *http.Request) {
 		hoursByDay[wh.DayOfWeek] = append(hoursByDay[wh.DayOfWeek], wh)
 	}
 
+	// Check for flash messages from query params
+	var flash *FlashMessage
+	if r.URL.Query().Get("success") == "updated" {
+		flash = &FlashMessage{Type: "success", Message: "Settings saved successfully"}
+	} else if errType := r.URL.Query().Get("error"); errType != "" {
+		switch errType {
+		case "slug_taken":
+			flash = &FlashMessage{Type: "error", Message: "That URL slug is already taken"}
+		case "update_failed":
+			flash = &FlashMessage{Type: "error", Message: "Failed to save settings"}
+		case "invalid_form":
+			flash = &FlashMessage{Type: "error", Message: "Invalid form data"}
+		default:
+			flash = &FlashMessage{Type: "error", Message: "An error occurred"}
+		}
+	}
+
 	h.handlers.render(w, "dashboard_settings.html", PageData{
 		Title:  "Settings",
 		Host:   host.Host,
 		Tenant: host.Tenant,
+		Flash:  flash,
 		Data: map[string]interface{}{
 			"WorkingHours": hoursByDay,
 			"DayNames":     []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"},
