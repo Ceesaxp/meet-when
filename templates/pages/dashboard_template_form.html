@@ -4,56 +4,89 @@
 
 {{define "content"}}
 <div class="page-header">
-    <h1>{{if .Data.IsNew}}New Meeting Type{{else}}Edit Meeting Type{{end}}</h1>
+    <a href="/dashboard/templates" class="back-btn" aria-label="Go back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <line x1="19" y1="12" x2="5" y2="12"/>
+            <polyline points="12 19 5 12 12 5"/>
+        </svg>
+    </a>
+    <div>
+        <h1 class="page-title">{{if .Data.IsNew}}New Meeting Type{{else}}Edit Meeting Type{{end}}</h1>
+    </div>
 </div>
 
-<form method="POST" action="{{if .Data.IsNew}}/dashboard/templates{{else}}/dashboard/templates/{{.Data.Template.ID}}{{end}}" class="form">
+<form method="POST" action="{{if .Data.IsNew}}/dashboard/templates{{else}}/dashboard/templates/{{.Data.Template.ID}}{{end}}" class="template-form">
     {{if not .Data.IsNew}}
     <input type="hidden" name="_method" value="PUT">
     {{end}}
 
-    <div class="form-section">
-        <h3>Basic Information</h3>
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Basic Info</h2>
+        </div>
 
         <div class="form-group">
-            <label for="name">Name</label>
-            <input type="text" id="name" name="name" required
+            <label class="form-label" for="name">Name</label>
+            <input type="text" id="name" name="name" class="form-input" required
                    value="{{if .Data.Template}}{{.Data.Template.Name}}{{end}}"
-                   placeholder="30 Minute Meeting">
+                   placeholder="e.g., Discovery Call">
         </div>
 
         <div class="form-group">
-            <label for="slug">URL Slug</label>
-            <input type="text" id="slug" name="slug" required pattern="[a-z0-9-]+"
+            <label class="form-label" for="description">Description</label>
+            <textarea id="description" name="description" class="form-textarea" rows="3"
+                      placeholder="What's this meeting about?">{{if .Data.Template}}{{.Data.Template.Description}}{{end}}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="slug">URL Slug</label>
+            <input type="text" id="slug" name="slug" class="form-input" required pattern="[a-z0-9-]+"
                    value="{{if .Data.Template}}{{.Data.Template.Slug}}{{end}}"
-                   placeholder="30-minute-meeting">
-            <small>Only lowercase letters, numbers, and hyphens</small>
+                   placeholder="discovery-call">
+            <p class="form-hint">Your booking link: {{$.BaseURL}}/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/<strong id="slug-preview">{{if .Data.Template}}{{.Data.Template.Slug}}{{else}}your-slug{{end}}</strong></p>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Duration</h2>
+            <p class="section-subtitle">How long should this meeting be?</p>
         </div>
 
-        <div class="form-group">
-            <label for="description">Description</label>
-            <textarea id="description" name="description" rows="3"
-                      placeholder="A short meeting to discuss...">{{if .Data.Template}}{{.Data.Template.Description}}{{end}}</textarea>
+        <div class="duration-chips" id="duration-chips">
+            <label class="duration-chip {{if .Data.Template}}{{if contains .Data.Template.Durations 15}}selected{{end}}{{end}}">
+                <input type="checkbox" name="durations" value="15" {{if .Data.Template}}{{if contains .Data.Template.Durations 15}}checked{{end}}{{end}}>
+                15 min
+            </label>
+            <label class="duration-chip {{if .Data.Template}}{{if contains .Data.Template.Durations 30}}selected{{else}}{{end}}{{else}}selected{{end}}">
+                <input type="checkbox" name="durations" value="30" {{if .Data.Template}}{{if contains .Data.Template.Durations 30}}checked{{end}}{{else}}checked{{end}}>
+                30 min
+            </label>
+            <label class="duration-chip {{if .Data.Template}}{{if contains .Data.Template.Durations 45}}selected{{end}}{{end}}">
+                <input type="checkbox" name="durations" value="45" {{if .Data.Template}}{{if contains .Data.Template.Durations 45}}checked{{end}}{{end}}>
+                45 min
+            </label>
+            <label class="duration-chip {{if .Data.Template}}{{if contains .Data.Template.Durations 60}}selected{{end}}{{end}}">
+                <input type="checkbox" name="durations" value="60" {{if .Data.Template}}{{if contains .Data.Template.Durations 60}}checked{{end}}{{end}}>
+                60 min
+            </label>
+            <label class="duration-chip {{if .Data.Template}}{{if contains .Data.Template.Durations 90}}selected{{end}}{{end}}">
+                <input type="checkbox" name="durations" value="90" {{if .Data.Template}}{{if contains .Data.Template.Durations 90}}checked{{end}}{{end}}>
+                90 min
+            </label>
         </div>
-    </div>
+    </section>
 
-    <div class="form-section">
-        <h3>Duration & Scheduling</h3>
-
-        <div class="form-group">
-            <label>Duration (minutes)</label>
-            <div class="checkbox-group">
-                <label><input type="checkbox" name="durations" value="15" {{if .Data.Template}}{{if contains .Data.Template.Durations 15}}checked{{end}}{{end}}> 15 min</label>
-                <label><input type="checkbox" name="durations" value="30" {{if .Data.Template}}{{if contains .Data.Template.Durations 30}}checked{{end}}{{else}}checked{{end}}> 30 min</label>
-                <label><input type="checkbox" name="durations" value="45" {{if .Data.Template}}{{if contains .Data.Template.Durations 45}}checked{{end}}{{end}}> 45 min</label>
-                <label><input type="checkbox" name="durations" value="60" {{if .Data.Template}}{{if contains .Data.Template.Durations 60}}checked{{end}}{{end}}> 60 min</label>
-            </div>
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Scheduling</h2>
+            <p class="section-subtitle">Set booking constraints</p>
         </div>
 
         <div class="form-row">
             <div class="form-group">
-                <label for="min_notice_minutes">Minimum Notice</label>
-                <select id="min_notice_minutes" name="min_notice_minutes">
+                <label class="form-label" for="min_notice_minutes">Minimum Notice</label>
+                <select id="min_notice_minutes" name="min_notice_minutes" class="form-select">
                     <option value="0" {{if .Data.Template}}{{if eq .Data.Template.MinNoticeMinutes 0}}selected{{end}}{{end}}>No minimum</option>
                     <option value="60" {{if .Data.Template}}{{if eq .Data.Template.MinNoticeMinutes 60}}selected{{end}}{{else}}selected{{end}}>1 hour</option>
                     <option value="120" {{if .Data.Template}}{{if eq .Data.Template.MinNoticeMinutes 120}}selected{{end}}{{end}}>2 hours</option>
@@ -63,8 +96,8 @@
             </div>
 
             <div class="form-group">
-                <label for="max_schedule_days">Scheduling Window</label>
-                <select id="max_schedule_days" name="max_schedule_days">
+                <label class="form-label" for="max_schedule_days">Scheduling Window</label>
+                <select id="max_schedule_days" name="max_schedule_days" class="form-select">
                     <option value="7" {{if .Data.Template}}{{if eq .Data.Template.MaxScheduleDays 7}}selected{{end}}{{end}}>1 week</option>
                     <option value="14" {{if .Data.Template}}{{if eq .Data.Template.MaxScheduleDays 14}}selected{{end}}{{else}}selected{{end}}>2 weeks</option>
                     <option value="30" {{if .Data.Template}}{{if eq .Data.Template.MaxScheduleDays 30}}selected{{end}}{{end}}>1 month</option>
@@ -76,8 +109,8 @@
 
         <div class="form-row">
             <div class="form-group">
-                <label for="pre_buffer_minutes">Buffer Before</label>
-                <select id="pre_buffer_minutes" name="pre_buffer_minutes">
+                <label class="form-label" for="pre_buffer_minutes">Buffer Before</label>
+                <select id="pre_buffer_minutes" name="pre_buffer_minutes" class="form-select">
                     <option value="0" {{if .Data.Template}}{{if eq .Data.Template.PreBufferMinutes 0}}selected{{end}}{{else}}selected{{end}}>None</option>
                     <option value="5" {{if .Data.Template}}{{if eq .Data.Template.PreBufferMinutes 5}}selected{{end}}{{end}}>5 min</option>
                     <option value="10" {{if .Data.Template}}{{if eq .Data.Template.PreBufferMinutes 10}}selected{{end}}{{end}}>10 min</option>
@@ -87,8 +120,8 @@
             </div>
 
             <div class="form-group">
-                <label for="post_buffer_minutes">Buffer After</label>
-                <select id="post_buffer_minutes" name="post_buffer_minutes">
+                <label class="form-label" for="post_buffer_minutes">Buffer After</label>
+                <select id="post_buffer_minutes" name="post_buffer_minutes" class="form-select">
                     <option value="0" {{if .Data.Template}}{{if eq .Data.Template.PostBufferMinutes 0}}selected{{end}}{{else}}selected{{end}}>None</option>
                     <option value="5" {{if .Data.Template}}{{if eq .Data.Template.PostBufferMinutes 5}}selected{{end}}{{end}}>5 min</option>
                     <option value="10" {{if .Data.Template}}{{if eq .Data.Template.PostBufferMinutes 10}}selected{{end}}{{end}}>10 min</option>
@@ -97,112 +130,186 @@
                 </select>
             </div>
         </div>
-    </div>
+    </section>
 
-    <div class="form-section">
-        <h3>Location</h3>
-
-        <div class="form-group">
-            <label for="location_type">Meeting Location</label>
-            <select id="location_type" name="location_type">
-                <option value="google_meet" {{if .Data.Template}}{{if eq .Data.Template.LocationType "google_meet"}}selected{{end}}{{else}}selected{{end}}>Google Meet</option>
-                <option value="zoom" {{if .Data.Template}}{{if eq .Data.Template.LocationType "zoom"}}selected{{end}}{{end}}>Zoom</option>
-                <option value="phone" {{if .Data.Template}}{{if eq .Data.Template.LocationType "phone"}}selected{{end}}{{end}}>Phone Call</option>
-                <option value="custom" {{if .Data.Template}}{{if eq .Data.Template.LocationType "custom"}}selected{{end}}{{end}}>Custom</option>
-            </select>
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Location</h2>
+            <p class="section-subtitle">Where will the meeting take place?</p>
         </div>
 
-        <div class="form-group" id="custom_location_group" style="{{if .Data.Template}}{{if or (eq .Data.Template.LocationType "phone") (eq .Data.Template.LocationType "custom")}}{{else}}display:none{{end}}{{else}}display:none{{end}}">
-            <label for="custom_location" id="custom_location_label">{{if .Data.Template}}{{if eq .Data.Template.LocationType "phone"}}Phone Number{{else}}Location Details{{end}}{{else}}Location Details{{end}}</label>
-            <input type="text" id="custom_location" name="custom_location"
+        <div class="radio-cards" id="location-cards">
+            <label class="radio-card {{if .Data.Template}}{{if eq .Data.Template.LocationType "google_meet"}}selected{{end}}{{else}}selected{{end}}">
+                <input type="radio" name="location_type" value="google_meet" {{if .Data.Template}}{{if eq .Data.Template.LocationType "google_meet"}}checked{{end}}{{else}}checked{{end}}>
+                <div class="radio-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <polygon points="23 7 16 12 23 17 23 7"/>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>
+                </div>
+                <div class="radio-content">
+                    <div class="radio-label">Google Meet</div>
+                    <div class="radio-description">Auto-generate link</div>
+                </div>
+            </label>
+            <label class="radio-card {{if .Data.Template}}{{if eq .Data.Template.LocationType "zoom"}}selected{{end}}{{end}}">
+                <input type="radio" name="location_type" value="zoom" {{if .Data.Template}}{{if eq .Data.Template.LocationType "zoom"}}checked{{end}}{{end}}>
+                <div class="radio-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <polygon points="23 7 16 12 23 17 23 7"/>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>
+                </div>
+                <div class="radio-content">
+                    <div class="radio-label">Zoom</div>
+                    <div class="radio-description">Auto-generate link</div>
+                </div>
+            </label>
+            <label class="radio-card {{if .Data.Template}}{{if eq .Data.Template.LocationType "phone"}}selected{{end}}{{end}}">
+                <input type="radio" name="location_type" value="phone" {{if .Data.Template}}{{if eq .Data.Template.LocationType "phone"}}checked{{end}}{{end}}>
+                <div class="radio-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"/>
+                    </svg>
+                </div>
+                <div class="radio-content">
+                    <div class="radio-label">Phone Call</div>
+                    <div class="radio-description">Guest provides number</div>
+                </div>
+            </label>
+            <label class="radio-card {{if .Data.Template}}{{if eq .Data.Template.LocationType "custom"}}selected{{end}}{{end}}">
+                <input type="radio" name="location_type" value="custom" {{if .Data.Template}}{{if eq .Data.Template.LocationType "custom"}}checked{{end}}{{end}}>
+                <div class="radio-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                        <circle cx="12" cy="10" r="3"/>
+                    </svg>
+                </div>
+                <div class="radio-content">
+                    <div class="radio-label">Custom</div>
+                    <div class="radio-description">Specify location</div>
+                </div>
+            </label>
+        </div>
+
+        <div class="form-group" id="custom_location_group" style="{{if .Data.Template}}{{if or (eq .Data.Template.LocationType "phone") (eq .Data.Template.LocationType "custom")}}margin-top: 20px;{{else}}display:none{{end}}{{else}}display:none{{end}}">
+            <label class="form-label" for="custom_location" id="custom_location_label">{{if .Data.Template}}{{if eq .Data.Template.LocationType "phone"}}Phone Number{{else}}Location Details{{end}}{{else}}Location Details{{end}}</label>
+            <input type="text" id="custom_location" name="custom_location" class="form-input"
                    value="{{if .Data.Template}}{{.Data.Template.CustomLocation}}{{end}}"
-                   placeholder="{{if .Data.Template}}{{if eq .Data.Template.LocationType "phone"}}Enter your phone number{{else}}Address or custom location{{end}}{{else}}Address or custom location{{end}}"
-                   id="custom_location_input">
-            <small class="form-help" id="phone_help" style="{{if .Data.Template}}{{if eq .Data.Template.LocationType "phone"}}{{else}}display:none{{end}}{{else}}display:none{{end}}">The phone number will be displayed to invitees so they know where to call.</small>
+                   placeholder="{{if .Data.Template}}{{if eq .Data.Template.LocationType "phone"}}Enter your phone number{{else}}Address or custom location{{end}}{{else}}Address or custom location{{end}}">
+            <p class="form-hint" id="phone_help" style="{{if .Data.Template}}{{if eq .Data.Template.LocationType "phone"}}{{else}}display:none{{end}}{{else}}display:none{{end}}">The phone number will be displayed to invitees so they know where to call.</p>
         </div>
-    </div>
+    </section>
 
-    <div class="form-section">
-        <h3>Calendar</h3>
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Calendar</h2>
+        </div>
 
         <div class="form-group">
-            <label for="calendar_id">Add Event To</label>
-            <select id="calendar_id" name="calendar_id">
+            <label class="form-label" for="calendar_id">Add Event To</label>
+            <select id="calendar_id" name="calendar_id" class="form-select">
                 <option value="">Select a calendar</option>
                 {{range .Data.Calendars}}
                 <option value="{{.ID}}" {{if $.Data.Template}}{{if eq $.Data.Template.CalendarID .ID}}selected{{end}}{{end}}>{{.Name}} ({{.Provider}})</option>
                 {{end}}
             </select>
         </div>
-    </div>
+    </section>
 
-    <div class="form-section">
-        <h3>Booking Settings</h3>
-
-        <div class="form-group">
-            <label class="checkbox-label">
-                <input type="checkbox" name="requires_approval" {{if .Data.Template}}{{if .Data.Template.RequiresApproval}}checked{{end}}{{else}}checked{{end}}>
-                Require approval before confirming bookings
-            </label>
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Booking Settings</h2>
         </div>
 
+        <div class="toggle-row">
+            <div class="toggle-info">
+                <h4>Require approval</h4>
+                <p>Review booking requests before confirming</p>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" name="requires_approval" {{if .Data.Template}}{{if .Data.Template.RequiresApproval}}checked{{end}}{{else}}checked{{end}}>
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
         {{if not .Data.IsNew}}
-        <div class="form-group">
-            <label class="checkbox-label">
+        <div class="toggle-row">
+            <div class="toggle-info">
+                <h4>Active</h4>
+                <p>Allow people to book this meeting type</p>
+            </div>
+            <label class="toggle-switch">
                 <input type="checkbox" name="is_active" {{if .Data.Template}}{{if .Data.Template.IsActive}}checked{{end}}{{else}}checked{{end}}>
-                Active (visible on public page)
+                <span class="toggle-slider"></span>
             </label>
         </div>
         {{end}}
-    </div>
+    </section>
 
-    <div class="form-section">
-        <h3>Availability</h3>
-        <p class="form-section-description">Restrict availability for this meeting type beyond your working hours. Leave unchecked to use your default working hours.</p>
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Availability</h2>
+            <p class="section-subtitle">Restrict availability for this meeting type beyond your working hours</p>
+        </div>
 
-        <div class="form-group">
-            <label class="checkbox-label">
+        <div class="toggle-row">
+            <div class="toggle-info">
+                <h4>Use custom availability</h4>
+                <p>Override default working hours for this template</p>
+            </div>
+            <label class="toggle-switch">
                 <input type="checkbox" id="use_custom_availability" onchange="toggleCustomAvailability()">
-                Use custom availability for this template
+                <span class="toggle-slider"></span>
             </label>
         </div>
 
-        <div id="availability-rules-container" style="display: none;">
+        <div id="availability-rules-container" style="display: none; margin-top: 20px;">
             <div class="availability-days" id="availability-days-container">
                 <!-- Days will be rendered by JavaScript -->
             </div>
         </div>
         <input type="hidden" name="availability_rules" id="availability_rules_json">
-    </div>
+    </section>
 
-    <div class="form-section">
-        <h3>Custom Questions</h3>
-        <p class="form-section-description">Add questions that invitees must answer when booking.</p>
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Custom Questions</h2>
+            <p class="section-subtitle">Add questions that invitees must answer when booking</p>
+        </div>
 
-        <div id="questions-container">
+        <div id="questions-container" class="questions-list">
             <!-- Questions will be rendered here by JavaScript -->
         </div>
 
-        <button type="button" onclick="addQuestion()" class="btn btn-sm">+ Add Question</button>
+        <button type="button" onclick="addQuestion()" class="btn btn-outline btn-add-question">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Add Question
+        </button>
         <input type="hidden" name="invitee_questions" id="invitee_questions_json">
-    </div>
+    </section>
 
-    <div class="form-section">
-        <h3>Email Templates</h3>
-        <p class="form-section-description">Customize the emails sent to invitees. Leave blank to use default templates.</p>
-
-        <div class="form-group">
-            <label for="confirmation_email_subject">Confirmation Email Subject</label>
-            <input type="text" id="confirmation_email_subject" name="confirmation_email_subject"
-                   value=""
-                   placeholder="e.g., Confirmed: {{"{{meeting_name}}"}} with {{"{{host_name}}"}}">
-            <small>Available placeholders: <code>{{"{{invitee_name}}"}}</code>, <code>{{"{{host_name}}"}}</code>, <code>{{"{{meeting_name}}"}}</code>, <code>{{"{{meeting_time}}"}}</code>, <code>{{"{{duration}}"}}</code>, <code>{{"{{location}}"}}</code></small>
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Email Templates</h2>
+            <p class="section-subtitle">Customize the emails sent to invitees. Leave blank to use defaults.</p>
         </div>
 
-        <div class="form-group">
-            <label for="confirmation_email_body">Confirmation Email Body</label>
-            <textarea id="confirmation_email_body" name="confirmation_email_body" rows="8"
-                      placeholder="Hello {{"{{invitee_name}}"}},
+        <div class="email-template-group">
+            <h3 class="subsection-title">Confirmation Email</h3>
+            <div class="form-group">
+                <label class="form-label" for="confirmation_email_subject">Subject</label>
+                <input type="text" id="confirmation_email_subject" name="confirmation_email_subject" class="form-input"
+                       value=""
+                       placeholder="e.g., Confirmed: {{"{{meeting_name}}"}} with {{"{{host_name}}"}}">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="confirmation_email_body">Body</label>
+                <textarea id="confirmation_email_body" name="confirmation_email_body" class="form-textarea" rows="8"
+                          placeholder="Hello {{"{{invitee_name}}"}},
 
 Your meeting has been confirmed!
 
@@ -217,22 +324,23 @@ Cancel: {{"{{cancel_link}}"}}
 Reschedule: {{"{{reschedule_link}}"}}
 
 Best regards"></textarea>
-            <small>Available placeholders: <code>{{"{{invitee_name}}"}}</code>, <code>{{"{{host_name}}"}}</code>, <code>{{"{{meeting_name}}"}}</code>, <code>{{"{{meeting_time}}"}}</code>, <code>{{"{{duration}}"}}</code>, <code>{{"{{location}}"}}</code>, <code>{{"{{cancel_link}}"}}</code>, <code>{{"{{reschedule_link}}"}}</code></small>
+            </div>
+            <p class="form-hint">Available: <code>{{"{{invitee_name}}"}}</code>, <code>{{"{{host_name}}"}}</code>, <code>{{"{{meeting_name}}"}}</code>, <code>{{"{{meeting_time}}"}}</code>, <code>{{"{{duration}}"}}</code>, <code>{{"{{location}}"}}</code>, <code>{{"{{cancel_link}}"}}</code>, <code>{{"{{reschedule_link}}"}}</code></p>
         </div>
 
-        <hr style="margin: 1.5rem 0;">
+        <div class="email-template-group" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--gray-200);">
+            <h3 class="subsection-title">Reminder Email</h3>
+            <div class="form-group">
+                <label class="form-label" for="reminder_email_subject">Subject</label>
+                <input type="text" id="reminder_email_subject" name="reminder_email_subject" class="form-input"
+                       value=""
+                       placeholder="e.g., Reminder: {{"{{meeting_name}}"}} tomorrow with {{"{{host_name}}"}}">
+            </div>
 
-        <div class="form-group">
-            <label for="reminder_email_subject">Reminder Email Subject</label>
-            <input type="text" id="reminder_email_subject" name="reminder_email_subject"
-                   value=""
-                   placeholder="e.g., Reminder: {{"{{meeting_name}}"}} tomorrow with {{"{{host_name}}"}}">
-        </div>
-
-        <div class="form-group">
-            <label for="reminder_email_body">Reminder Email Body</label>
-            <textarea id="reminder_email_body" name="reminder_email_body" rows="8"
-                      placeholder="Hello {{"{{invitee_name}}"}},
+            <div class="form-group">
+                <label class="form-label" for="reminder_email_body">Body</label>
+                <textarea id="reminder_email_body" name="reminder_email_body" class="form-textarea" rows="8"
+                          placeholder="Hello {{"{{invitee_name}}"}},
 
 This is a reminder about your upcoming meeting:
 
@@ -247,17 +355,18 @@ Cancel: {{"{{cancel_link}}"}}
 Reschedule: {{"{{reschedule_link}}"}}
 
 Best regards"></textarea>
+            </div>
         </div>
         <input type="hidden" name="confirmation_email" id="confirmation_email_json">
         <input type="hidden" name="reminder_email" id="reminder_email_json">
-    </div>
+    </section>
 
     <div class="form-actions">
-        <a href="/dashboard/templates" class="btn">Cancel</a>
-        {{if not .Data.IsNew}}
-        <button type="button" class="btn" onclick="document.getElementById('duplicate-form').submit()">Duplicate</button>
-        {{end}}
         <button type="submit" class="btn btn-primary">{{if .Data.IsNew}}Create Meeting Type{{else}}Save Changes{{end}}</button>
+        {{if not .Data.IsNew}}
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('duplicate-form').submit()">Duplicate</button>
+        {{end}}
+        <a href="/dashboard/templates" class="btn btn-outline">Cancel</a>
     </div>
 </form>
 
@@ -266,26 +375,49 @@ Best regards"></textarea>
 {{end}}
 
 <script>
-document.getElementById('location_type').addEventListener('change', function() {
-    var customGroup = document.getElementById('custom_location_group');
-    var label = document.getElementById('custom_location_label');
-    var input = document.getElementById('custom_location');
-    var phoneHelp = document.getElementById('phone_help');
+// Slug preview
+document.getElementById('slug').addEventListener('input', function() {
+    document.getElementById('slug-preview').textContent = this.value || 'your-slug';
+});
 
-    if (this.value === 'phone') {
-        customGroup.style.display = 'block';
-        label.textContent = 'Phone Number';
-        input.placeholder = 'Enter your phone number';
-        phoneHelp.style.display = 'block';
-    } else if (this.value === 'custom') {
-        customGroup.style.display = 'block';
-        label.textContent = 'Location Details';
-        input.placeholder = 'Address or custom location';
-        phoneHelp.style.display = 'none';
-    } else {
-        customGroup.style.display = 'none';
-        phoneHelp.style.display = 'none';
-    }
+// Duration chip selection (multiple allowed)
+document.querySelectorAll('#duration-chips .duration-chip input').forEach(function(input) {
+    input.addEventListener('change', function() {
+        this.closest('.duration-chip').classList.toggle('selected', this.checked);
+    });
+});
+
+// Radio card selection (location)
+document.querySelectorAll('#location-cards .radio-card input').forEach(function(input) {
+    input.addEventListener('change', function() {
+        document.querySelectorAll('#location-cards .radio-card').forEach(function(card) {
+            card.classList.remove('selected');
+        });
+        this.closest('.radio-card').classList.add('selected');
+
+        // Handle custom location visibility
+        var customGroup = document.getElementById('custom_location_group');
+        var label = document.getElementById('custom_location_label');
+        var inputEl = document.getElementById('custom_location');
+        var phoneHelp = document.getElementById('phone_help');
+
+        if (this.value === 'phone') {
+            customGroup.style.display = 'block';
+            customGroup.style.marginTop = '20px';
+            label.textContent = 'Phone Number';
+            inputEl.placeholder = 'Enter your phone number';
+            phoneHelp.style.display = 'block';
+        } else if (this.value === 'custom') {
+            customGroup.style.display = 'block';
+            customGroup.style.marginTop = '20px';
+            label.textContent = 'Location Details';
+            inputEl.placeholder = 'Address or custom location';
+            phoneHelp.style.display = 'none';
+        } else {
+            customGroup.style.display = 'none';
+            phoneHelp.style.display = 'none';
+        }
+    });
 });
 
 // Custom Questions Builder
@@ -310,21 +442,26 @@ function renderQuestions() {
         div.innerHTML = `
             <div class="question-header">
                 <span class="question-number">Question ${index + 1}</span>
-                <button type="button" onclick="removeQuestion(${index})" class="btn btn-sm btn-danger">Remove</button>
+                <button type="button" onclick="removeQuestion(${index})" class="btn-icon btn-remove" aria-label="Remove question">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    </svg>
+                </button>
             </div>
             <div class="form-group">
-                <label>Question Label *</label>
-                <input type="text" value="${escapeHtml(q.label || '')}" onchange="updateQuestion(${index}, 'label', this.value)" placeholder="e.g., What company are you from?" required>
+                <label class="form-label">Question Label *</label>
+                <input type="text" class="form-input" value="${escapeHtml(q.label || '')}" onchange="updateQuestion(${index}, 'label', this.value)" placeholder="e.g., What company are you from?" required>
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label>Field Name *</label>
-                    <input type="text" value="${escapeHtml(q.field || '')}" onchange="updateQuestion(${index}, 'field', this.value)" placeholder="e.g., company_name" pattern="[a-z0-9_]+" required>
-                    <small>Lowercase letters, numbers, underscores only</small>
+                    <label class="form-label">Field Name *</label>
+                    <input type="text" class="form-input" value="${escapeHtml(q.field || '')}" onchange="updateQuestion(${index}, 'field', this.value)" placeholder="e.g., company_name" pattern="[a-z0-9_]+" required>
+                    <p class="form-hint">Lowercase letters, numbers, underscores only</p>
                 </div>
                 <div class="form-group">
-                    <label>Type</label>
-                    <select onchange="updateQuestion(${index}, 'type', this.value)">
+                    <label class="form-label">Type</label>
+                    <select class="form-select" onchange="updateQuestion(${index}, 'type', this.value)">
                         <option value="text" ${q.type === 'text' ? 'selected' : ''}>Text (single line)</option>
                         <option value="textarea" ${q.type === 'textarea' ? 'selected' : ''}>Textarea (multi-line)</option>
                         <option value="select" ${q.type === 'select' ? 'selected' : ''}>Dropdown</option>
@@ -332,13 +469,16 @@ function renderQuestions() {
                 </div>
             </div>
             <div class="form-group" id="options-group-${index}" style="${q.type === 'select' ? '' : 'display:none'}">
-                <label>Options (one per line)</label>
-                <textarea rows="3" onchange="updateQuestion(${index}, 'options', this.value.split('\\n').filter(o => o.trim()))" placeholder="Option 1\nOption 2\nOption 3">${(q.options || []).join('\\n')}</textarea>
+                <label class="form-label">Options (one per line)</label>
+                <textarea class="form-textarea" rows="3" onchange="updateQuestion(${index}, 'options', this.value.split('\\n').filter(o => o.trim()))" placeholder="Option 1\nOption 2\nOption 3">${(q.options || []).join('\n')}</textarea>
             </div>
-            <div class="form-group">
-                <label class="checkbox-label">
+            <div class="toggle-row" style="padding: 0; border: none;">
+                <div class="toggle-info">
+                    <h4>Required</h4>
+                </div>
+                <label class="toggle-switch">
                     <input type="checkbox" ${q.required ? 'checked' : ''} onchange="updateQuestion(${index}, 'required', this.checked)">
-                    Required
+                    <span class="toggle-slider"></span>
                 </label>
             </div>
         `;
@@ -470,19 +610,20 @@ function renderAvailabilityDays() {
         dayDiv.setAttribute('data-day', day);
 
         var dayHeader = document.createElement('div');
-        dayHeader.className = 'day-header';
+        dayHeader.className = 'availability-day-header';
         dayHeader.innerHTML = `
-            <label class="checkbox-label">
+            <label class="toggle-switch-inline">
                 <input type="checkbox" class="day-enabled" data-day="${day}" onchange="toggleDay(${day})" ${isEnabled ? 'checked' : ''}>
-                <span>${dayNames[day]}</span>
+                <span class="toggle-slider"></span>
             </label>
+            <span class="day-name">${dayNames[day]}</span>
         `;
         dayDiv.appendChild(dayHeader);
 
         var timeRangesDiv = document.createElement('div');
-        timeRangesDiv.className = 'day-time-ranges';
+        timeRangesDiv.className = 'availability-day-times';
         timeRangesDiv.id = 'day-time-ranges-' + day;
-        timeRangesDiv.style.display = isEnabled ? 'block' : 'none';
+        timeRangesDiv.style.display = isEnabled ? 'flex' : 'none';
 
         // Render intervals
         var intervalsContainer = document.createElement('div');
@@ -503,13 +644,13 @@ function renderAvailabilityDays() {
         // Add interval button (shown only if less than MAX_INTERVALS_PER_DAY intervals)
         var addIntervalBtn = document.createElement('button');
         addIntervalBtn.type = 'button';
-        addIntervalBtn.className = 'btn btn-sm btn-add-interval';
+        addIntervalBtn.className = 'btn-icon btn-add-interval';
         addIntervalBtn.id = 'add-interval-btn-' + day;
-        addIntervalBtn.textContent = '+ Add interval';
+        addIntervalBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
         addIntervalBtn.onclick = function(d) {
             return function() { addInterval(d); };
         }(day);
-        addIntervalBtn.style.display = (isEnabled && intervals.length < MAX_INTERVALS_PER_DAY) ? 'inline-block' : 'none';
+        addIntervalBtn.style.display = (isEnabled && intervals.length < MAX_INTERVALS_PER_DAY) ? 'inline-flex' : 'none';
         timeRangesDiv.appendChild(addIntervalBtn);
 
         // Error message div for overlap validation
@@ -532,16 +673,17 @@ function createIntervalElement(day, index, start, end, totalIntervals) {
 
     var startInput = document.createElement('input');
     startInput.type = 'time';
-    startInput.className = 'interval-start';
+    startInput.className = 'form-input time-input interval-start';
     startInput.value = start;
     startInput.onchange = function() { updateAvailabilityRules(); };
 
     var toSpan = document.createElement('span');
+    toSpan.className = 'time-separator';
     toSpan.textContent = 'to';
 
     var endInput = document.createElement('input');
     endInput.type = 'time';
-    endInput.className = 'interval-end';
+    endInput.className = 'form-input time-input interval-end';
     endInput.value = end;
     endInput.onchange = function() { updateAvailabilityRules(); };
 
@@ -553,8 +695,8 @@ function createIntervalElement(day, index, start, end, totalIntervals) {
     if (totalIntervals > 1) {
         var removeBtn = document.createElement('button');
         removeBtn.type = 'button';
-        removeBtn.className = 'btn btn-sm btn-remove-interval';
-        removeBtn.textContent = 'Remove';
+        removeBtn.className = 'btn-icon btn-remove-interval';
+        removeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
         removeBtn.onclick = function(d, i) {
             return function() { removeInterval(d, i); };
         }(day, index);
@@ -570,11 +712,11 @@ function toggleDay(day) {
     var addIntervalBtn = document.getElementById('add-interval-btn-' + day);
 
     if (checkbox.checked) {
-        timeRangesDiv.style.display = 'block';
+        timeRangesDiv.style.display = 'flex';
         // Show add interval button if less than max intervals
         var intervalsContainer = document.getElementById('intervals-container-' + day);
         var currentIntervals = intervalsContainer.querySelectorAll('.time-range').length;
-        addIntervalBtn.style.display = currentIntervals < MAX_INTERVALS_PER_DAY ? 'inline-block' : 'none';
+        addIntervalBtn.style.display = currentIntervals < MAX_INTERVALS_PER_DAY ? 'inline-flex' : 'none';
     } else {
         timeRangesDiv.style.display = 'none';
     }
@@ -647,7 +789,7 @@ function removeInterval(day, index) {
 
     // Show add interval button
     var addIntervalBtn = document.getElementById('add-interval-btn-' + day);
-    addIntervalBtn.style.display = 'inline-block';
+    addIntervalBtn.style.display = 'inline-flex';
 
     updateAvailabilityRules();
 }
@@ -670,8 +812,8 @@ function updateRemoveButtons(day) {
         if (totalIntervals > 1) {
             var removeBtn = document.createElement('button');
             removeBtn.type = 'button';
-            removeBtn.className = 'btn btn-sm btn-remove-interval';
-            removeBtn.textContent = 'Remove';
+            removeBtn.className = 'btn-icon btn-remove-interval';
+            removeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
             removeBtn.onclick = function(d, i) {
                 return function() { removeInterval(d, i); };
             }(day, idx);

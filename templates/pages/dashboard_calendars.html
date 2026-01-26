@@ -4,12 +4,17 @@
 
 {{define "content"}}
 <div class="page-header">
-    <h1>Calendars & Integrations</h1>
+    <div>
+        <h1 class="page-title">Calendars & Integrations</h1>
+        <p class="page-subtitle">Connect calendars and video conferencing</p>
+    </div>
 </div>
 
-<div class="section">
-    <h2>Connected Calendars</h2>
-    <p>Connect your calendars to show your availability and automatically create events.</p>
+<section class="settings-section">
+    <div class="section-header-simple">
+        <h2 class="section-title">Connected Calendars</h2>
+    </div>
+    <p class="section-description">Connect your calendars to show your availability and automatically create events.</p>
 
     {{if .Data.Calendars}}
     <div class="calendar-list">
@@ -17,134 +22,172 @@
         <div class="calendar-card {{if eq (printf "%s" .SyncStatus) "failed"}}calendar-card-error{{end}}" id="calendar-card-{{.ID}}">
             <div class="calendar-info">
                 <div class="calendar-header">
-                    <strong>{{.Name}}</strong>
-                    {{if eq (printf "%s" .Provider) "google"}}<span class="badge badge-google">Google Calendar</span>
-                    {{else if eq (printf "%s" .Provider) "icloud"}}<span class="badge badge-icloud">iCloud</span>
-                    {{else}}<span class="badge">CalDAV</span>{{end}}
-                    {{if .IsDefault}}<span class="badge badge-primary">Default</span>{{end}}
+                    <span class="calendar-name">{{.Name}}</span>
+                    <div class="calendar-badges">
+                        {{if eq (printf "%s" .Provider) "google"}}<span class="badge badge-google">Google</span>
+                        {{else if eq (printf "%s" .Provider) "icloud"}}<span class="badge badge-icloud">iCloud</span>
+                        {{else}}<span class="badge">CalDAV</span>{{end}}
+                        {{if .IsDefault}}<span class="badge badge-primary">Default</span>{{end}}
+                    </div>
                 </div>
                 <div class="calendar-sync-status">
                     {{if eq (printf "%s" .SyncStatus) "synced"}}
-                        <span class="sync-indicator sync-ok" title="Sync successful">&#10003;</span>
-                        {{if .LastSyncedAt}}
-                        <span class="sync-time">Synced {{timeAgo .LastSyncedAt}}</span>
-                        {{else}}
-                        <span class="sync-time">Synced</span>
-                        {{end}}
+                    <span class="sync-indicator sync-ok">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                    </span>
+                    <span class="sync-time">{{if .LastSyncedAt}}Synced {{timeAgo .LastSyncedAt}}{{else}}Synced{{end}}</span>
                     {{else if eq (printf "%s" .SyncStatus) "failed"}}
-                        <span class="sync-indicator sync-error" title="Sync failed - click for details" onclick="toggleCalendarError(this)">&#9888;</span>
-                        <span class="sync-time sync-error-text sync-error-clickable" onclick="toggleCalendarError(this)">Sync failed - click for details</span>
+                    <span class="sync-indicator sync-error" onclick="toggleCalendarError(this)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="8" x2="12" y2="12"/>
+                            <line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                    </span>
+                    <span class="sync-time sync-error-clickable" onclick="toggleCalendarError(this)">Sync failed - click for details</span>
                     {{else}}
-                        <span class="sync-indicator sync-unknown" title="Not synced yet">&#8635;</span>
-                        <span class="sync-time">Never synced</span>
+                    <span class="sync-indicator sync-pending">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <polyline points="23 4 23 10 17 10"/>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                        </svg>
+                    </span>
+                    <span class="sync-time">Never synced</span>
                     {{end}}
                 </div>
                 {{if and (eq (printf "%s" .SyncStatus) "failed") .SyncError}}
                 <div class="calendar-error-message" style="display: none;">
-                    <span class="error-icon">&#9888;</span>
-                    <span class="error-text">{{.SyncError}}</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    <span>{{.SyncError}}</span>
                 </div>
                 {{end}}
             </div>
             <div class="calendar-actions">
-                <button type="button" class="btn btn-sm btn-refresh"
+                <button type="button" class="btn-sm btn-secondary"
                         hx-post="/dashboard/calendars/{{.ID}}/refresh"
                         hx-target="#calendar-card-{{.ID}}"
                         hx-swap="outerHTML"
-                        hx-indicator="#refresh-spinner-{{.ID}}"
-                        title="Refresh sync status">
-                    <span class="refresh-icon">&#8635;</span>
-                    <span class="refresh-text">Refresh</span>
-                    <span id="refresh-spinner-{{.ID}}" class="htmx-indicator refresh-spinner"></span>
+                        hx-indicator="#refresh-spinner-{{.ID}}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <polyline points="23 4 23 10 17 10"/>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                    Refresh
+                    <span id="refresh-spinner-{{.ID}}" class="htmx-indicator">...</span>
                 </button>
                 {{if not .IsDefault}}
                 <form action="/dashboard/calendars/{{.ID}}/default" method="POST" style="display:inline">
-                    <button type="submit" class="btn btn-sm">Set Default</button>
+                    <button type="submit" class="btn-sm btn-secondary">Set Default</button>
                 </form>
                 {{end}}
                 <form action="/dashboard/calendars/{{.ID}}/disconnect" method="POST" style="display:inline">
-                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Disconnect this calendar?')">Disconnect</button>
+                    <button type="submit" class="btn-sm btn-danger" onclick="return confirm('Disconnect this calendar?')">Disconnect</button>
                 </form>
             </div>
         </div>
         {{end}}
     </div>
     {{else}}
-    <p class="empty-state">No calendars connected yet.</p>
+    <div class="empty-state-inline">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        <span>No calendars connected yet</span>
+    </div>
     {{end}}
 
-    <div class="connect-options">
-        <h3>Connect a Calendar</h3>
-        <div class="connect-buttons">
-            <a href="{{.Data.GoogleAuthURL}}" class="btn btn-google">Connect Google Calendar</a>
-        </div>
+    <div class="connect-section">
+        <h3 class="connect-section-title">Connect a Calendar</h3>
+        <a href="{{.Data.GoogleAuthURL}}" class="btn btn-google">
+            <svg viewBox="0 0 24 24" width="20" height="20">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Connect Google Calendar
+        </a>
 
-        <details class="caldav-form icloud-form">
-            <summary>Connect iCloud Calendar</summary>
-            <div class="icloud-instructions">
-                <p><strong>To connect iCloud Calendar, you'll need an app-specific password:</strong></p>
-                <ol>
-                    <li>Go to <a href="https://appleid.apple.com/account/manage" target="_blank" rel="noopener">appleid.apple.com</a></li>
-                    <li>Sign in with your Apple ID</li>
-                    <li>In the "Sign-In and Security" section, click "App-Specific Passwords"</li>
-                    <li>Click the "+" button to generate a new password</li>
-                    <li>Name it something like "Meet-When Calendar"</li>
-                    <li>Copy the generated password and paste it below</li>
-                </ol>
+        <details class="caldav-details">
+            <summary class="caldav-summary">Connect iCloud Calendar</summary>
+            <div class="caldav-content">
+                <div class="caldav-instructions">
+                    <p><strong>To connect iCloud Calendar, you need an app-specific password:</strong></p>
+                    <ol>
+                        <li>Go to <a href="https://appleid.apple.com/account/manage" target="_blank" rel="noopener">appleid.apple.com</a></li>
+                        <li>Sign in with your Apple ID</li>
+                        <li>Click "App-Specific Passwords" under Sign-In and Security</li>
+                        <li>Generate a new password named "Meet-When"</li>
+                        <li>Copy and paste it below</li>
+                    </ol>
+                </div>
+                <form method="POST" action="/dashboard/calendars/connect/caldav" class="caldav-form">
+                    <input type="hidden" name="provider" value="icloud">
+                    <div class="form-group">
+                        <label class="form-label" for="icloud_name">Calendar Name</label>
+                        <input type="text" id="icloud_name" name="name" class="form-input" required value="iCloud Calendar">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="icloud_url">CalDAV URL</label>
+                        <input type="url" id="icloud_url" name="url" class="form-input" required value="https://caldav.icloud.com/">
+                        <p class="form-hint">Default iCloud CalDAV URL. Usually no changes needed.</p>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="icloud_username">Apple ID Email</label>
+                        <input type="email" id="icloud_username" name="username" class="form-input" required placeholder="your.email@icloud.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="icloud_password">App-Specific Password</label>
+                        <input type="password" id="icloud_password" name="password" class="form-input" required placeholder="xxxx-xxxx-xxxx-xxxx">
+                        <p class="form-hint">The app-specific password from Apple ID settings.</p>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Connect iCloud</button>
+                </form>
             </div>
-            <form method="POST" action="/dashboard/calendars/connect/caldav" class="form">
-                <input type="hidden" name="provider" value="icloud">
-                <div class="form-group">
-                    <label for="icloud_name">Calendar Name</label>
-                    <input type="text" id="icloud_name" name="name" required value="iCloud Calendar">
-                </div>
-                <div class="form-group">
-                    <label for="icloud_url">CalDAV URL</label>
-                    <input type="url" id="icloud_url" name="url" required value="https://caldav.icloud.com/">
-                    <small class="form-help">Default iCloud CalDAV URL. Usually no changes needed.</small>
-                </div>
-                <div class="form-group">
-                    <label for="icloud_username">Apple ID Email</label>
-                    <input type="email" id="icloud_username" name="username" required placeholder="your.email@icloud.com">
-                </div>
-                <div class="form-group">
-                    <label for="icloud_password">App-Specific Password</label>
-                    <input type="password" id="icloud_password" name="password" required placeholder="xxxx-xxxx-xxxx-xxxx">
-                    <small class="form-help">The app-specific password generated from Apple ID settings (not your Apple ID password).</small>
-                </div>
-                <button type="submit" class="btn btn-primary">Connect iCloud</button>
-            </form>
         </details>
 
-        <details class="caldav-form">
-            <summary>Connect Other CalDAV Calendar</summary>
-            <form method="POST" action="/dashboard/calendars/connect/caldav" class="form">
-                <input type="hidden" name="provider" value="caldav">
-                <div class="form-group">
-                    <label for="caldav_name">Calendar Name</label>
-                    <input type="text" id="caldav_name" name="name" required placeholder="My Calendar">
-                </div>
-                <div class="form-group">
-                    <label for="caldav_url">CalDAV URL</label>
-                    <input type="url" id="caldav_url" name="url" required placeholder="https://caldav.example.com/calendars/user/">
-                </div>
-                <div class="form-group">
-                    <label for="caldav_username">Username</label>
-                    <input type="text" id="caldav_username" name="username" required>
-                </div>
-                <div class="form-group">
-                    <label for="caldav_password">Password / App Password</label>
-                    <input type="password" id="caldav_password" name="password" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Connect CalDAV</button>
-            </form>
+        <details class="caldav-details">
+            <summary class="caldav-summary">Connect Other CalDAV Calendar</summary>
+            <div class="caldav-content">
+                <form method="POST" action="/dashboard/calendars/connect/caldav" class="caldav-form">
+                    <input type="hidden" name="provider" value="caldav">
+                    <div class="form-group">
+                        <label class="form-label" for="caldav_name">Calendar Name</label>
+                        <input type="text" id="caldav_name" name="name" class="form-input" required placeholder="My Calendar">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="caldav_url">CalDAV URL</label>
+                        <input type="url" id="caldav_url" name="url" class="form-input" required placeholder="https://caldav.example.com/calendars/user/">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="caldav_username">Username</label>
+                        <input type="text" id="caldav_username" name="username" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="caldav_password">Password</label>
+                        <input type="password" id="caldav_password" name="password" class="form-input" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Connect CalDAV</button>
+                </form>
+            </div>
         </details>
     </div>
-</div>
+</section>
 
-<div class="section">
-    <h2>Video Conferencing</h2>
-    <p>Connect video conferencing providers to automatically create meeting links.</p>
+<section class="settings-section">
+    <div class="section-header-simple">
+        <h2 class="section-title">Video Conferencing</h2>
+    </div>
+    <p class="section-description">Connect video conferencing providers to automatically create meeting links.</p>
 
     <div class="conferencing-list">
         {{$hasZoom := false}}
@@ -154,47 +197,45 @@
 
         <div class="conferencing-card">
             <div class="conferencing-info">
-                <strong>Google Meet</strong>
-                <span class="badge badge-success">Via Google Calendar</span>
+                <div class="conferencing-header">
+                    <span class="conferencing-name">Google Meet</span>
+                    <span class="badge badge-success">Via Google Calendar</span>
+                </div>
+                <p class="conferencing-description">Google Meet links are created automatically when using Google Calendar</p>
             </div>
-            <small>Google Meet links are created automatically when using Google Calendar</small>
         </div>
 
         <div class="conferencing-card">
             <div class="conferencing-info">
-                <strong>Zoom</strong>
+                <div class="conferencing-header">
+                    <span class="conferencing-name">Zoom</span>
+                    {{if $hasZoom}}
+                    <span class="badge badge-success">Connected</span>
+                    {{else}}
+                    <span class="badge badge-inactive">Not Connected</span>
+                    {{end}}
+                </div>
+            </div>
+            <div class="conferencing-actions">
                 {{if $hasZoom}}
-                <span class="badge badge-success">Connected</span>
+                <form action="/dashboard/conferencing/zoom/disconnect" method="POST">
+                    <button type="submit" class="btn-sm btn-danger">Disconnect</button>
+                </form>
                 {{else}}
-                <span class="badge">Not Connected</span>
+                <a href="{{.Data.ZoomAuthURL}}" class="btn-sm btn-primary">Connect Zoom</a>
                 {{end}}
             </div>
-            {{if $hasZoom}}
-            <form action="/dashboard/conferencing/zoom/disconnect" method="POST" style="display:inline">
-                <button type="submit" class="btn btn-sm btn-danger">Disconnect</button>
-            </form>
-            {{else}}
-            <a href="{{.Data.ZoomAuthURL}}" class="btn btn-sm">Connect Zoom</a>
-            {{end}}
         </div>
     </div>
-</div>
+</section>
 
 <script>
 function toggleCalendarError(element) {
-    // Find the parent calendar-card and then the error message
     var card = element.closest('.calendar-card');
     if (!card) return;
-
     var errorMsg = card.querySelector('.calendar-error-message');
     if (!errorMsg) return;
-
-    // Toggle visibility
-    if (errorMsg.style.display === 'none') {
-        errorMsg.style.display = 'flex';
-    } else {
-        errorMsg.style.display = 'none';
-    }
+    errorMsg.style.display = errorMsg.style.display === 'none' ? 'flex' : 'none';
 }
 </script>
 {{end}}

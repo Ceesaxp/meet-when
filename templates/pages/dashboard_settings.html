@@ -4,29 +4,34 @@
 
 {{define "content"}}
 <div class="page-header">
-    <h1>Settings</h1>
+    <div>
+        <h1 class="page-title">Settings</h1>
+        <p class="page-subtitle">Manage your profile and preferences</p>
+    </div>
 </div>
 
-<div class="section">
-    <h2>Profile</h2>
-    <form method="POST" action="/dashboard/settings" class="form">
+<section class="settings-section">
+    <div class="section-header-simple">
+        <h2 class="section-title">Profile</h2>
+    </div>
+    <form method="POST" action="/dashboard/settings" class="settings-form">
         <input type="hidden" name="_method" value="PUT">
 
         <div class="form-group">
-            <label for="name">Name</label>
-            <input type="text" id="name" name="name" required value="{{.Host.Name}}">
+            <label class="form-label" for="name">Name</label>
+            <input type="text" id="name" name="name" class="form-input" required value="{{.Host.Name}}">
         </div>
 
         <div class="form-group">
-            <label for="slug">URL Slug</label>
-            <input type="text" id="slug" name="slug" required pattern="[a-z0-9-]+" value="{{.Host.Slug}}">
-            <small>Your booking URL: {{$.BaseURL}}/m/{{.Tenant.Slug}}/<strong>{{.Host.Slug}}</strong></small>
+            <label class="form-label" for="slug">URL Slug</label>
+            <input type="text" id="slug" name="slug" class="form-input" required pattern="[a-z0-9-]+" value="{{.Host.Slug}}">
+            <p class="form-hint">Your booking URL: <span class="url-preview">{{$.BaseURL}}/m/{{.Tenant.Slug}}/<strong>{{.Host.Slug}}</strong></span></p>
         </div>
 
         <div class="form-group">
-            <label for="timezone-search">Timezone</label>
+            <label class="form-label" for="timezone-search">Timezone</label>
             <div class="tz-picker-container">
-                <input type="text" id="timezone-search" class="tz-picker-input"
+                <input type="text" id="timezone-search" class="form-input tz-picker-input"
                        placeholder="Search for a timezone..." autocomplete="off">
                 <input type="hidden" id="timezone" name="timezone" value="{{.Host.Timezone}}">
                 <div id="timezone-results" class="tz-picker-dropdown" style="display: none;"></div>
@@ -35,49 +40,42 @@
 
         <button type="submit" class="btn btn-primary">Save Profile</button>
     </form>
-</div>
+</section>
 
-<div class="section">
-    <h2>Working Hours</h2>
-    <p>Set your default availability. These can be overridden per meeting type.</p>
+<section class="settings-section">
+    <div class="section-header-simple">
+        <h2 class="section-title">Working Hours</h2>
+    </div>
+    <p class="section-description">Set your default availability. These can be overridden per meeting type.</p>
 
-    <form method="POST" action="/dashboard/settings/working-hours" class="form">
+    <form method="POST" action="/dashboard/settings/working-hours" class="settings-form">
         <input type="hidden" name="_method" value="PUT">
 
-        <table class="working-hours-table">
-            <thead>
-                <tr>
-                    <th>Day</th>
-                    <th>Enabled</th>
-                    <th>Start</th>
-                    <th>End</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{range $i, $day := .Data.DayNames}}
-                {{$hours := index $.Data.WorkingHours $i}}
-                <tr>
-                    <td>{{$day}}</td>
-                    <td>
+        <div class="working-hours-grid">
+            {{range $i, $day := .Data.DayNames}}
+            {{$hours := index $.Data.WorkingHours $i}}
+            <div class="working-hours-row">
+                <div class="working-hours-day">
+                    <label class="checkbox-label">
                         <input type="checkbox" name="day_{{$i}}_enabled"
                                {{if $hours}}{{if (index $hours 0).IsEnabled}}checked{{end}}{{end}}>
-                    </td>
-                    <td>
-                        <input type="time" name="day_{{$i}}_start"
-                               value="{{if $hours}}{{(index $hours 0).StartTime}}{{else}}09:00{{end}}">
-                    </td>
-                    <td>
-                        <input type="time" name="day_{{$i}}_end"
-                               value="{{if $hours}}{{(index $hours 0).EndTime}}{{else}}17:00{{end}}">
-                    </td>
-                </tr>
-                {{end}}
-            </tbody>
-        </table>
+                        <span class="day-name">{{$day}}</span>
+                    </label>
+                </div>
+                <div class="working-hours-times">
+                    <input type="time" name="day_{{$i}}_start" class="form-input time-input"
+                           value="{{if $hours}}{{(index $hours 0).StartTime}}{{else}}09:00{{end}}">
+                    <span class="time-separator">to</span>
+                    <input type="time" name="day_{{$i}}_end" class="form-input time-input"
+                           value="{{if $hours}}{{(index $hours 0).EndTime}}{{else}}17:00{{end}}">
+                </div>
+            </div>
+            {{end}}
+        </div>
 
         <button type="submit" class="btn btn-primary">Save Working Hours</button>
     </form>
-</div>
+</section>
 
 <script src="/static/js/timezone-picker.js"></script>
 <script>

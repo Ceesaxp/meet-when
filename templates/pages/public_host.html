@@ -6,40 +6,83 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}} | Meet When</title>
     <meta name="description" content="{{.Description}}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body class="public-page">
     <div class="public-container">
-        <div class="host-header">
-            <h1>{{.Host.Name}}</h1>
-            <p>Select a meeting type to schedule</p>
-        </div>
+        <header class="profile-header">
+            <div class="avatar">{{slice .Host.Name 0 1}}</div>
+            <div class="profile-info">
+                <h1 class="profile-name">{{.Host.Name}}</h1>
+                <p class="profile-bio">Select a meeting type to schedule a time with me.</p>
+            </div>
+        </header>
 
         {{if .Data.Templates}}
-        <div class="template-list">
+        <div class="section-header-simple">
+            <span class="section-title">Available Meetings</span>
+            <span class="section-count">{{len .Data.Templates}} {{if eq (len .Data.Templates) 1}}type{{else}}types{{end}}</span>
+        </div>
+
+        <div class="meetings-list">
             {{range .Data.Templates}}
-            <a href="/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}" class="template-link">
-                <div class="template-link-content">
-                    <h3>{{.Name}}</h3>
+            <a href="/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}" class="meeting-item">
+                <span class="meeting-duration">{{index .Durations 0}} min</span>
+                <div class="meeting-content">
+                    <h3 class="meeting-title">{{.Name}}</h3>
                     {{if .Description}}
-                    <p>{{.Description}}</p>
+                    <p class="meeting-description">{{.Description}}</p>
                     {{end}}
-                    <span class="duration-badge">{{index .Durations 0}} min</span>
                 </div>
-                <span class="arrow">&rarr;</span>
+                <div class="meeting-meta">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <polygon points="23 7 16 12 23 17 23 7"/>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>
+                    {{if eq (printf "%s" .LocationType) "google_meet"}}Google Meet{{else if eq (printf "%s" .LocationType) "zoom"}}Zoom{{else if eq (printf "%s" .LocationType) "phone"}}Phone{{else}}Video{{end}}
+                </div>
+                <div class="meeting-arrow">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                </div>
             </a>
             {{end}}
         </div>
         {{else}}
         <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48" height="48">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
             <p>No meeting types available.</p>
         </div>
         {{end}}
 
         <footer class="public-footer">
-            <p>Powered by <a href="/">Meet When</a></p>
+            <span>Powered by <a href="/">Meet When</a></span>
+            <div class="timezone-display">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+                <span id="visitor-timezone">UTC</span>
+            </div>
         </footer>
     </div>
+
+    <script>
+        // Detect visitor timezone
+        try {
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            document.getElementById('visitor-timezone').textContent = tz.replace(/_/g, ' ');
+        } catch(e) {}
+    </script>
 </body>
 </html>
 {{end}}

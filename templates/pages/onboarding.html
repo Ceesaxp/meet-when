@@ -5,6 +5,7 @@
 {{define "content"}}
 <div class="onboarding-container">
     <div class="onboarding-header">
+        <a href="/" class="logo">Meet<span>When</span></a>
         <h1>Welcome to MeetWhen</h1>
         <p>Let's get your scheduling set up in just a few steps.</p>
     </div>
@@ -15,17 +16,17 @@
 
     <div class="onboarding-progress">
         <div class="progress-step {{if ge .Data.Step 1}}active{{end}} {{if .Data.Step1Complete}}completed{{end}}">
-            <div class="step-number">1</div>
+            <div class="step-number">{{if .Data.Step1Complete}}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>{{else}}1{{end}}</div>
             <div class="step-label">Working Hours</div>
         </div>
         <div class="progress-line {{if ge .Data.Step 2}}active{{end}}"></div>
         <div class="progress-step {{if ge .Data.Step 2}}active{{end}} {{if .Data.Step2Complete}}completed{{end}}">
-            <div class="step-number">2</div>
+            <div class="step-number">{{if .Data.Step2Complete}}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>{{else}}2{{end}}</div>
             <div class="step-label">Calendar</div>
         </div>
         <div class="progress-line {{if ge .Data.Step 3}}active{{end}}"></div>
         <div class="progress-step {{if ge .Data.Step 3}}active{{end}} {{if .Data.Step3Complete}}completed{{end}}">
-            <div class="step-number">3</div>
+            <div class="step-number">{{if .Data.Step3Complete}}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>{{else}}3{{end}}</div>
             <div class="step-label">First Meeting</div>
         </div>
     </div>
@@ -35,56 +36,48 @@
         <!-- Step 1: Working Hours -->
         <div class="onboarding-step">
             <h2>Set Your Working Hours</h2>
-            <p>When are you typically available for meetings? You can always adjust this later.</p>
+            <p class="step-description">When are you typically available for meetings? You can always adjust this later.</p>
 
-            <form method="POST" action="/onboarding/working-hours" class="form">
+            <form method="POST" action="/onboarding/working-hours">
                 <div class="form-group">
-                    <label for="timezone-search">Your Timezone</label>
+                    <label class="form-label" for="timezone-search">Your Timezone</label>
                     <div class="tz-picker-container">
-                        <input type="text" id="timezone-search" class="tz-picker-input"
+                        <input type="text" id="timezone-search" class="form-input tz-picker-input"
                                placeholder="Search for a timezone..." autocomplete="off">
                         <input type="hidden" id="timezone" name="timezone" value="{{.Host.Timezone}}">
                         <div id="timezone-results" class="tz-picker-dropdown" style="display: none;"></div>
                     </div>
-                    <small id="timezone-detected-hint" class="form-help" style="display: none;">
+                    <p id="timezone-detected-hint" class="form-hint" style="display: none;">
                         <span class="detected-indicator">Detected from your browser</span> - you can change this if needed
-                    </small>
+                    </p>
                 </div>
 
-                <table class="working-hours-table">
-                    <thead>
-                        <tr>
-                            <th>Day</th>
-                            <th>Available</th>
-                            <th>Start</th>
-                            <th>End</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {{$stepData := .Data.StepData}}
-                        {{range $i, $day := $stepData.DayNames}}
-                        {{$hours := index $stepData.WorkingHours $i}}
-                        <tr>
-                            <td>{{$day}}</td>
-                            <td>
+                <div class="working-hours-grid">
+                    {{$stepData := .Data.StepData}}
+                    {{range $i, $day := $stepData.DayNames}}
+                    {{$hours := index $stepData.WorkingHours $i}}
+                    <div class="working-hours-row">
+                        <div class="working-hours-day">
+                            <label class="toggle-switch-inline">
                                 <input type="checkbox" name="day_{{$i}}_enabled"
                                        {{if $hours}}{{if (index $hours 0).IsEnabled}}checked{{end}}{{else}}{{if and (ge $i 1) (le $i 5)}}checked{{end}}{{end}}>
-                            </td>
-                            <td>
-                                <input type="time" name="day_{{$i}}_start"
-                                       value="{{if $hours}}{{(index $hours 0).StartTime}}{{else}}09:00{{end}}">
-                            </td>
-                            <td>
-                                <input type="time" name="day_{{$i}}_end"
-                                       value="{{if $hours}}{{(index $hours 0).EndTime}}{{else}}17:00{{end}}">
-                            </td>
-                        </tr>
-                        {{end}}
-                    </tbody>
-                </table>
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="day-name">{{$day}}</span>
+                        </div>
+                        <div class="working-hours-times">
+                            <input type="time" name="day_{{$i}}_start" class="form-input time-input"
+                                   value="{{if $hours}}{{(index $hours 0).StartTime}}{{else}}09:00{{end}}">
+                            <span class="time-separator">to</span>
+                            <input type="time" name="day_{{$i}}_end" class="form-input time-input"
+                                   value="{{if $hours}}{{(index $hours 0).EndTime}}{{else}}17:00{{end}}">
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
 
                 <div class="onboarding-actions">
-                    <a href="/onboarding/skip/1" class="btn btn-secondary">Skip for Now</a>
+                    <a href="/onboarding/skip/1" class="btn btn-outline">Skip for Now</a>
                     <button type="submit" class="btn btn-primary">Continue</button>
                 </div>
             </form>
@@ -95,7 +88,7 @@
         <!-- Step 2: Calendar Connection -->
         <div class="onboarding-step">
             <h2>Connect Your Calendar</h2>
-            <p>Connect a calendar to automatically check your availability and add new bookings.</p>
+            <p class="step-description">Connect a calendar to automatically check your availability and add new bookings.</p>
 
             {{$stepData := .Data.StepData}}
             {{if $stepData.Calendars}}
@@ -103,7 +96,13 @@
                 <h3>Connected Calendars</h3>
                 <ul>
                     {{range $stepData.Calendars}}
-                    <li><span class="badge badge-{{.Provider}}">{{.Provider}}</span> {{.Name}}</li>
+                    <li>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        <span class="badge badge-{{.Provider}}">{{.Provider}}</span>
+                        {{.Name}}
+                    </li>
                     {{end}}
                 </ul>
             </div>
@@ -111,47 +110,68 @@
 
             <div class="calendar-options">
                 <div class="calendar-option">
-                    <h3>Google Calendar</h3>
+                    <div class="calendar-option-header">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8" y1="2" x2="8" y2="6"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                        <h3>Google Calendar</h3>
+                    </div>
                     <p>Recommended for most users. Automatically syncs availability and creates events.</p>
                     <a href="/onboarding/connect/google" class="btn btn-google">
-                        <img src="/static/img/google-icon.svg" alt="Google" onerror="this.style.display='none'">
+                        <svg viewBox="0 0 24 24" width="18" height="18">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        </svg>
                         Connect Google Calendar
                     </a>
                 </div>
 
                 <div class="calendar-option">
-                    <h3>iCloud Calendar</h3>
+                    <div class="calendar-option-header">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                        </svg>
+                        <h3>iCloud Calendar</h3>
+                    </div>
                     <p>For Apple users. Requires an app-specific password from Apple ID settings.</p>
 
-                    <form method="POST" action="/onboarding/connect/caldav" class="form caldav-form">
-                        <input type="hidden" name="provider" value="icloud">
-                        <input type="hidden" name="url" value="https://caldav.icloud.com/">
+                    <details class="caldav-details">
+                        <summary class="btn btn-outline">Connect iCloud</summary>
+                        <form method="POST" action="/onboarding/connect/caldav" class="caldav-form">
+                            <input type="hidden" name="provider" value="icloud">
+                            <input type="hidden" name="url" value="https://caldav.icloud.com/">
 
-                        <div class="form-group">
-                            <label for="icloud_name">Calendar Name</label>
-                            <input type="text" id="icloud_name" name="name" required placeholder="My iCloud Calendar">
-                        </div>
+                            <div class="form-group">
+                                <label class="form-label" for="icloud_name">Calendar Name</label>
+                                <input type="text" id="icloud_name" name="name" class="form-input" required placeholder="My iCloud Calendar">
+                            </div>
 
-                        <div class="form-group">
-                            <label for="icloud_username">Apple ID Email</label>
-                            <input type="email" id="icloud_username" name="username" required placeholder="your@icloud.com">
-                        </div>
+                            <div class="form-group">
+                                <label class="form-label" for="icloud_username">Apple ID Email</label>
+                                <input type="email" id="icloud_username" name="username" class="form-input" required placeholder="your@icloud.com">
+                            </div>
 
-                        <div class="form-group">
-                            <label for="icloud_password">App-Specific Password</label>
-                            <input type="password" id="icloud_password" name="password" required placeholder="xxxx-xxxx-xxxx-xxxx">
-                            <small class="form-help">
-                                Generate at <a href="https://appleid.apple.com/account/manage" target="_blank">appleid.apple.com</a> > Sign-In and Security > App-Specific Passwords
-                            </small>
-                        </div>
+                            <div class="form-group">
+                                <label class="form-label" for="icloud_password">App-Specific Password</label>
+                                <input type="password" id="icloud_password" name="password" class="form-input" required placeholder="xxxx-xxxx-xxxx-xxxx">
+                                <p class="form-hint">
+                                    Generate at <a href="https://appleid.apple.com/account/manage" target="_blank">appleid.apple.com</a> > Sign-In and Security > App-Specific Passwords
+                                </p>
+                            </div>
 
-                        <button type="submit" class="btn btn-primary">Connect iCloud</button>
-                    </form>
+                            <button type="submit" class="btn btn-primary">Connect iCloud</button>
+                        </form>
+                    </details>
                 </div>
             </div>
 
             <div class="onboarding-actions">
-                <a href="/onboarding/skip/2" class="btn btn-secondary">Skip for Now</a>
+                <a href="/onboarding/skip/2" class="btn btn-outline">Skip for Now</a>
                 {{if $stepData.Calendars}}
                 <a href="/onboarding/step/3" class="btn btn-primary">Continue</a>
                 {{end}}
@@ -163,47 +183,51 @@
         <!-- Step 3: Create First Meeting Template -->
         <div class="onboarding-step">
             <h2>Create Your First Meeting Type</h2>
-            <p>Set up a meeting template that people can book with you.</p>
+            <p class="step-description">Set up a meeting template that people can book with you.</p>
 
             {{$stepData := .Data.StepData}}
-            <form method="POST" action="/onboarding/template" class="form">
+            <form method="POST" action="/onboarding/template">
                 <div class="form-group">
-                    <label for="name">Meeting Name</label>
-                    <input type="text" id="name" name="name" required placeholder="30 Minute Meeting" value="30 Minute Meeting">
+                    <label class="form-label" for="name">Meeting Name</label>
+                    <input type="text" id="name" name="name" class="form-input" required placeholder="30 Minute Meeting" value="30 Minute Meeting">
                 </div>
 
                 <div class="form-group">
-                    <label for="slug">URL Slug</label>
-                    <input type="text" id="slug" name="slug" required pattern="[a-z0-9-]+" placeholder="30min" value="30min">
-                    <small>Your booking link will be: /m/{{.Tenant.Slug}}/{{.Host.Slug}}/<strong>30min</strong></small>
+                    <label class="form-label" for="slug">URL Slug</label>
+                    <input type="text" id="slug" name="slug" class="form-input" required pattern="[a-z0-9-]+" placeholder="30min" value="30min">
+                    <p class="form-hint">Your booking link will be: /m/{{.Tenant.Slug}}/{{.Host.Slug}}/<strong>30min</strong></p>
                 </div>
 
                 <div class="form-group">
-                    <label for="description">Description (optional)</label>
-                    <textarea id="description" name="description" rows="2" placeholder="A quick call to discuss..."></textarea>
+                    <label class="form-label" for="description">Description (optional)</label>
+                    <textarea id="description" name="description" class="form-textarea" rows="2" placeholder="A quick call to discuss..."></textarea>
                 </div>
 
                 <div class="form-group">
-                    <label>Duration</label>
-                    <div class="duration-options">
-                        <label class="checkbox-label">
-                            <input type="checkbox" name="durations" value="15"> 15 min
+                    <label class="form-label">Duration</label>
+                    <div class="duration-chips">
+                        <label class="duration-chip">
+                            <input type="checkbox" name="durations" value="15">
+                            15 min
                         </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" name="durations" value="30" checked> 30 min
+                        <label class="duration-chip selected">
+                            <input type="checkbox" name="durations" value="30" checked>
+                            30 min
                         </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" name="durations" value="45"> 45 min
+                        <label class="duration-chip">
+                            <input type="checkbox" name="durations" value="45">
+                            45 min
                         </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" name="durations" value="60"> 60 min
+                        <label class="duration-chip">
+                            <input type="checkbox" name="durations" value="60">
+                            60 min
                         </label>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="location_type">Location</label>
-                    <select id="location_type" name="location_type">
+                    <label class="form-label" for="location_type">Location</label>
+                    <select id="location_type" name="location_type" class="form-select">
                         <option value="google_meet">Google Meet</option>
                         <option value="zoom">Zoom</option>
                         <option value="phone">Phone Call</option>
@@ -212,14 +236,14 @@
                 </div>
 
                 <div class="form-group" id="custom_location_group" style="display: none;">
-                    <label for="custom_location">Location Details</label>
-                    <input type="text" id="custom_location" name="custom_location" placeholder="Enter address or meeting link">
+                    <label class="form-label" for="custom_location">Location Details</label>
+                    <input type="text" id="custom_location" name="custom_location" class="form-input" placeholder="Enter address or meeting link">
                 </div>
 
                 {{if $stepData.Calendars}}
                 <div class="form-group">
-                    <label for="calendar_id">Add to Calendar</label>
-                    <select id="calendar_id" name="calendar_id">
+                    <label class="form-label" for="calendar_id">Add to Calendar</label>
+                    <select id="calendar_id" name="calendar_id" class="form-select">
                         {{range $stepData.Calendars}}
                         <option value="{{.ID}}">{{.Name}}</option>
                         {{end}}
@@ -227,14 +251,19 @@
                 </div>
                 {{end}}
 
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" name="requires_approval"> Require my approval before confirming bookings
+                <div class="toggle-row">
+                    <div class="toggle-info">
+                        <h4>Require approval</h4>
+                        <p>Review bookings before confirming</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="requires_approval">
+                        <span class="toggle-slider"></span>
                     </label>
                 </div>
 
                 <div class="onboarding-actions">
-                    <a href="/onboarding/skip/3" class="btn btn-secondary">Skip for Now</a>
+                    <a href="/onboarding/skip/3" class="btn btn-outline">Skip for Now</a>
                     <button type="submit" class="btn btn-primary">Create & Finish Setup</button>
                 </div>
             </form>
@@ -246,6 +275,13 @@
 <script src="/static/js/timezone-picker.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Duration chip selection
+    document.querySelectorAll('.duration-chips .duration-chip input').forEach(function(input) {
+        input.addEventListener('change', function() {
+            this.closest('.duration-chip').classList.toggle('selected', this.checked);
+        });
+    });
+
     // ===== Timezone Picker Initialization (Step 1) =====
     var timezoneSearchInput = document.getElementById('timezone-search');
     if (timezoneSearchInput) {
@@ -257,7 +293,6 @@ document.addEventListener('DOMContentLoaded', function() {
             hiddenInputId: 'timezone',
             dropdownId: 'timezone-results',
             onSelect: function(tz) {
-                // When user manually selects a timezone, hide the detected hint
                 var hint = document.getElementById('timezone-detected-hint');
                 if (hint) {
                     hint.style.display = 'none';
@@ -266,44 +301,35 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         picker.init();
 
-        // Auto-detect timezone if host doesn't have one set
         if (!currentHostTimezone) {
             try {
                 var detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 if (detectedTimezone) {
-                    // Wait for timezone data to load, then set the detected timezone
                     var checkLoaded = setInterval(function() {
                         if (picker.timezones.length > 0) {
                             clearInterval(checkLoaded);
                             picker.setTimezone(detectedTimezone);
                             wasAutoDetected = true;
-
-                            // Show the detected hint
                             var hint = document.getElementById('timezone-detected-hint');
                             if (hint) {
                                 hint.style.display = 'block';
                             }
                         }
                     }, 100);
-
-                    // Timeout after 5 seconds
                     setTimeout(function() {
                         clearInterval(checkLoaded);
                     }, 5000);
                 }
             } catch (e) {
-                // Detection failed, leave field empty for manual selection
                 console.log('Timezone detection not supported:', e);
             }
         } else {
-            // Host already has a timezone, set it
             var checkLoaded = setInterval(function() {
                 if (picker.timezones.length > 0) {
                     clearInterval(checkLoaded);
                     picker.setTimezone(currentHostTimezone);
                 }
             }, 100);
-
             setTimeout(function() {
                 clearInterval(checkLoaded);
             }, 5000);
@@ -350,179 +376,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-
-<style>
-.onboarding-container {
-    max-width: 700px;
-    margin: 40px auto;
-    padding: 0 20px;
-}
-
-.onboarding-header {
-    text-align: center;
-    margin-bottom: 40px;
-}
-
-.onboarding-header h1 {
-    color: var(--primary-color);
-    margin-bottom: 10px;
-}
-
-.onboarding-header p {
-    color: #666;
-    font-size: 1.1rem;
-}
-
-.onboarding-progress {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 40px;
-}
-
-.progress-step {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    opacity: 0.5;
-}
-
-.progress-step.active {
-    opacity: 1;
-}
-
-.progress-step.completed .step-number {
-    background: var(--success-color);
-}
-
-.step-number {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: #ddd;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    color: white;
-    margin-bottom: 8px;
-}
-
-.progress-step.active .step-number {
-    background: var(--primary-color);
-}
-
-.step-label {
-    font-size: 0.85rem;
-    color: #666;
-}
-
-.progress-line {
-    width: 60px;
-    height: 3px;
-    background: #ddd;
-    margin: 0 10px;
-    margin-bottom: 28px;
-}
-
-.progress-line.active {
-    background: var(--primary-color);
-}
-
-.onboarding-content {
-    background: white;
-    border-radius: 12px;
-    padding: 30px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
-
-.onboarding-step h2 {
-    margin-bottom: 10px;
-}
-
-.onboarding-step > p {
-    color: #666;
-    margin-bottom: 25px;
-}
-
-.onboarding-actions {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 30px;
-    padding-top: 20px;
-    border-top: 1px solid #eee;
-}
-
-.calendar-options {
-    display: grid;
-    gap: 25px;
-    margin-top: 20px;
-}
-
-.calendar-option {
-    padding: 20px;
-    border: 1px solid #eee;
-    border-radius: 8px;
-}
-
-.calendar-option h3 {
-    margin-bottom: 8px;
-}
-
-.calendar-option > p {
-    color: #666;
-    font-size: 0.9rem;
-    margin-bottom: 15px;
-}
-
-.caldav-form {
-    margin-top: 15px;
-}
-
-.connected-calendars {
-    background: #f0fdf4;
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-}
-
-.connected-calendars h3 {
-    font-size: 0.9rem;
-    margin-bottom: 10px;
-}
-
-.connected-calendars ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.connected-calendars li {
-    padding: 5px 0;
-}
-
-.duration-options {
-    display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
-}
-
-.checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-}
-
-/* Timezone detected indicator */
-.detected-indicator {
-    color: var(--success-color);
-    font-weight: 500;
-}
-
-#timezone-detected-hint {
-    margin-top: 6px;
-    color: #666;
-}
-</style>
 {{end}}

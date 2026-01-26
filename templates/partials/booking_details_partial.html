@@ -3,59 +3,84 @@
     <div class="modal-content" onclick="event.stopPropagation()">
         <div class="modal-header">
             <h2>Booking Details</h2>
-            <button type="button" class="modal-close" onclick="closeBookingModal()">&times;</button>
+            <button type="button" class="modal-close" onclick="closeBookingModal()" aria-label="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
         </div>
         <div class="modal-body">
             {{if .Booking}}
             <div class="booking-detail-section">
-                <h3>Meeting</h3>
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                        <line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    Meeting
+                </h3>
                 <div class="booking-detail-row">
-                    <span class="label">Type:</span>
+                    <span class="label">Type</span>
                     <span class="value">{{if .Template}}{{.Template.Name}}{{else}}Unknown{{end}}</span>
                 </div>
                 <div class="booking-detail-row">
-                    <span class="label">Status:</span>
+                    <span class="label">Status</span>
                     <span class="badge badge-{{.Booking.Status}}">{{.Booking.Status}}</span>
                 </div>
                 <div class="booking-detail-row">
-                    <span class="label">Date:</span>
+                    <span class="label">Date</span>
                     <span class="value">{{formatDate .Booking.StartTime}}</span>
                 </div>
                 <div class="booking-detail-row">
-                    <span class="label">Time:</span>
+                    <span class="label">Time</span>
                     <span class="value">{{formatTime .Booking.StartTime}} - {{formatTime .Booking.EndTime}}</span>
                 </div>
                 <div class="booking-detail-row">
-                    <span class="label">Duration:</span>
+                    <span class="label">Duration</span>
                     <span class="value">{{.Booking.Duration}} minutes</span>
                 </div>
                 {{if .Booking.ConferenceLink}}
                 <div class="booking-detail-row">
-                    <span class="label">Meeting Link:</span>
-                    <span class="value"><a href="{{.Booking.ConferenceLink}}" target="_blank">Join Meeting</a></span>
+                    <span class="label">Meeting Link</span>
+                    <a href="{{.Booking.ConferenceLink}}" target="_blank" class="btn-sm btn-primary">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <polygon points="23 7 16 12 23 17 23 7"/>
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                        </svg>
+                        Join Meeting
+                    </a>
                 </div>
                 {{end}}
             </div>
 
             <div class="booking-detail-section">
-                <h3>Guest Information</h3>
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                    Guest Information
+                </h3>
                 <div class="booking-detail-row">
-                    <span class="label">Name:</span>
+                    <span class="label">Name</span>
                     <span class="value">{{.Booking.InviteeName}}</span>
                 </div>
                 <div class="booking-detail-row">
-                    <span class="label">Email:</span>
-                    <span class="value"><a href="mailto:{{.Booking.InviteeEmail}}">{{.Booking.InviteeEmail}}</a></span>
+                    <span class="label">Email</span>
+                    <a href="mailto:{{.Booking.InviteeEmail}}" class="value link">{{.Booking.InviteeEmail}}</a>
                 </div>
                 {{if .Booking.InviteePhone}}
                 <div class="booking-detail-row">
-                    <span class="label">Phone:</span>
+                    <span class="label">Phone</span>
                     <span class="value">{{.Booking.InviteePhone}}</span>
                 </div>
                 {{end}}
                 {{if .Booking.InviteeTimezone}}
                 <div class="booking-detail-row">
-                    <span class="label">Timezone:</span>
+                    <span class="label">Timezone</span>
                     <span class="value">{{.Booking.InviteeTimezone}}</span>
                 </div>
                 {{end}}
@@ -64,7 +89,15 @@
             {{if .Booking.AdditionalGuests}}
             {{if gt (len .Booking.AdditionalGuests) 0}}
             <div class="booking-detail-section">
-                <h3>Additional Guests</h3>
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    Additional Guests
+                </h3>
                 <ul class="additional-guests-list">
                     {{range .Booking.AdditionalGuests}}
                     <li>{{.}}</li>
@@ -78,17 +111,25 @@
             {{$answers := .Booking.Answers}}
             {{if or (index $answers "agenda") (gt (len $answers) 1)}}
             <div class="booking-detail-section">
-                <h3>Meeting Details</h3>
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                    Meeting Details
+                </h3>
                 {{with index $answers "agenda"}}
                 <div class="booking-detail-row">
-                    <span class="label">Subject/Agenda:</span>
+                    <span class="label">Subject/Agenda</span>
                     <span class="value agenda-text">{{.}}</span>
                 </div>
                 {{end}}
                 {{range $key, $value := $answers}}
                 {{if ne $key "agenda"}}
                 <div class="booking-detail-row">
-                    <span class="label">{{$key}}:</span>
+                    <span class="label">{{$key}}</span>
                     <span class="value">{{$value}}</span>
                 </div>
                 {{end}}
@@ -98,15 +139,22 @@
             {{end}}
 
             {{if eq .Booking.Status "cancelled"}}
-            <div class="booking-detail-section">
-                <h3>Cancellation</h3>
+            <div class="booking-detail-section booking-cancellation">
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                    Cancellation
+                </h3>
                 <div class="booking-detail-row">
-                    <span class="label">Cancelled by:</span>
+                    <span class="label">Cancelled by</span>
                     <span class="value">{{if eq .Booking.CancelledBy "host"}}Host{{else}}Invitee{{end}}</span>
                 </div>
                 {{if .Booking.CancelReason}}
                 <div class="booking-detail-row">
-                    <span class="label">Reason:</span>
+                    <span class="label">Reason</span>
                     <span class="value">{{.Booking.CancelReason}}</span>
                 </div>
                 {{end}}
@@ -115,16 +163,18 @@
 
             <div class="booking-detail-section booking-meta">
                 <div class="booking-detail-row">
-                    <span class="label">Created:</span>
-                    <span class="value">{{formatDateTime .Booking.CreatedAt}}</span>
+                    <span class="label">Created</span>
+                    <span class="value text-muted">{{formatDateTime .Booking.CreatedAt}}</span>
                 </div>
             </div>
             {{else}}
-            <p class="text-muted">Booking not found.</p>
+            <div class="empty-state">
+                <p>Booking not found.</p>
+            </div>
             {{end}}
         </div>
         <div class="modal-footer">
-            <button type="button" class="btn" onclick="closeBookingModal()">Close</button>
+            <button type="button" class="btn btn-outline" onclick="closeBookingModal()">Close</button>
         </div>
     </div>
 </div>
