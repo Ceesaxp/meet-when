@@ -1,337 +1,85 @@
 {
-  "project": "MeetWhen",
-  "branchName": "ralph/scheduling-system-completion",
-  "description": "Complete the self-hosted scheduling system with all PRD requirements - calendar integrations, booking flows, email notifications, and UI enhancements",
-  "userStories": [
-    {
-      "id": "US-001",
-      "title": "Implement CalDAV/iCloud busy time fetching",
-      "description": "As a host, I want my iCloud/CalDAV calendars to show accurate busy times so invitees see correct availability.",
-      "acceptanceCriteria": [
-        "Implement REPORT request with calendar-query in getCalDAVBusyTimes",
-        "Parse VCALENDAR response to extract VEVENT busy blocks",
-        "Handle iCloud-specific CalDAV endpoint (caldav.icloud.com)",
-        "Return actual busy times instead of nil",
-        "Typecheck passes",
-        "go test ./... passes"
-      ],
-      "priority": 1,
-      "passes": true,
-      "notes": "Implemented with full VCALENDAR parsing - see calendar.go:546-888"
-    },
-    {
-      "id": "US-002",
-      "title": "Add iCloud calendar connection UI",
-      "description": "As a host, I want a dedicated iCloud connection form with app-specific password instructions.",
-      "acceptanceCriteria": [
-        "Add 'Connect iCloud' section on calendars page",
-        "Show instructions for generating app-specific password",
-        "Pre-fill CalDAV URL for iCloud (caldav.icloud.com)",
-        "Store with provider type 'icloud' for proper handling",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 2,
-      "passes": true,
-      "notes": "Implemented dedicated iCloud form with app-specific password instructions, pre-filled CalDAV URL, and provider type handling"
-    },
-    {
-      "id": "US-003",
-      "title": "Implement Zoom meeting creation API",
-      "description": "As a host, I want Zoom meetings auto-created when booking is approved with Zoom location type.",
-      "acceptanceCriteria": [
-        "Implement CreateZoomMeeting in ConferencingService",
-        "Call Zoom API POST /users/me/meetings with booking details",
-        "Store join_url in booking.conference_link",
-        "Handle token refresh for expired Zoom tokens",
-        "Typecheck passes",
-        "go test ./... passes"
-      ],
-      "priority": 3,
-      "passes": true,
-      "notes": "Zoom meeting creation fully implemented - fixed token refresh bug where nil TokenExpiry would skip refresh"
-    },
-    {
-      "id": "US-004",
-      "title": "Add duration selector to public booking form",
-      "description": "As an invitee, I want to choose meeting duration when multiple options are available.",
-      "acceptanceCriteria": [
-        "Show duration radio buttons/dropdown when template has multiple durations",
-        "Selected duration passed to GetSlots and CreateBooking",
-        "Slot times update when duration changes",
-        "Single duration templates skip the selector",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 4,
-      "passes": true,
-      "notes": "Implemented duration dropdown selector in sidebar (shown only for multi-duration templates), slots reload on duration change, duration passed to CreateBooking"
-    },
-    {
-      "id": "US-005",
-      "title": "Complete reschedule booking flow",
-      "description": "As an invitee, I want to select a new time and complete rescheduling via the reschedule page.",
-      "acceptanceCriteria": [
-        "Reschedule page shows available slots like booking page",
-        "Form submission cancels old booking and creates new one",
-        "New booking preserves invitee info from original",
-        "Both host and invitee receive reschedule notification emails",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 5,
-      "passes": true,
-      "notes": "Implemented full reschedule flow - same booking record is updated (not cancelled+new), preserves invitee info, calendar events recreated, emails sent to both parties"
-    },
-    {
-      "id": "US-006",
-      "title": "Add agenda/subject field to booking form",
-      "description": "As an invitee, I want to provide a meeting agenda or subject when booking.",
-      "acceptanceCriteria": [
-        "Add 'Meeting subject/agenda' textarea to public booking form",
-        "Store in booking.answers with key 'agenda'",
-        "Display agenda in host notification email",
-        "Include agenda in calendar event description",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 6,
-      "passes": true,
-      "notes": "Implemented agenda textarea on booking form, stored in answers['agenda'], displayed in host emails and calendar event descriptions"
-    },
-    {
-      "id": "US-007",
-      "title": "Add custom questions builder to template form",
-      "description": "As a host, I want to add custom questions that invitees must answer when booking.",
-      "acceptanceCriteria": [
-        "Template form has 'Custom Questions' section",
-        "Can add/remove text questions dynamically",
-        "Questions saved to invitee_questions JSON field",
-        "Questions rendered on public booking form",
-        "Answers stored in booking.answers",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 7,
-      "passes": true,
-      "notes": "Implemented custom questions builder with support for text, textarea, and dropdown types. Questions stored in invitee_questions JSON field, rendered on public booking form, answers stored in booking.answers. Fixed bug in CreateBooking using strconv.Itoa for question indices."
-    },
-    {
-      "id": "US-008",
-      "title": "Add template availability rules UI",
-      "description": "As a host, I want to restrict availability per template beyond my working hours.",
-      "acceptanceCriteria": [
-        "Template form has 'Availability' section",
-        "Can select allowed weekdays (checkboxes)",
-        "Can set time ranges per day that differ from global working hours",
-        "Rules saved to availability_rules JSON field",
-        "AvailabilityService applies template rules on top of working hours",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 8,
-      "passes": true,
-      "notes": "Implemented availability rules UI with weekday checkboxes and time ranges. Rules saved to availability_rules JSON field. AvailabilityService parses and applies template rules, overriding working hours when enabled."
-    },
-    {
-      "id": "US-009",
-      "title": "Implement editable email templates",
-      "description": "As a host, I want to customize confirmation and reminder emails per meeting template.",
-      "acceptanceCriteria": [
-        "Template form has 'Email Templates' section",
-        "Can edit confirmation email subject and body",
-        "Can edit reminder email subject and body",
-        "Support placeholders: {{invitee_name}}, {{meeting_time}}, {{location}}, etc.",
-        "EmailService uses custom templates when available",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 9,
-      "passes": true,
-      "notes": "Implemented Email Templates section with subject/body fields for confirmation and reminder emails. Supports placeholders: {{invitee_name}}, {{host_name}}, {{meeting_name}}, {{meeting_time}}, {{duration}}, {{location}}, {{cancel_link}}, {{reschedule_link}}. EmailService parses custom templates from JSON and renders with placeholder substitution."
-    },
-    {
-      "id": "US-010",
-      "title": "Send booking reminder emails",
-      "description": "As an invitee, I want to receive a reminder email before my meeting.",
-      "acceptanceCriteria": [
-        "Add reminder_sent boolean field to bookings table",
-        "Create background job/cron to check upcoming bookings",
-        "Send reminder 24 hours before meeting start",
-        "Use template's reminder_email if customized",
-        "Include meeting details and reschedule/cancel links",
-        "Typecheck passes",
-        "go test ./... passes"
-      ],
-      "priority": 10,
-      "passes": true,
-      "notes": "Implemented ReminderService background job that runs every 15 minutes, checks for confirmed bookings starting in 23-25 hours, sends reminder emails with custom template support, includes ICS attachment with meeting details and reschedule/cancel links."
-    },
-    {
-      "id": "US-011",
-      "title": "Add phone location type to templates",
-      "description": "As a host, I want to specify phone as meeting location with my number.",
-      "acceptanceCriteria": [
-        "Template form shows phone number input when 'Phone' location selected",
-        "Phone number stored in custom_location field",
-        "Public booking page shows 'Call [number]' as location",
-        "Phone number included in confirmation email and calendar invite",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 11,
-      "passes": true,
-      "notes": "Implemented phone-specific label and placeholder in template form, 'Call [number]' display on public booking page, booking status page, confirmation emails, ICS attachments, and calendar events (Google Calendar and CalDAV)"
-    },
-    {
-      "id": "US-012",
-      "title": "Add audit log viewer page",
-      "description": "As a tenant admin, I want to view audit logs for my organization.",
-      "acceptanceCriteria": [
-        "Add /dashboard/audit-log route",
-        "Show paginated list of audit events",
-        "Display: timestamp, action, entity type, user, details",
-        "Filter by action type and date range",
-        "Only visible to users with is_admin=true",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 12,
-      "passes": true,
-      "notes": "Implemented audit log viewer with paginated table, action filter buttons, admin-only access, and sidebar link for admin users"
-    },
-    {
-      "id": "US-013",
-      "title": "Add booking details modal in dashboard",
-      "description": "As a host, I want to view full booking details including answers and guest list.",
-      "acceptanceCriteria": [
-        "Click booking row to open details modal/panel",
-        "Show all invitee info: name, email, phone, timezone",
-        "Show additional guests list",
-        "Show custom question answers",
-        "Show meeting subject/agenda if provided",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 13,
-      "passes": true,
-      "notes": "Implemented booking details modal with clickable table rows, full guest info display, additional guests list, custom answers, agenda, and cancellation details"
-    },
-    {
-      "id": "US-014",
-      "title": "Add host welcome/onboarding flow",
-      "description": "As a new host, I want guidance on setting up my scheduling after registration.",
-      "acceptanceCriteria": [
-        "After registration, redirect to onboarding page",
-        "Step 1: Set working hours",
-        "Step 2: Connect calendar (Google or iCloud)",
-        "Step 3: Create first meeting template",
-        "Show public booking link when complete",
-        "Allow skipping steps",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 14,
-      "passes": true,
-      "notes": "Implemented 3-step onboarding flow: working hours, calendar connection, first template. Skippable steps, Google OAuth callback detects onboarding origin, shows booking link on completion."
-    },
-    {
-      "id": "US-015",
-      "title": "Add copy booking link button",
-      "description": "As a host, I want to easily copy my public booking URLs to share.",
-      "acceptanceCriteria": [
-        "Template list shows 'Copy Link' button for each template",
-        "Dashboard home shows quick-copy link for host's booking page",
-        "Click copies full URL to clipboard",
-        "Show brief 'Copied!' confirmation",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 15,
-      "passes": true,
-      "notes": "Implemented Copy Link button on template list and dashboard home with 'Copied!' confirmation feedback and CSS styling"
-    },
-    {
-      "id": "US-016",
-      "title": "Add template duplication",
-      "description": "As a host, I want to duplicate an existing template to create variations.",
-      "acceptanceCriteria": [
-        "Add 'Duplicate' button on template list and edit page",
-        "Creates copy with '(Copy)' appended to name",
-        "New template has unique slug",
-        "All settings copied except is_active (defaults to false)",
-        "Redirect to edit page for new template",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 16,
-      "passes": true,
-      "notes": "Implemented DuplicateTemplate service method with slug collision handling (-copy, -copy-2, etc.), Duplicate buttons on template list and edit pages, redirects to edit page for new template"
-    },
-    {
-      "id": "US-017",
-      "title": "Show booking count on templates",
-      "description": "As a host, I want to see how many bookings each template has received.",
-      "acceptanceCriteria": [
-        "Template list shows total booking count per template",
-        "Shows pending vs confirmed breakdown",
-        "Count updated when viewing template list",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 17,
-      "passes": true,
-      "notes": "Implemented BookingCount struct in repository, GetBookingCountsByHostID method to fetch counts grouped by template and status, updated Templates handler to pass counts, and dashboard_templates.html displays total/pending/confirmed breakdown"
-    },
-    {
-      "id": "US-018",
-      "title": "Add timezone selector to booking form",
-      "description": "As an invitee, I want to change the detected timezone if it's incorrect.",
-      "acceptanceCriteria": [
-        "Auto-detect timezone via JavaScript Intl API",
-        "Show detected timezone with 'Change' link",
-        "Clicking opens timezone selector dropdown",
-        "Selecting new timezone reloads slots in that timezone",
-        "Selected timezone persisted in form submission",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 18,
-      "passes": true,
-      "notes": "Implemented timezone selector with auto-detection via Intl API, 'Change' link reveals dropdown with 50+ timezones grouped by region, unknown timezones dynamically added with '(Detected)' suffix, shows timezone abbreviation, reloads slots on change, persisted in form submission. Also updated reschedule page for consistency."
-    },
-    {
-      "id": "US-019",
-      "title": "Add calendar sync status indicator",
-      "description": "As a host, I want to know when my calendar was last synced for availability.",
-      "acceptanceCriteria": [
-        "Calendar list shows last sync timestamp",
-        "Show warning icon if sync failed or token expired",
-        "Add 'Refresh' button to manually re-sync",
-        "Display sync errors with guidance to reconnect",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 19,
-      "passes": true,
-      "notes": "Implemented sync status tracking with last_synced_at, sync_status, and sync_error fields. Calendar cards show sync indicator (checkmark/warning), last sync time, error messages for failed syncs, and Refresh button to manually trigger sync. GetBusyTimes now updates sync status automatically."
-    },
-    {
-      "id": "US-020",
-      "title": "Add booking confirmation page improvements",
-      "description": "As an invitee, I want clear confirmation after booking with all meeting details.",
-      "acceptanceCriteria": [
-        "Show clear status: Pending approval vs Confirmed",
-        "Display all meeting details: time, duration, location",
-        "Show 'Add to Calendar' button (downloads ICS)",
-        "Provide cancel and reschedule links prominently",
-        "For pending: explain host needs to approve",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 20,
-      "passes": true,
-      "notes": "Implemented improved booking status page with status badges, detailed meeting info with icons, Add to Calendar button (ICS download), prominent reschedule/cancel actions, and clear pending approval notice"
-    }
-  ]
+    "project": "MeetWhen",
+    "branchName": "ralph/multiple-availability-intervals",
+    "description": "Multiple Time Intervals in Custom Availability - Allow hosts to define up to 2 time intervals per day (e.g., morning 9:00-12:00 and afternoon 14:00-17:00) for accommodating lunch breaks or split schedules",
+    "userStories": [
+        {
+            "id": "US-001",
+            "title": "Update data structure for multiple intervals",
+            "description": "As a developer, I need to extend the availability rules data structure to support multiple intervals per day so that the backend can store and process them.",
+            "acceptanceCriteria": [
+                "DayAvailability struct in availability.go supports a slice of intervals instead of single start/end",
+                "parseAvailabilityRules() handles both old format (single start/end) and new format (intervals array)",
+                "JSON structure supports: { \"days\": { \"1\": { \"enabled\": true, \"intervals\": [{\"start\": \"09:00\", \"end\": \"12:00\"}, {\"start\": \"14:00\", \"end\": \"17:00\"}] } } }",
+                "Existing templates with old format continue to work (backward compatible)",
+                "Typecheck passes"
+            ],
+            "priority": 1,
+            "passes": true,
+            "notes": "Implemented in commit 1942e30. Added TimeInterval struct, modified DayAvailability to use Intervals slice, and updated both parseAvailabilityRules() and getSlotsForDay() to handle multiple intervals per day while maintaining backward compatibility with old format."
+        },
+        {
+            "id": "US-002",
+            "title": "Update slot generation to use multiple intervals",
+            "description": "As a developer, I need to update the availability calculation to generate slots from all intervals so that bookings can be made in any defined time period.",
+            "acceptanceCriteria": [
+                "getSlotsForDay() iterates through all intervals for a day",
+                "Slots are generated within each interval independently",
+                "All slots are combined and returned sorted by start time",
+                "Unit tests cover: single interval, two intervals, empty intervals",
+                "Typecheck passes"
+            ],
+            "priority": 2,
+            "passes": true,
+            "notes": "Implementation was completed as part of US-001. Added comprehensive unit tests covering: single interval, two intervals, empty intervals, day disabled, working hours fallback, template rules disabled, busy time blocking, earliest start constraint, slot overlap detection, and time slot merging."
+        },
+        {
+            "id": "US-003",
+            "title": "Update UI to support multiple intervals per day",
+            "description": "As a host, I want to add a second time interval for each day so that I can block out lunch breaks or other unavailable periods.",
+            "acceptanceCriteria": [
+                "Each enabled day shows its current interval(s)",
+                "Add interval button appears when a day has fewer than 2 intervals",
+                "Remove button appears on each interval (except the first one when only one exists)",
+                "Time inputs for start/end on each interval",
+                "Maximum of 2 intervals per day enforced",
+                "Typecheck passes",
+                "Verify in browser using dev-browser skill"
+            ],
+            "priority": 3,
+            "passes": false,
+            "notes": ""
+        },
+        {
+            "id": "US-004",
+            "title": "Implement smart defaults for second interval",
+            "description": "As a host, when I add a second interval, I want sensible default times so I don't have to manually set everything from scratch.",
+            "acceptanceCriteria": [
+                "When first interval ends at or before 12:00, second interval defaults to 13:00-17:00",
+                "When first interval ends after 12:00, second interval defaults to first interval end time + 1 hour, for 3 hours duration",
+                "Default times are editable immediately after adding",
+                "Typecheck passes",
+                "Verify in browser using dev-browser skill"
+            ],
+            "priority": 4,
+            "passes": false,
+            "notes": ""
+        },
+        {
+            "id": "US-005",
+            "title": "Implement interval overlap validation",
+            "description": "As a host, I want to be prevented from saving overlapping intervals so that my availability is always valid.",
+            "acceptanceCriteria": [
+                "Frontend validates intervals don't overlap before form submission",
+                "If intervals overlap, show inline error message below the day's intervals",
+                "Overlap check: interval A overlaps B if A.start < B.end AND A.end > B.start",
+                "Form submission is blocked if any day has overlapping intervals",
+                "Typecheck passes",
+                "Verify in browser using dev-browser skill"
+            ],
+            "priority": 5,
+            "passes": false,
+            "notes": ""
+        }
+    ]
 }

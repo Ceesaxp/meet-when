@@ -600,3 +600,47 @@ The following features from the requirements document are already fully implemen
   - Different location types (phone, google_meet, zoom, custom) need different display logic in templates
 
 ---
+
+## 2026-01-26 - US-002 - Update slot generation to use multiple intervals
+- What was implemented:
+  - The slot generation logic was already implemented as part of US-001 (getSlotsForDay iterates through all intervals)
+  - Added comprehensive unit test file `availability_test.go` covering all acceptance criteria:
+    - `TestParseAvailabilityRules_SingleInterval` - old format backward compatibility
+    - `TestParseAvailabilityRules_MultipleIntervals` - new format with 2 intervals
+    - `TestParseAvailabilityRules_EmptyIntervals` - empty intervals array
+    - `TestGetSlotsForDay_MultipleIntervals` - slots generated from both intervals and sorted
+    - `TestGetSlotsForDay_EmptyIntervals` - returns no slots when intervals empty
+    - `TestGetSlotsForDay_DayDisabled` - respects day disabled flag
+    - `TestGetSlotsForDay_FallsBackToWorkingHours` - uses working hours when no template rules
+    - `TestGenerateSlotsInRange_SingleInterval` - basic slot generation
+    - `TestGenerateSlotsInRange_WithBusyTimes` - respects busy slots
+    - `TestSlotOverlapsBusy` - overlap detection edge cases
+    - `TestMergeTimeSlots` - slot merging logic
+- Files changed:
+  - `internal/services/availability_test.go` - New file with 16 test cases (~400 lines)
+- **Learnings for future iterations:**
+  - This codebase had no test files prior to this change - all `go test ./...` passed trivially
+  - The slot generation with multiple intervals was already implemented in US-001 commit (1942e30)
+  - When testing time-based logic, use a fixed date (e.g., 2024-01-15) in UTC to avoid timezone issues
+  - The getSlotsForDay function requires both working hours and template rules - it falls back to working hours when template rules are nil or disabled
+  - Test coverage should include: single interval, two intervals, empty intervals as per acceptance criteria
+
+---
+
+## 2026-01-26 - US-001 - Update data structure for multiple intervals
+- What was implemented:
+  - Added `TimeInterval` struct to represent a single time interval with start and end times (HH:MM format)
+  - Modified `DayAvailability` struct to use `Intervals []TimeInterval` instead of single `Start`/`End` fields
+  - Updated `parseAvailabilityRules()` to handle both old format (single start/end) and new format (intervals array) for backward compatibility
+  - Updated `getSlotsForDay()` to iterate through all intervals for a day and combine slots, sorting by start time
+  - New JSON structure supported: `{ "days": { "1": { "enabled": true, "intervals": [{"start": "09:00", "end": "12:00"}, {"start": "14:00", "end": "17:00"}] } } }`
+- Files changed:
+  - `internal/services/availability.go` - Added TimeInterval struct, modified DayAvailability, updated parseAvailabilityRules() and getSlotsForDay()
+- **Learnings for future iterations:**
+  - The parseAvailabilityRules() function receives JSON from the database as `models.JSONMap` (map[string]interface{}) - type assertions required for nested data
+  - For backward compatibility when changing data structures, check for new format first, then fall back to old format
+  - Intervals can be parsed from JSON as `[]interface{}` which requires type assertion for each element
+  - The existing template's availability rules with old format (single start/end per day) will continue to work without modification
+  - Slots from multiple intervals need to be sorted after generation since intervals may not be in order
+
+---
