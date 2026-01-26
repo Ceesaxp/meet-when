@@ -97,3 +97,43 @@ The following features from the requirements document are already fully implemen
   - Keeping the same `/dashboard/calendars/connect/caldav` endpoint with hidden provider field avoids route proliferation
 
 ---
+
+## 2026-01-26 - US-003 - Implement Zoom meeting creation API
+- What was implemented:
+  - Fixed bug in `refreshZoomToken` where nil `TokenExpiry` would incorrectly skip token refresh
+  - The Zoom meeting creation (`createZoomMeeting`) was already fully implemented with:
+    - Call to Zoom API `POST /users/me/meetings` with booking details
+    - Storage of `join_url` in `booking.ConferenceLink`
+    - Token refresh before API call
+  - The bug fix ensures tokens are refreshed when expiry is unknown (nil)
+- Files changed:
+  - `internal/services/conferencing.go` - Fixed token refresh condition (line 156)
+- **Learnings for future iterations:**
+  - The Zoom integration was already complete - OAuth flow, token storage, meeting creation, and booking integration
+  - Token refresh logic: condition was `TokenExpiry == nil || time.Now().Before(...)` which skipped refresh when expiry was nil
+  - Fixed to `TokenExpiry != nil && time.Now().Before(...)` so unknown expiry triggers refresh
+  - Meeting creation is called from `processConfirmedBooking` in booking.go when template location type is Zoom
+  - The `ConferenceLink` is persisted to the database via `repos.Booking.Update` after meeting creation
+
+---
+
+## 2026-01-26 - US-004 - Add duration selector to public booking form
+- What was implemented:
+  - Added duration dropdown selector in booking sidebar (only shown when template has multiple durations)
+  - Fixed critical bug in GetSlots duration parsing: `string(rune(d))` doesn't work for integers > 9
+  - Added hidden `duration` field to booking form to pass selected duration
+  - Updated CreateBooking handler to accept and validate duration from form input
+  - Updated slots_partial.html navigation to use `getSelectedDuration()` function
+  - Duration is validated against allowed template durations in both GetSlots and CreateBooking
+- Files changed:
+  - `internal/handlers/public.go` - Fixed duration parsing in GetSlots, added duration handling in CreateBooking
+  - `templates/pages/public_template.html` - Added duration dropdown, hidden form field, and `getSelectedDuration()` JS function
+  - `templates/partials/slots_partial.html` - Updated week navigation to use dynamic duration
+- **Learnings for future iterations:**
+  - The original duration parsing used `string(rune(d))` which only works for single-digit numbers (0-9)
+  - Use `strconv.Atoi()` to properly parse integer query parameters
+  - The HTMX `hx-vals` approach was replaced with explicit JavaScript `loadSlots()` call for more control
+  - The `getSelectedDuration()` function provides a single source of truth for duration across all JS
+  - Single-duration templates skip the selector entirely (cleaner UX)
+
+---

@@ -48,8 +48,8 @@
         "go test ./... passes"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "Zoom OAuth callback exists but meeting creation needs implementation"
+      "passes": true,
+      "notes": "Zoom meeting creation fully implemented - fixed token refresh bug where nil TokenExpiry would skip refresh"
     },
     {
       "id": "US-004",
@@ -64,8 +64,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": "Duration field exists in form but UI for selection is missing"
+      "passes": true,
+      "notes": "Implemented duration dropdown selector in sidebar (shown only for multi-duration templates), slots reload on duration change, duration passed to CreateBooking"
     },
     {
       "id": "US-005",
