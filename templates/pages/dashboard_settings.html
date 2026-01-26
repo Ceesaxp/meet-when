@@ -24,20 +24,13 @@
         </div>
 
         <div class="form-group">
-            <label for="timezone">Timezone</label>
-            <select id="timezone" name="timezone">
-                <option value="UTC" {{if eq .Host.Timezone "UTC"}}selected{{end}}>UTC</option>
-                <option value="America/New_York" {{if eq .Host.Timezone "America/New_York"}}selected{{end}}>Eastern Time</option>
-                <option value="America/Chicago" {{if eq .Host.Timezone "America/Chicago"}}selected{{end}}>Central Time</option>
-                <option value="America/Denver" {{if eq .Host.Timezone "America/Denver"}}selected{{end}}>Mountain Time</option>
-                <option value="America/Los_Angeles" {{if eq .Host.Timezone "America/Los_Angeles"}}selected{{end}}>Pacific Time</option>
-                <option value="Europe/London" {{if eq .Host.Timezone "Europe/London"}}selected{{end}}>London</option>
-                <option value="Europe/Paris" {{if eq .Host.Timezone "Europe/Paris"}}selected{{end}}>Paris</option>
-                <option value="Europe/Berlin" {{if eq .Host.Timezone "Europe/Berlin"}}selected{{end}}>Berlin</option>
-                <option value="Asia/Tokyo" {{if eq .Host.Timezone "Asia/Tokyo"}}selected{{end}}>Tokyo</option>
-                <option value="Asia/Shanghai" {{if eq .Host.Timezone "Asia/Shanghai"}}selected{{end}}>Shanghai</option>
-                <option value="Australia/Sydney" {{if eq .Host.Timezone "Australia/Sydney"}}selected{{end}}>Sydney</option>
-            </select>
+            <label for="timezone-search">Timezone</label>
+            <div class="tz-picker-container">
+                <input type="text" id="timezone-search" class="tz-picker-input"
+                       placeholder="Search for a timezone..." autocomplete="off">
+                <input type="hidden" id="timezone" name="timezone" value="{{.Host.Timezone}}">
+                <div id="timezone-results" class="tz-picker-dropdown" style="display: none;"></div>
+            </div>
         </div>
 
         <button type="submit" class="btn btn-primary">Save Profile</button>
@@ -85,4 +78,20 @@
         <button type="submit" class="btn btn-primary">Save Working Hours</button>
     </form>
 </div>
+
+<script src="/static/js/timezone-picker.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var picker = new TimezonePicker({
+        inputId: 'timezone-search',
+        hiddenInputId: 'timezone',
+        dropdownId: 'timezone-results',
+        initialValue: '{{.Host.Timezone}}',
+        onSelect: function(tz) {
+            console.log('Selected timezone:', tz.id);
+        }
+    });
+    picker.init();
+});
+</script>
 {{end}}

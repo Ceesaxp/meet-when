@@ -1760,3 +1760,120 @@ body.modal-open {
 .bookings-table .actions-cell {
     cursor: default;
 }
+
+/* Searchable Timezone Picker Component */
+.tz-picker-container {
+    position: relative;
+}
+
+.tz-picker-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    background-color: var(--card-bg);
+    color: var(--text-color);
+}
+
+.tz-picker-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.tz-picker-input::placeholder {
+    color: var(--text-light);
+}
+
+.tz-picker-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    margin-top: 0.25rem;
+    max-height: 300px;
+    overflow-y: auto;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.tz-region-header {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-light);
+    background-color: var(--bg-color);
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+}
+
+.tz-option {
+    padding: 0.625rem 0.75rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.1s ease;
+}
+
+.tz-option:last-child {
+    border-bottom: none;
+}
+
+.tz-option:hover,
+.tz-option.selected {
+    background-color: rgba(79, 70, 229, 0.08);
+}
+
+.tz-option.selected {
+    background-color: rgba(79, 70, 229, 0.12);
+}
+
+.tz-option-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.125rem;
+}
+
+.tz-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.tz-time {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+}
+
+.tz-option-sub {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tz-id {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.tz-offset {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    font-weight: 500;
+}
+
+.tz-no-results {
+    padding: 1rem;
+    text-align: center;
+    color: var(--text-light);
+    font-size: 0.875rem;
+}

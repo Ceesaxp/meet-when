@@ -750,3 +750,54 @@ The following features from the requirements document are already fully implemen
   - Pattern: handlers that redirect with ?success/error should have corresponding display logic in the GET handler
 
 ---
+
+## 2026-01-26 - US-003 - Create timezone data endpoint
+- What was implemented:
+  - Created `TimezoneService` in `internal/services/timezone.go` with static IANA timezone data
+  - Defined `TimezoneInfo` struct with: id (IANA ID), display_name (human readable), offset (e.g., "UTC+5"), offset_mins (numeric offset)
+  - Defined `TimezoneGroup` struct to group timezones by region
+  - Implemented 70+ timezones across 7 regions: Americas, Europe, Asia, Pacific, Africa, Atlantic, Other
+  - Created `APIHandler` in `internal/handlers/api.go` for API endpoints
+  - Registered `GET /api/timezones` public route in main.go
+  - Response includes Cache-Control header for 24-hour caching
+  - Offsets are computed dynamically at service initialization using Go's time.LoadLocation
+- Files changed:
+  - `internal/services/timezone.go` - New file with TimezoneService (~380 lines)
+  - `internal/services/services.go` - Added Timezone field to Services struct
+  - `internal/handlers/api.go` - New file with APIHandler for JSON endpoints
+  - `internal/handlers/handlers.go` - Added API field to Handlers struct
+  - `cmd/server/main.go` - Registered GET /api/timezones route
+- **Learnings for future iterations:**
+  - The codebase already imports `_ "time/tzdata"` to embed timezone database, so `time.LoadLocation()` always works
+  - JSON API responses should set `Content-Type: application/json` header
+  - Static data services can precompute at startup for better performance
+  - This endpoint is public (no auth required) since timezone data is not sensitive
+  - The APIHandler pattern separates JSON API endpoints from the HTMX-based dashboard handlers
+
+---
+
+## 2026-01-26 - US-004 - Create searchable timezone dropdown component
+- What was implemented:
+  - Created reusable `TimezonePicker` JavaScript component at `static/js/timezone-picker.js`
+  - Text input field that filters timezone list as user types
+  - Search matches: timezone ID (America/New_York), display name (Eastern Time), city names, and 40+ common abbreviations (PST, EST, CST, MST, JST, etc.)
+  - Dropdown displays: timezone name, current time (live calculated), UTC offset, timezone ID, grouped by region
+  - Keyboard navigation: Arrow Up/Down to move selection (with wrap-around), Enter to select, Escape to close, Tab to close and continue
+  - Click to select and close dropdown
+  - Fetches timezone data from `/api/timezones` endpoint created in US-003
+  - Added CSS styles for `.tz-picker-container`, `.tz-picker-input`, `.tz-picker-dropdown`, `.tz-option`, `.tz-region-header`
+  - Integrated component into dashboard settings page, replacing the simple select dropdown
+  - Hidden input stores IANA timezone ID for form submission; visible input shows formatted display
+- Files changed:
+  - `static/js/timezone-picker.js` - New file with TimezonePicker component (~380 lines)
+  - `static/css/style.css` - Added ~110 lines of timezone picker styles
+  - `templates/pages/dashboard_settings.html` - Replaced select with searchable picker, added script initialization
+- **Learnings for future iterations:**
+  - Use a hidden input to store the actual value (IANA ID) while the visible input shows a formatted display name
+  - Common timezone abbreviations are ambiguous (e.g., CST = Central Standard Time US or China Standard Time) - map to array of matches
+  - `Intl.DateTimeFormat` with `timeZone` option can display current time in any IANA timezone
+  - Sticky region headers (`position: sticky`) improve usability in long dropdown lists
+  - `scrollIntoView({ block: 'nearest' })` ensures keyboard-selected items are visible without jarring scroll jumps
+  - HTML escaping is critical when rendering user-filtered results to prevent XSS
+
+---
