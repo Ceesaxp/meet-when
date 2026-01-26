@@ -1,0 +1,55 @@
+{{define "calendar_card_partial.html"}}
+<div class="calendar-card {{if eq (printf "%s" .SyncStatus) "failed"}}calendar-card-error{{end}}" id="calendar-card-{{.ID}}">
+    <div class="calendar-info">
+        <div class="calendar-header">
+            <strong>{{.Name}}</strong>
+            {{if eq (printf "%s" .Provider) "google"}}<span class="badge badge-google">Google Calendar</span>
+            {{else if eq (printf "%s" .Provider) "icloud"}}<span class="badge badge-icloud">iCloud</span>
+            {{else}}<span class="badge">CalDAV</span>{{end}}
+            {{if .IsDefault}}<span class="badge badge-primary">Default</span>{{end}}
+        </div>
+        <div class="calendar-sync-status">
+            {{if eq (printf "%s" .SyncStatus) "synced"}}
+                <span class="sync-indicator sync-ok" title="Sync successful">&#10003;</span>
+                {{if .LastSyncedAt}}
+                <span class="sync-time">Synced {{timeAgo .LastSyncedAt}}</span>
+                {{else}}
+                <span class="sync-time">Synced</span>
+                {{end}}
+            {{else if eq (printf "%s" .SyncStatus) "failed"}}
+                <span class="sync-indicator sync-error" title="Sync failed - click for details" onclick="toggleCalendarError(this)">&#9888;</span>
+                <span class="sync-time sync-error-text sync-error-clickable" onclick="toggleCalendarError(this)">Sync failed - click for details</span>
+            {{else}}
+                <span class="sync-indicator sync-unknown" title="Not synced yet">&#8635;</span>
+                <span class="sync-time">Never synced</span>
+            {{end}}
+        </div>
+        {{if and (eq (printf "%s" .SyncStatus) "failed") .SyncError}}
+        <div class="calendar-error-message" style="display: none;">
+            <span class="error-icon">&#9888;</span>
+            <span class="error-text">{{.SyncError}}</span>
+        </div>
+        {{end}}
+    </div>
+    <div class="calendar-actions">
+        <button type="button" class="btn btn-sm btn-refresh"
+                hx-post="/dashboard/calendars/{{.ID}}/refresh"
+                hx-target="#calendar-card-{{.ID}}"
+                hx-swap="outerHTML"
+                hx-indicator="#refresh-spinner-{{.ID}}"
+                title="Refresh sync status">
+            <span class="refresh-icon">&#8635;</span>
+            <span class="refresh-text">Refresh</span>
+            <span id="refresh-spinner-{{.ID}}" class="htmx-indicator refresh-spinner"></span>
+        </button>
+        {{if not .IsDefault}}
+        <form action="/dashboard/calendars/{{.ID}}/default" method="POST" style="display:inline">
+            <button type="submit" class="btn btn-sm">Set Default</button>
+        </form>
+        {{end}}
+        <form action="/dashboard/calendars/{{.ID}}/disconnect" method="POST" style="display:inline">
+            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Disconnect this calendar?')">Disconnect</button>
+        </form>
+    </div>
+</div>
+{{end}}

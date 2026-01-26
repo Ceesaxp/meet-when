@@ -14,7 +14,7 @@
     {{if .Data.Calendars}}
     <div class="calendar-list">
         {{range .Data.Calendars}}
-        <div class="calendar-card {{if eq (printf "%s" .SyncStatus) "failed"}}calendar-card-error{{end}}">
+        <div class="calendar-card {{if eq (printf "%s" .SyncStatus) "failed"}}calendar-card-error{{end}}" id="calendar-card-{{.ID}}">
             <div class="calendar-info">
                 <div class="calendar-header">
                     <strong>{{.Name}}</strong>
@@ -47,9 +47,16 @@
                 {{end}}
             </div>
             <div class="calendar-actions">
-                <form action="/dashboard/calendars/{{.ID}}/refresh" method="POST" style="display:inline">
-                    <button type="submit" class="btn btn-sm" title="Refresh sync status">&#8635; Refresh</button>
-                </form>
+                <button type="button" class="btn btn-sm btn-refresh"
+                        hx-post="/dashboard/calendars/{{.ID}}/refresh"
+                        hx-target="#calendar-card-{{.ID}}"
+                        hx-swap="outerHTML"
+                        hx-indicator="#refresh-spinner-{{.ID}}"
+                        title="Refresh sync status">
+                    <span class="refresh-icon">&#8635;</span>
+                    <span class="refresh-text">Refresh</span>
+                    <span id="refresh-spinner-{{.ID}}" class="htmx-indicator refresh-spinner"></span>
+                </button>
                 {{if not .IsDefault}}
                 <form action="/dashboard/calendars/{{.ID}}/default" method="POST" style="display:inline">
                     <button type="submit" class="btn btn-sm">Set Default</button>

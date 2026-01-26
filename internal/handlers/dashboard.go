@@ -154,6 +154,22 @@ func (h *DashboardHandler) RefreshCalendarSync(w http.ResponseWriter, r *http.Re
 
 	calendarID := r.PathValue("id")
 	err := h.handlers.services.Calendar.RefreshCalendarSync(r.Context(), host.Host.ID, calendarID)
+
+	// For HTMX requests, return the updated calendar card partial
+	if r.Header.Get("HX-Request") == "true" {
+		// Get the updated calendar data
+		cal, calErr := h.handlers.services.Calendar.GetCalendar(r.Context(), calendarID)
+		if calErr != nil || cal == nil {
+			http.Error(w, "Calendar not found", http.StatusNotFound)
+			return
+		}
+
+		// If sync failed, the calendar will have the error in SyncError field
+		h.handlers.renderPartial(w, "calendar_card_partial.html", cal)
+		return
+	}
+
+	// For regular requests, redirect as before
 	if err != nil {
 		log.Printf("Calendar sync refresh failed for %s: %v", calendarID, err)
 		h.handlers.redirect(w, r, "/dashboard/calendars?error=sync_failed")
