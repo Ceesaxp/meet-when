@@ -107,7 +107,7 @@ func (r *HostRepository) GetByID(ctx context.Context, id string) (*models.Host, 
 	host := &models.Host{}
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
-		       default_calendar_id, is_admin, COALESCE(onboarding_completed, 0), created_at, updated_at
+		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false), created_at, updated_at
 		FROM hosts WHERE id = $1
 	`)
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
@@ -124,7 +124,7 @@ func (r *HostRepository) GetByEmail(ctx context.Context, tenantID, email string)
 	host := &models.Host{}
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
-		       default_calendar_id, is_admin, COALESCE(onboarding_completed, 0), created_at, updated_at
+		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false), created_at, updated_at
 		FROM hosts WHERE tenant_id = $1 AND email = $2
 	`)
 	err := r.db.QueryRowContext(ctx, query, tenantID, email).Scan(
@@ -141,7 +141,7 @@ func (r *HostRepository) GetBySlug(ctx context.Context, tenantID, slug string) (
 	host := &models.Host{}
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
-		       default_calendar_id, is_admin, COALESCE(onboarding_completed, 0), created_at, updated_at
+		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false), created_at, updated_at
 		FROM hosts WHERE tenant_id = $1 AND slug = $2
 	`)
 	err := r.db.QueryRowContext(ctx, query, tenantID, slug).Scan(
@@ -558,7 +558,7 @@ func (r *BookingRepository) GetByID(ctx context.Context, id string) (*models.Boo
 		SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
 		       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
 		       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
-		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, 0),
+		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, false),
 		       created_at, updated_at
 		FROM bookings WHERE id = $1
 	`)
@@ -582,7 +582,7 @@ func (r *BookingRepository) GetByToken(ctx context.Context, token string) (*mode
 		SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
 		       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
 		       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
-		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, 0),
+		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, false),
 		       created_at, updated_at
 		FROM bookings WHERE token = $1
 	`)
@@ -609,7 +609,7 @@ func (r *BookingRepository) GetByHostID(ctx context.Context, hostID string, stat
 			SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
 			       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
 			       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
-			       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, 0),
+			       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, false),
 			       created_at, updated_at
 			FROM bookings WHERE host_id = $1 AND status = $2
 			ORDER BY start_time ASC
@@ -620,7 +620,7 @@ func (r *BookingRepository) GetByHostID(ctx context.Context, hostID string, stat
 			SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
 			       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
 			       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
-			       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, 0),
+			       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, false),
 			       created_at, updated_at
 			FROM bookings WHERE host_id = $1
 			ORDER BY start_time ASC
@@ -662,7 +662,7 @@ func (r *BookingRepository) GetByHostIDAndTimeRange(ctx context.Context, hostID 
 		SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
 		       invitee_name, invitee_email, invitee_timezone, invitee_phone,
 		       additional_guests, answers, conference_link, calendar_event_id,
-		       cancelled_by, cancel_reason, COALESCE(reminder_sent, 0), created_at, updated_at
+		       cancelled_by, cancel_reason, COALESCE(reminder_sent, false), created_at, updated_at
 		FROM bookings
 		WHERE host_id = $1
 		  AND status IN ('pending', 'confirmed')
@@ -718,7 +718,7 @@ func (r *BookingRepository) GetBookingsNeedingReminder(ctx context.Context, star
 		SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
 		       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
 		       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
-		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, 0),
+		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, false),
 		       created_at, updated_at
 		FROM bookings
 		WHERE status = 'confirmed'
