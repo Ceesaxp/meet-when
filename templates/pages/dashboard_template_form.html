@@ -275,6 +275,71 @@
         <input type="hidden" name="invitee_questions" id="invitee_questions_json">
     </div>
 
+    <div class="form-section">
+        <h3>Email Templates</h3>
+        <p class="form-section-description">Customize the emails sent to invitees. Leave blank to use default templates.</p>
+
+        <div class="form-group">
+            <label for="confirmation_email_subject">Confirmation Email Subject</label>
+            <input type="text" id="confirmation_email_subject" name="confirmation_email_subject"
+                   value=""
+                   placeholder="e.g., Confirmed: {{meeting_name}} with {{host_name}}">
+            <small>Available placeholders: <code>{{invitee_name}}</code>, <code>{{host_name}}</code>, <code>{{meeting_name}}</code>, <code>{{meeting_time}}</code>, <code>{{duration}}</code>, <code>{{location}}</code></small>
+        </div>
+
+        <div class="form-group">
+            <label for="confirmation_email_body">Confirmation Email Body</label>
+            <textarea id="confirmation_email_body" name="confirmation_email_body" rows="8"
+                      placeholder="Hello {{invitee_name}},
+
+Your meeting has been confirmed!
+
+Meeting: {{meeting_name}}
+With: {{host_name}}
+When: {{meeting_time}}
+Duration: {{duration}} minutes
+Location: {{location}}
+
+Need to make changes?
+Cancel: {{cancel_link}}
+Reschedule: {{reschedule_link}}
+
+Best regards"></textarea>
+            <small>Available placeholders: <code>{{invitee_name}}</code>, <code>{{host_name}}</code>, <code>{{meeting_name}}</code>, <code>{{meeting_time}}</code>, <code>{{duration}}</code>, <code>{{location}}</code>, <code>{{cancel_link}}</code>, <code>{{reschedule_link}}</code></small>
+        </div>
+
+        <hr style="margin: 1.5rem 0;">
+
+        <div class="form-group">
+            <label for="reminder_email_subject">Reminder Email Subject</label>
+            <input type="text" id="reminder_email_subject" name="reminder_email_subject"
+                   value=""
+                   placeholder="e.g., Reminder: {{meeting_name}} tomorrow with {{host_name}}">
+        </div>
+
+        <div class="form-group">
+            <label for="reminder_email_body">Reminder Email Body</label>
+            <textarea id="reminder_email_body" name="reminder_email_body" rows="8"
+                      placeholder="Hello {{invitee_name}},
+
+This is a reminder about your upcoming meeting:
+
+Meeting: {{meeting_name}}
+With: {{host_name}}
+When: {{meeting_time}}
+Duration: {{duration}} minutes
+Location: {{location}}
+
+Need to make changes?
+Cancel: {{cancel_link}}
+Reschedule: {{reschedule_link}}
+
+Best regards"></textarea>
+        </div>
+        <input type="hidden" name="confirmation_email" id="confirmation_email_json">
+        <input type="hidden" name="reminder_email" id="reminder_email_json">
+    </div>
+
     <div class="form-actions">
         <a href="/dashboard/templates" class="btn">Cancel</a>
         <button type="submit" class="btn btn-primary">{{if .Data.IsNew}}Create Meeting Type{{else}}Save Changes{{end}}</button>
@@ -396,6 +461,7 @@ function escapeHtml(text) {
 document.querySelector('form').addEventListener('submit', function() {
     updateHiddenInput();
     updateAvailabilityHiddenInput();
+    updateEmailTemplateHiddenInputs();
 });
 
 // Availability Rules Builder
@@ -494,10 +560,69 @@ function initializeAvailabilityRules() {
     updateAvailabilityHiddenInput();
 }
 
+// Email Templates Handler
+var confirmationEmail = null;
+var reminderEmail = null;
+
+// Initialize email templates from template data
+{{if .Data.Template}}{{if .Data.Template.ConfirmationEmail}}
+try {
+    confirmationEmail = JSON.parse({{.Data.Template.ConfirmationEmail}});
+} catch (e) {
+    confirmationEmail = null;
+}
+{{end}}{{end}}
+
+{{if .Data.Template}}{{if .Data.Template.ReminderEmail}}
+try {
+    reminderEmail = JSON.parse({{.Data.Template.ReminderEmail}});
+} catch (e) {
+    reminderEmail = null;
+}
+{{end}}{{end}}
+
+function initializeEmailTemplates() {
+    if (confirmationEmail) {
+        document.getElementById('confirmation_email_subject').value = confirmationEmail.subject || '';
+        document.getElementById('confirmation_email_body').value = confirmationEmail.body || '';
+    }
+    if (reminderEmail) {
+        document.getElementById('reminder_email_subject').value = reminderEmail.subject || '';
+        document.getElementById('reminder_email_body').value = reminderEmail.body || '';
+    }
+}
+
+function updateEmailTemplateHiddenInputs() {
+    var confirmSubject = document.getElementById('confirmation_email_subject').value.trim();
+    var confirmBody = document.getElementById('confirmation_email_body').value.trim();
+    var reminderSubject = document.getElementById('reminder_email_subject').value.trim();
+    var reminderBody = document.getElementById('reminder_email_body').value.trim();
+
+    // Only set JSON if at least one field has content
+    if (confirmSubject || confirmBody) {
+        document.getElementById('confirmation_email_json').value = JSON.stringify({
+            subject: confirmSubject,
+            body: confirmBody
+        });
+    } else {
+        document.getElementById('confirmation_email_json').value = '';
+    }
+
+    if (reminderSubject || reminderBody) {
+        document.getElementById('reminder_email_json').value = JSON.stringify({
+            subject: reminderSubject,
+            body: reminderBody
+        });
+    } else {
+        document.getElementById('reminder_email_json').value = '';
+    }
+}
+
 // Initialize availability on page load (after renderQuestions)
 document.addEventListener('DOMContentLoaded', function() {
     renderQuestions();
     initializeAvailabilityRules();
+    initializeEmailTemplates();
 });
 </script>
 {{end}}

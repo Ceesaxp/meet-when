@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
@@ -13,6 +14,24 @@ import (
 	"github.com/meet-when/meet-when/internal/config"
 )
 
+// EmailTemplate represents a custom email template with subject and body
+type EmailTemplate struct {
+	Subject string `json:"subject"`
+	Body    string `json:"body"`
+}
+
+// EmailTemplateData contains the data available for email template placeholders
+type EmailTemplateData struct {
+	InviteeName    string
+	HostName       string
+	MeetingName    string
+	MeetingTime    string
+	Duration       int
+	Location       string
+	CancelLink     string
+	RescheduleLink string
+}
+
 // EmailService handles email sending
 type EmailService struct {
 	cfg *config.Config
@@ -21,6 +40,89 @@ type EmailService struct {
 // NewEmailService creates a new email service
 func NewEmailService(cfg *config.Config) *EmailService {
 	return &EmailService{cfg: cfg}
+}
+
+// parseEmailTemplate parses a JSON email template string
+func parseEmailTemplate(templateJSON string) *EmailTemplate {
+	if templateJSON == "" {
+		return nil
+	}
+	var tmpl EmailTemplate
+	if err := json.Unmarshal([]byte(templateJSON), &tmpl); err != nil {
+		log.Printf("Failed to parse email template: %v", err)
+		return nil
+	}
+	// Only return if at least subject or body is set
+	if tmpl.Subject == "" && tmpl.Body == "" {
+		return nil
+	}
+	return &tmpl
+}
+
+// renderEmailTemplate replaces placeholders in the template with actual values
+func renderEmailTemplate(templateStr string, data *EmailTemplateData) string {
+	result := templateStr
+	result = strings.ReplaceAll(result, "{{invitee_name}}", data.InviteeName)
+	result = strings.ReplaceAll(result, "{{host_name}}", data.HostName)
+	result = strings.ReplaceAll(result, "{{meeting_name}}", data.MeetingName)
+	result = strings.ReplaceAll(result, "{{meeting_time}}", data.MeetingTime)
+	result = strings.ReplaceAll(result, "{{duration}}", fmt.Sprintf("%d", data.Duration))
+	result = strings.ReplaceAll(result, "{{location}}", data.Location)
+	result = strings.ReplaceAll(result, "{{cancel_link}}", data.CancelLink)
+	result = strings.ReplaceAll(result, "{{reschedule_link}}", data.RescheduleLink)
+	return result
+}
+
+// buildEmailTemplateData creates template data from booking details for invitee emails
+func (s *EmailService) buildEmailTemplateData(details *BookingWithDetails, timezone *time.Location) *EmailTemplateData {
+	startTime := details.Booking.StartTime.In(timezone)
+
+	location := "To be determined"
+	if details.Booking.ConferenceLink != "" {
+		location = details.Booking.ConferenceLink
+	} else if details.Template.CustomLocation != "" {
+		location = details.Template.CustomLocation
+	}
+
+	return &EmailTemplateData{
+		InviteeName:    details.Booking.InviteeName,
+		HostName:       details.Host.Name,
+		MeetingName:    details.Template.Name,
+		MeetingTime:    startTime.Format("Monday, January 2, 2006 at 3:04 PM MST"),
+		Duration:       details.Booking.Duration,
+		Location:       location,
+		CancelLink:     fmt.Sprintf("%s/booking/%s", s.cfg.Server.BaseURL, details.Booking.Token),
+		RescheduleLink: fmt.Sprintf("%s/booking/%s/reschedule", s.cfg.Server.BaseURL, details.Booking.Token),
+	}
+}
+
+// defaultInviteeConfirmationBody returns the default confirmation email body
+func (s *EmailService) defaultInviteeConfirmationBody(data *EmailTemplateData) string {
+	return fmt.Sprintf(`Hello %s,
+
+Your meeting has been confirmed!
+
+Meeting: %s
+With: %s
+When: %s
+Duration: %d minutes
+Location: %s
+
+Need to make changes?
+Cancel: %s
+Reschedule: %s
+
+Best regards,
+Meet When`,
+		data.InviteeName,
+		data.MeetingName,
+		data.HostName,
+		data.MeetingTime,
+		data.Duration,
+		data.Location,
+		data.CancelLink,
+		data.RescheduleLink,
+	)
 }
 
 // SendBookingRequested sends notification to host about new booking request
@@ -80,49 +182,36 @@ func (s *EmailService) SendBookingConfirmed(ctx context.Context, details *Bookin
 }
 
 func (s *EmailService) sendInviteeConfirmation(ctx context.Context, details *BookingWithDetails) {
-	subject := fmt.Sprintf("Confirmed: %s with %s", details.Template.Name, details.Host.Name)
-
 	// Format time in invitee's timezone
 	inviteeLoc, _ := time.LoadLocation(details.Booking.InviteeTimezone)
 	if inviteeLoc == nil {
 		inviteeLoc = time.UTC
 	}
-	startTime := details.Booking.StartTime.In(inviteeLoc)
 
-	location := "To be determined"
-	if details.Booking.ConferenceLink != "" {
-		location = details.Booking.ConferenceLink
-	} else if details.Template.CustomLocation != "" {
-		location = details.Template.CustomLocation
+	// Build template data for custom templates
+	templateData := s.buildEmailTemplateData(details, inviteeLoc)
+
+	var subject, body string
+
+	// Check for custom confirmation email template
+	customTemplate := parseEmailTemplate(details.Template.ConfirmationEmail)
+	if customTemplate != nil {
+		// Use custom template
+		if customTemplate.Subject != "" {
+			subject = renderEmailTemplate(customTemplate.Subject, templateData)
+		} else {
+			subject = fmt.Sprintf("Confirmed: %s with %s", details.Template.Name, details.Host.Name)
+		}
+		if customTemplate.Body != "" {
+			body = renderEmailTemplate(customTemplate.Body, templateData)
+		} else {
+			body = s.defaultInviteeConfirmationBody(templateData)
+		}
+	} else {
+		// Use default template
+		subject = fmt.Sprintf("Confirmed: %s with %s", details.Template.Name, details.Host.Name)
+		body = s.defaultInviteeConfirmationBody(templateData)
 	}
-
-	body := fmt.Sprintf(`Hello %s,
-
-Your meeting has been confirmed!
-
-Meeting: %s
-With: %s
-When: %s
-Duration: %d minutes
-Location: %s
-
-Need to make changes?
-Cancel: %s/booking/%s
-Reschedule: %s/booking/%s/reschedule
-
-Best regards,
-Meet When`,
-		details.Booking.InviteeName,
-		details.Template.Name,
-		details.Host.Name,
-		startTime.Format("Monday, January 2, 2006 at 3:04 PM MST"),
-		details.Booking.Duration,
-		location,
-		s.cfg.Server.BaseURL,
-		details.Booking.Token,
-		s.cfg.Server.BaseURL,
-		details.Booking.Token,
-	)
 
 	// Generate ICS attachment
 	ics := s.generateICS(details)

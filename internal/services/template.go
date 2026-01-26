@@ -46,6 +46,8 @@ type CreateTemplateInput struct {
 	PostBufferMinutes int
 	AvailabilityRules models.JSONMap
 	InviteeQuestions  models.JSONArray
+	ConfirmationEmail string
+	ReminderEmail     string
 }
 
 // CreateTemplate creates a new meeting template
@@ -88,6 +90,8 @@ func (s *TemplateService) CreateTemplate(ctx context.Context, input CreateTempla
 		PostBufferMinutes: input.PostBufferMinutes,
 		AvailabilityRules: input.AvailabilityRules,
 		InviteeQuestions:  input.InviteeQuestions,
+		ConfirmationEmail: input.ConfirmationEmail,
+		ReminderEmail:     input.ReminderEmail,
 		IsActive:          true,
 		CreatedAt:         now,
 		UpdatedAt:         now,
@@ -122,6 +126,8 @@ type UpdateTemplateInput struct {
 	PostBufferMinutes int
 	AvailabilityRules models.JSONMap
 	InviteeQuestions  models.JSONArray
+	ConfirmationEmail string
+	ReminderEmail     string
 	IsActive          bool
 }
 
@@ -160,6 +166,8 @@ func (s *TemplateService) UpdateTemplate(ctx context.Context, input UpdateTempla
 	template.PostBufferMinutes = input.PostBufferMinutes
 	template.AvailabilityRules = input.AvailabilityRules
 	template.InviteeQuestions = input.InviteeQuestions
+	template.ConfirmationEmail = input.ConfirmationEmail
+	template.ReminderEmail = input.ReminderEmail
 	template.IsActive = input.IsActive
 
 	if err := s.repos.Template.Update(ctx, template); err != nil {

@@ -257,6 +257,8 @@ func (h *DashboardHandler) CreateTemplate(w http.ResponseWriter, r *http.Request
 		PostBufferMinutes: parseIntOrDefault(r.FormValue("post_buffer_minutes"), 0),
 		AvailabilityRules: availabilityRules,
 		InviteeQuestions:  inviteeQuestions,
+		ConfirmationEmail: r.FormValue("confirmation_email"),
+		ReminderEmail:     r.FormValue("reminder_email"),
 	}
 
 	_, err := h.handlers.services.Template.CreateTemplate(r.Context(), input)
@@ -368,6 +370,8 @@ func (h *DashboardHandler) UpdateTemplate(w http.ResponseWriter, r *http.Request
 		PostBufferMinutes: parseIntOrDefault(r.FormValue("post_buffer_minutes"), 0),
 		AvailabilityRules: availabilityRules,
 		InviteeQuestions:  inviteeQuestions,
+		ConfirmationEmail: r.FormValue("confirmation_email"),
+		ReminderEmail:     r.FormValue("reminder_email"),
 		IsActive:          r.FormValue("is_active") == "on",
 	}
 
