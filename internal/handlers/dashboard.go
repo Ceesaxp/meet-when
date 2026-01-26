@@ -144,6 +144,25 @@ func (h *DashboardHandler) DisconnectCalendar(w http.ResponseWriter, r *http.Req
 	h.handlers.redirect(w, r, "/dashboard/calendars")
 }
 
+// RefreshCalendarSync manually triggers a sync check for a calendar
+func (h *DashboardHandler) RefreshCalendarSync(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	calendarID := r.PathValue("id")
+	err := h.handlers.services.Calendar.RefreshCalendarSync(r.Context(), host.Host.ID, calendarID)
+	if err != nil {
+		log.Printf("Calendar sync refresh failed for %s: %v", calendarID, err)
+		h.handlers.redirect(w, r, "/dashboard/calendars?error=sync_failed")
+		return
+	}
+
+	h.handlers.redirect(w, r, "/dashboard/calendars?success=sync_complete")
+}
+
 // SetDefaultCalendar sets a calendar as default
 func (h *DashboardHandler) SetDefaultCalendar(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())

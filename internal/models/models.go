@@ -108,6 +108,15 @@ const (
 	CalendarProviderCalDAV CalendarProvider = "caldav"
 )
 
+// CalendarSyncStatus represents the sync status of a calendar
+type CalendarSyncStatus string
+
+const (
+	CalendarSyncStatusUnknown CalendarSyncStatus = "unknown"
+	CalendarSyncStatusSynced  CalendarSyncStatus = "synced"
+	CalendarSyncStatusFailed  CalendarSyncStatus = "failed"
+)
+
 // CalendarConnection represents a connected calendar
 type CalendarConnection struct {
 	ID           string           `json:"id" db:"id"`
@@ -123,8 +132,12 @@ type CalendarConnection struct {
 	CalDAVUsername string     `json:"-" db:"caldav_username"`
 	CalDAVPassword string     `json:"-" db:"caldav_password"`
 	IsDefault      bool       `json:"is_default" db:"is_default"`
-	CreatedAt      SQLiteTime `json:"created_at" db:"created_at"`
-	UpdatedAt      SQLiteTime `json:"updated_at" db:"updated_at"`
+	// Sync status tracking
+	LastSyncedAt *SQLiteTime        `json:"last_synced_at" db:"last_synced_at"`
+	SyncStatus   CalendarSyncStatus `json:"sync_status" db:"sync_status"`
+	SyncError    string             `json:"sync_error" db:"sync_error"`
+	CreatedAt    SQLiteTime         `json:"created_at" db:"created_at"`
+	UpdatedAt    SQLiteTime         `json:"updated_at" db:"updated_at"`
 }
 
 // ConferencingProvider represents supported conferencing providers

@@ -14,15 +14,40 @@
     {{if .Data.Calendars}}
     <div class="calendar-list">
         {{range .Data.Calendars}}
-        <div class="calendar-card">
+        <div class="calendar-card {{if eq (printf "%s" .SyncStatus) "failed"}}calendar-card-error{{end}}">
             <div class="calendar-info">
-                <strong>{{.Name}}</strong>
-                {{if eq (printf "%s" .Provider) "google"}}<span class="badge badge-google">Google Calendar</span>
-                {{else if eq (printf "%s" .Provider) "icloud"}}<span class="badge badge-icloud">iCloud</span>
-                {{else}}<span class="badge">CalDAV</span>{{end}}
-                {{if .IsDefault}}<span class="badge badge-primary">Default</span>{{end}}
+                <div class="calendar-header">
+                    <strong>{{.Name}}</strong>
+                    {{if eq (printf "%s" .Provider) "google"}}<span class="badge badge-google">Google Calendar</span>
+                    {{else if eq (printf "%s" .Provider) "icloud"}}<span class="badge badge-icloud">iCloud</span>
+                    {{else}}<span class="badge">CalDAV</span>{{end}}
+                    {{if .IsDefault}}<span class="badge badge-primary">Default</span>{{end}}
+                </div>
+                <div class="calendar-sync-status">
+                    {{if eq (printf "%s" .SyncStatus) "synced"}}
+                        <span class="sync-indicator sync-ok" title="Sync successful">&#10003;</span>
+                        {{if .LastSyncedAt}}
+                        <span class="sync-time">Last synced: {{.LastSyncedAt.Format "Jan 2, 3:04 PM"}}</span>
+                        {{end}}
+                    {{else if eq (printf "%s" .SyncStatus) "failed"}}
+                        <span class="sync-indicator sync-error" title="Sync failed">&#9888;</span>
+                        <span class="sync-time sync-error-text">Sync failed</span>
+                    {{else}}
+                        <span class="sync-indicator sync-unknown" title="Not synced yet">&#8635;</span>
+                        <span class="sync-time">Not synced yet</span>
+                    {{end}}
+                </div>
+                {{if and (eq (printf "%s" .SyncStatus) "failed") .SyncError}}
+                <div class="calendar-error-message">
+                    <span class="error-icon">&#9888;</span>
+                    <span class="error-text">{{.SyncError}}</span>
+                </div>
+                {{end}}
             </div>
             <div class="calendar-actions">
+                <form action="/dashboard/calendars/{{.ID}}/refresh" method="POST" style="display:inline">
+                    <button type="submit" class="btn btn-sm" title="Refresh sync status">&#8635; Refresh</button>
+                </form>
                 {{if not .IsDefault}}
                 <form action="/dashboard/calendars/{{.ID}}/default" method="POST" style="display:inline">
                     <button type="submit" class="btn btn-sm">Set Default</button>

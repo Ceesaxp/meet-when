@@ -162,6 +162,57 @@ func (s *CalendarService) GetCalendars(ctx context.Context, hostID string) ([]*m
 	return s.repos.Calendar.GetByHostID(ctx, hostID)
 }
 
+// GetCalendar returns a single calendar by ID
+func (s *CalendarService) GetCalendar(ctx context.Context, calendarID string) (*models.CalendarConnection, error) {
+	return s.repos.Calendar.GetByID(ctx, calendarID)
+}
+
+// RefreshCalendarSync performs a sync check on a calendar and updates its sync status
+func (s *CalendarService) RefreshCalendarSync(ctx context.Context, hostID, calendarID string) error {
+	cal, err := s.repos.Calendar.GetByID(ctx, calendarID)
+	if err != nil {
+		return err
+	}
+	if cal == nil || cal.HostID != hostID {
+		return ErrCalendarNotFound
+	}
+
+	// Try to fetch busy times for a short range to test the connection
+	start := time.Now()
+	end := start.Add(24 * time.Hour)
+
+	var syncErr error
+	switch cal.Provider {
+	case models.CalendarProviderGoogle:
+		_, syncErr = s.getGoogleBusyTimes(ctx, cal, start, end)
+	case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
+		_, syncErr = s.getCalDAVBusyTimes(ctx, cal, start, end)
+	}
+
+	now := models.Now()
+	if syncErr != nil {
+		// Sync failed - update status
+		errMsg := syncErr.Error()
+		if errors.Is(syncErr, ErrCalendarAuth) {
+			errMsg = "Authentication failed. Please reconnect your calendar."
+		}
+		return s.repos.Calendar.UpdateSyncStatus(ctx, calendarID, models.CalendarSyncStatusFailed, errMsg, nil)
+	}
+
+	// Sync succeeded
+	return s.repos.Calendar.UpdateSyncStatus(ctx, calendarID, models.CalendarSyncStatusSynced, "", &now)
+}
+
+// UpdateSyncStatus is a helper to update calendar sync status (used by GetBusyTimes tracking)
+func (s *CalendarService) UpdateSyncStatus(ctx context.Context, calendarID string, status models.CalendarSyncStatus, syncError string) error {
+	var lastSynced *models.SQLiteTime
+	if status == models.CalendarSyncStatusSynced {
+		now := models.Now()
+		lastSynced = &now
+	}
+	return s.repos.Calendar.UpdateSyncStatus(ctx, calendarID, status, syncError, lastSynced)
+}
+
 // GetBusyTimes returns busy times from all connected calendars
 func (s *CalendarService) GetBusyTimes(ctx context.Context, hostID string, start, end time.Time) ([]models.TimeSlot, error) {
 	calendars, err := s.repos.Calendar.GetByHostID(ctx, hostID)
@@ -183,9 +234,20 @@ func (s *CalendarService) GetBusyTimes(ctx context.Context, hostID string, start
 		}
 
 		if fetchErr != nil {
+			// Track sync failure
+			errMsg := fetchErr.Error()
+			if errors.Is(fetchErr, ErrCalendarAuth) {
+				errMsg = "Authentication failed. Please reconnect your calendar."
+			}
+			_ = s.repos.Calendar.UpdateSyncStatus(ctx, cal.ID, models.CalendarSyncStatusFailed, errMsg, nil)
 			// Log but continue with other calendars
+			log.Printf("Calendar sync failed for %s: %v", cal.ID, fetchErr)
 			continue
 		}
+
+		// Track sync success
+		now := models.Now()
+		_ = s.repos.Calendar.UpdateSyncStatus(ctx, cal.ID, models.CalendarSyncStatusSynced, "", &now)
 
 		allBusyTimes = append(allBusyTimes, busyTimes...)
 	}

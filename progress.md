@@ -533,3 +533,41 @@ The following features from the requirements document are already fully implemen
   - Closing dropdown on outside click requires checking both the dropdown and trigger link with `event.target`
 
 ---
+
+## 2026-01-26 - US-019 - Add calendar sync status indicator
+- What was implemented:
+  - Added `last_synced_at`, `sync_status`, and `sync_error` fields to calendar_connections table
+  - Added `CalendarSyncStatus` type with constants: unknown, synced, failed
+  - Updated CalendarConnection model with new sync status fields
+  - Updated CalendarRepository: Create, GetByID, GetByHostID, Update methods now include sync fields
+  - Added `UpdateSyncStatus` method to CalendarRepository for updating just sync fields
+  - Added `RefreshCalendarSync` method to CalendarService that tests calendar connection and updates status
+  - Added `GetCalendar` method to CalendarService for fetching single calendar
+  - Modified `GetBusyTimes` to automatically update sync status after each calendar fetch
+  - Added `RefreshCalendarSync` handler to DashboardHandler
+  - Added route `POST /dashboard/calendars/{id}/refresh` for manual sync refresh
+  - Updated `dashboard_calendars.html` template with sync status UI:
+    - Sync indicator (checkmark for success, warning for failed, refresh for unknown)
+    - Last synced timestamp display
+    - Error message display with guidance for failed syncs
+    - Refresh button on each calendar card
+  - Added CSS styles for sync status indicators, error messages, and updated calendar card layout
+- Files changed:
+  - `migrations/004_add_calendar_sync_status.up.sql` - PostgreSQL migration
+  - `migrations/sqlite/004_add_calendar_sync_status.up.sql` - SQLite migration
+  - `internal/models/models.go` - Added CalendarSyncStatus type and fields to CalendarConnection
+  - `internal/repository/repository.go` - Updated calendar queries and added UpdateSyncStatus
+  - `internal/services/calendar.go` - Added RefreshCalendarSync, GetCalendar, UpdateSyncStatus methods; updated GetBusyTimes
+  - `internal/handlers/dashboard.go` - Added RefreshCalendarSync handler
+  - `cmd/server/main.go` - Added refresh route
+  - `templates/pages/dashboard_calendars.html` - Added sync status display UI
+  - `static/css/style.css` - Added ~80 lines of sync status styles
+- **Learnings for future iterations:**
+  - Sync status is tracked per calendar, not globally - each calendar has independent status
+  - GetBusyTimes already iterates all calendars, so it's natural to update status there
+  - Using COALESCE in SQL queries handles NULL values from existing rows before migration
+  - Calendar card layout changed from flex row to column to accommodate new status info
+  - Error messages should provide actionable guidance (e.g., "Please reconnect your calendar")
+  - The `errors.Is(syncErr, ErrCalendarAuth)` pattern allows custom error messages for auth failures
+
+---

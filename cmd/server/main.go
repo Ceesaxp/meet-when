@@ -94,6 +94,7 @@ func main() {
 	dashboard.HandleFunc("POST /dashboard/calendars/connect/caldav", h.Dashboard.ConnectCalDAV)
 	dashboard.HandleFunc("POST /dashboard/calendars/{id}/disconnect", h.Dashboard.DisconnectCalendar)
 	dashboard.HandleFunc("POST /dashboard/calendars/{id}/default", h.Dashboard.SetDefaultCalendar)
+	dashboard.HandleFunc("POST /dashboard/calendars/{id}/refresh", h.Dashboard.RefreshCalendarSync)
 
 	// Meeting templates
 	dashboard.HandleFunc("GET /dashboard/templates", h.Dashboard.Templates)

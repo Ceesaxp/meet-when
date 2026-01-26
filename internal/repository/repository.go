@@ -187,14 +187,16 @@ func (r *CalendarRepository) Create(ctx context.Context, cal *models.CalendarCon
 	query := q(r.driver, `
 		INSERT INTO calendar_connections (id, host_id, provider, name, calendar_id,
 			access_token, refresh_token, token_expiry, caldav_url, caldav_username,
-			caldav_password, is_default, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+			caldav_password, is_default, last_synced_at, sync_status, sync_error,
+			created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 	`)
 	_, err := r.db.ExecContext(ctx, query,
 		cal.ID, cal.HostID, cal.Provider, cal.Name, cal.CalendarID,
 		cal.AccessToken, cal.RefreshToken, cal.TokenExpiry,
 		cal.CalDAVURL, cal.CalDAVUsername, cal.CalDAVPassword,
-		cal.IsDefault, cal.CreatedAt, cal.UpdatedAt)
+		cal.IsDefault, cal.LastSyncedAt, cal.SyncStatus, cal.SyncError,
+		cal.CreatedAt, cal.UpdatedAt)
 	return err
 }
 
@@ -203,6 +205,7 @@ func (r *CalendarRepository) GetByID(ctx context.Context, id string) (*models.Ca
 	query := q(r.driver, `
 		SELECT id, host_id, provider, name, calendar_id, access_token, refresh_token,
 		       token_expiry, caldav_url, caldav_username, caldav_password, is_default,
+		       last_synced_at, COALESCE(sync_status, 'unknown'), COALESCE(sync_error, ''),
 		       created_at, updated_at
 		FROM calendar_connections WHERE id = $1
 	`)
@@ -210,7 +213,8 @@ func (r *CalendarRepository) GetByID(ctx context.Context, id string) (*models.Ca
 		&cal.ID, &cal.HostID, &cal.Provider, &cal.Name, &cal.CalendarID,
 		&cal.AccessToken, &cal.RefreshToken, &cal.TokenExpiry,
 		&cal.CalDAVURL, &cal.CalDAVUsername, &cal.CalDAVPassword,
-		&cal.IsDefault, &cal.CreatedAt, &cal.UpdatedAt)
+		&cal.IsDefault, &cal.LastSyncedAt, &cal.SyncStatus, &cal.SyncError,
+		&cal.CreatedAt, &cal.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -221,6 +225,7 @@ func (r *CalendarRepository) GetByHostID(ctx context.Context, hostID string) ([]
 	query := q(r.driver, `
 		SELECT id, host_id, provider, name, calendar_id, access_token, refresh_token,
 		       token_expiry, caldav_url, caldav_username, caldav_password, is_default,
+		       last_synced_at, COALESCE(sync_status, 'unknown'), COALESCE(sync_error, ''),
 		       created_at, updated_at
 		FROM calendar_connections WHERE host_id = $1
 		ORDER BY is_default DESC, created_at ASC
@@ -242,7 +247,8 @@ func (r *CalendarRepository) GetByHostID(ctx context.Context, hostID string) ([]
 			&cal.ID, &cal.HostID, &cal.Provider, &cal.Name, &cal.CalendarID,
 			&cal.AccessToken, &cal.RefreshToken, &cal.TokenExpiry,
 			&cal.CalDAVURL, &cal.CalDAVUsername, &cal.CalDAVPassword,
-			&cal.IsDefault, &cal.CreatedAt, &cal.UpdatedAt)
+			&cal.IsDefault, &cal.LastSyncedAt, &cal.SyncStatus, &cal.SyncError,
+			&cal.CreatedAt, &cal.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -255,13 +261,25 @@ func (r *CalendarRepository) Update(ctx context.Context, cal *models.CalendarCon
 	query := q(r.driver, `
 		UPDATE calendar_connections
 		SET name = $1, access_token = $2, refresh_token = $3, token_expiry = $4,
-		    caldav_url = $5, caldav_username = $6, caldav_password = $7, is_default = $8
-		WHERE id = $9
+		    caldav_url = $5, caldav_username = $6, caldav_password = $7, is_default = $8,
+		    last_synced_at = $9, sync_status = $10, sync_error = $11
+		WHERE id = $12
 	`)
 	_, err := r.db.ExecContext(ctx, query,
 		cal.Name, cal.AccessToken, cal.RefreshToken, cal.TokenExpiry,
 		cal.CalDAVURL, cal.CalDAVUsername, cal.CalDAVPassword,
-		cal.IsDefault, cal.ID)
+		cal.IsDefault, cal.LastSyncedAt, cal.SyncStatus, cal.SyncError, cal.ID)
+	return err
+}
+
+// UpdateSyncStatus updates only the sync status fields for a calendar
+func (r *CalendarRepository) UpdateSyncStatus(ctx context.Context, calendarID string, syncStatus models.CalendarSyncStatus, syncError string, lastSyncedAt *models.SQLiteTime) error {
+	query := q(r.driver, `
+		UPDATE calendar_connections
+		SET last_synced_at = $1, sync_status = $2, sync_error = $3
+		WHERE id = $4
+	`)
+	_, err := r.db.ExecContext(ctx, query, lastSyncedAt, syncStatus, syncError, calendarID)
 	return err
 }
 
