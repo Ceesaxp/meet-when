@@ -15,6 +15,8 @@ import (
 	"github.com/meet-when/meet-when/internal/middleware"
 	"github.com/meet-when/meet-when/internal/repository"
 	"github.com/meet-when/meet-when/internal/services"
+
+	_ "time/tzdata"
 )
 
 func main() {

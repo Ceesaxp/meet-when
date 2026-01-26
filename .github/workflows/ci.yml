@@ -3,13 +3,13 @@ name: CI
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ["v*"]
   pull_request:
     branches: [main]
 
 env:
   REGISTRY: ghcr.io
-  GO_VERSION: '1.25'
+  GO_VERSION: "1.25"
 
 jobs:
   test:
@@ -28,9 +28,6 @@ jobs:
 
       - name: Run tests
         run: go test -v -race -coverprofile=coverage.out ./...
-
-      - name: Build
-        run: go build -v ./...
 
   build:
     needs: test
@@ -82,4 +79,4 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64 #,linux/arm64
