@@ -576,8 +576,8 @@ func (r *BookingRepository) Create(ctx context.Context, booking *models.Booking)
 		INSERT INTO bookings (id, template_id, host_id, token, status, start_time,
 			end_time, duration, invitee_name, invitee_email, invitee_timezone,
 			invitee_phone, additional_guests, answers, conference_link,
-			calendar_event_id, reminder_sent, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+			calendar_event_id, reminder_sent, is_archived, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 	`)
 	_, err := r.db.ExecContext(ctx, query,
 		booking.ID, booking.TemplateID, booking.HostID, booking.Token,
@@ -585,7 +585,7 @@ func (r *BookingRepository) Create(ctx context.Context, booking *models.Booking)
 		booking.InviteeName, booking.InviteeEmail, booking.InviteeTimezone,
 		booking.InviteePhone, booking.AdditionalGuests, booking.Answers,
 		booking.ConferenceLink, booking.CalendarEventID, booking.ReminderSent,
-		booking.CreatedAt, booking.UpdatedAt)
+		booking.IsArchived, booking.CreatedAt, booking.UpdatedAt)
 	return err
 }
 
@@ -596,7 +596,7 @@ func (r *BookingRepository) GetByID(ctx context.Context, id string) (*models.Boo
 		       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
 		       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
 		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, false),
-		       created_at, updated_at
+		       COALESCE(is_archived, false), created_at, updated_at
 		FROM bookings WHERE id = $1
 	`)
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
@@ -606,7 +606,7 @@ func (r *BookingRepository) GetByID(ctx context.Context, id string) (*models.Boo
 		&booking.InviteePhone, &booking.AdditionalGuests, &booking.Answers,
 		&booking.ConferenceLink, &booking.CalendarEventID,
 		&booking.CancelledBy, &booking.CancelReason, &booking.ReminderSent,
-		&booking.CreatedAt, &booking.UpdatedAt)
+		&booking.IsArchived, &booking.CreatedAt, &booking.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -620,7 +620,7 @@ func (r *BookingRepository) GetByToken(ctx context.Context, token string) (*mode
 		       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
 		       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
 		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, false),
-		       created_at, updated_at
+		       COALESCE(is_archived, false), created_at, updated_at
 		FROM bookings WHERE token = $1
 	`)
 	err := r.db.QueryRowContext(ctx, query, token).Scan(
@@ -630,38 +630,37 @@ func (r *BookingRepository) GetByToken(ctx context.Context, token string) (*mode
 		&booking.InviteePhone, &booking.AdditionalGuests, &booking.Answers,
 		&booking.ConferenceLink, &booking.CalendarEventID,
 		&booking.CancelledBy, &booking.CancelReason, &booking.ReminderSent,
-		&booking.CreatedAt, &booking.UpdatedAt)
+		&booking.IsArchived, &booking.CreatedAt, &booking.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	return booking, err
 }
 
-func (r *BookingRepository) GetByHostID(ctx context.Context, hostID string, status *models.BookingStatus) ([]*models.Booking, error) {
+func (r *BookingRepository) GetByHostID(ctx context.Context, hostID string, status *models.BookingStatus, includeArchived bool) ([]*models.Booking, error) {
 	var query string
 	var args []interface{}
 
+	// Build the base SELECT clause
+	selectClause := `
+		SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
+		       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
+		       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
+		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, false),
+		       COALESCE(is_archived, false), created_at, updated_at
+		FROM bookings WHERE host_id = $1`
+
+	// Build the WHERE conditions
+	archiveCondition := ""
+	if !includeArchived {
+		archiveCondition = " AND (is_archived = false OR is_archived IS NULL)"
+	}
+
 	if status != nil {
-		query = q(r.driver, `
-			SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
-			       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
-			       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
-			       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, false),
-			       created_at, updated_at
-			FROM bookings WHERE host_id = $1 AND status = $2
-			ORDER BY start_time ASC
-		`)
+		query = q(r.driver, selectClause+" AND status = $2"+archiveCondition+" ORDER BY start_time ASC")
 		args = []interface{}{hostID, *status}
 	} else {
-		query = q(r.driver, `
-			SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
-			       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
-			       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
-			       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, false),
-			       created_at, updated_at
-			FROM bookings WHERE host_id = $1
-			ORDER BY start_time ASC
-		`)
+		query = q(r.driver, selectClause+archiveCondition+" ORDER BY start_time ASC")
 		args = []interface{}{hostID}
 	}
 
@@ -685,7 +684,7 @@ func (r *BookingRepository) GetByHostID(ctx context.Context, hostID string, stat
 			&booking.InviteePhone, &booking.AdditionalGuests, &booking.Answers,
 			&booking.ConferenceLink, &booking.CalendarEventID,
 			&booking.CancelledBy, &booking.CancelReason, &booking.ReminderSent,
-			&booking.CreatedAt, &booking.UpdatedAt)
+			&booking.IsArchived, &booking.CreatedAt, &booking.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -697,9 +696,10 @@ func (r *BookingRepository) GetByHostID(ctx context.Context, hostID string, stat
 func (r *BookingRepository) GetByHostIDAndTimeRange(ctx context.Context, hostID string, start, end time.Time) ([]*models.Booking, error) {
 	query := q(r.driver, `
 		SELECT id, template_id, host_id, token, status, start_time, end_time, duration,
-		       invitee_name, invitee_email, invitee_timezone, invitee_phone,
-		       additional_guests, answers, conference_link, calendar_event_id,
-		       cancelled_by, cancel_reason, COALESCE(reminder_sent, false), created_at, updated_at
+		       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
+		       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
+		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, false),
+		       COALESCE(is_archived, false), created_at, updated_at
 		FROM bookings
 		WHERE host_id = $1
 		  AND status IN ('pending', 'confirmed')
@@ -726,7 +726,7 @@ func (r *BookingRepository) GetByHostIDAndTimeRange(ctx context.Context, hostID 
 			&booking.InviteePhone, &booking.AdditionalGuests, &booking.Answers,
 			&booking.ConferenceLink, &booking.CalendarEventID,
 			&booking.CancelledBy, &booking.CancelReason, &booking.ReminderSent,
-			&booking.CreatedAt, &booking.UpdatedAt)
+			&booking.IsArchived, &booking.CreatedAt, &booking.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -739,12 +739,13 @@ func (r *BookingRepository) Update(ctx context.Context, booking *models.Booking)
 	query := q(r.driver, `
 		UPDATE bookings
 		SET status = $1, conference_link = $2, calendar_event_id = $3,
-		    cancelled_by = $4, cancel_reason = $5, reminder_sent = $6
-		WHERE id = $7
+		    cancelled_by = $4, cancel_reason = $5, reminder_sent = $6, is_archived = $7
+		WHERE id = $8
 	`)
 	_, err := r.db.ExecContext(ctx, query,
 		booking.Status, booking.ConferenceLink, booking.CalendarEventID,
-		booking.CancelledBy, booking.CancelReason, booking.ReminderSent, booking.ID)
+		booking.CancelledBy, booking.CancelReason, booking.ReminderSent,
+		booking.IsArchived, booking.ID)
 	return err
 }
 
@@ -756,7 +757,7 @@ func (r *BookingRepository) GetBookingsNeedingReminder(ctx context.Context, star
 		       invitee_name, invitee_email, COALESCE(invitee_timezone, ''), COALESCE(invitee_phone, ''),
 		       additional_guests, answers, COALESCE(conference_link, ''), COALESCE(calendar_event_id, ''),
 		       COALESCE(cancelled_by, ''), COALESCE(cancel_reason, ''), COALESCE(reminder_sent, false),
-		       created_at, updated_at
+		       COALESCE(is_archived, false), created_at, updated_at
 		FROM bookings
 		WHERE status = 'confirmed'
 		  AND (reminder_sent = false OR reminder_sent IS NULL)
@@ -784,7 +785,7 @@ func (r *BookingRepository) GetBookingsNeedingReminder(ctx context.Context, star
 			&booking.InviteePhone, &booking.AdditionalGuests, &booking.Answers,
 			&booking.ConferenceLink, &booking.CalendarEventID,
 			&booking.CancelledBy, &booking.CancelReason, &booking.ReminderSent,
-			&booking.CreatedAt, &booking.UpdatedAt)
+			&booking.IsArchived, &booking.CreatedAt, &booking.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}

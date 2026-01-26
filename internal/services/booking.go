@@ -335,14 +335,14 @@ func (s *BookingService) GetBooking(ctx context.Context, bookingID string) (*mod
 }
 
 // GetBookings retrieves bookings for a host
-func (s *BookingService) GetBookings(ctx context.Context, hostID string, status *models.BookingStatus) ([]*models.Booking, error) {
-	return s.repos.Booking.GetByHostID(ctx, hostID, status)
+func (s *BookingService) GetBookings(ctx context.Context, hostID string, status *models.BookingStatus, includeArchived bool) ([]*models.Booking, error) {
+	return s.repos.Booking.GetByHostID(ctx, hostID, status, includeArchived)
 }
 
 // GetPendingBookings retrieves pending bookings for a host
 func (s *BookingService) GetPendingBookings(ctx context.Context, hostID string) ([]*models.Booking, error) {
 	status := models.BookingStatusPending
-	return s.repos.Booking.GetByHostID(ctx, hostID, &status)
+	return s.repos.Booking.GetByHostID(ctx, hostID, &status, false)
 }
 
 // RescheduleBookingInput represents the input for rescheduling a booking

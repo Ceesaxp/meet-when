@@ -218,6 +218,7 @@ type Booking struct {
 	CancelledBy      string        `json:"cancelled_by" db:"cancelled_by"` // host or invitee
 	CancelReason     string        `json:"cancel_reason" db:"cancel_reason"`
 	ReminderSent     bool          `json:"reminder_sent" db:"reminder_sent"`
+	IsArchived       bool          `json:"is_archived" db:"is_archived"`
 	CreatedAt        SQLiteTime    `json:"created_at" db:"created_at"`
 	UpdatedAt        SQLiteTime    `json:"updated_at" db:"updated_at"`
 }

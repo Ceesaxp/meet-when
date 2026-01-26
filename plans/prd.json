@@ -116,8 +116,8 @@
                 "Typecheck passes"
             ],
             "priority": 7,
-            "passes": false,
-            "notes": ""
+            "passes": true,
+            "notes": "Created CalendarSyncService following ReminderService pattern. Added GetAll method to CalendarRepository. Added SyncCalendar and GetAllCalendars methods to CalendarService. Service starts on server boot and stops on graceful shutdown."
         },
         {
             "id": "US-008",
@@ -132,8 +132,8 @@
                 "Verify in browser using dev-browser skill"
             ],
             "priority": 8,
-            "passes": false,
-            "notes": ""
+            "passes": true,
+            "notes": "Added timeAgo template function for relative time display. Calendar list shows 'Synced X minutes ago' for synced calendars, 'Never synced' for unknown status. Failed status is clickable to toggle error message visibility. CSS added for clickable error indicators."
         },
         {
             "id": "US-009",
@@ -149,8 +149,8 @@
                 "Verify in browser using dev-browser skill"
             ],
             "priority": 9,
-            "passes": false,
-            "notes": ""
+            "passes": true,
+            "notes": "Added HTMX-based refresh button with loading spinner. Created calendar_card_partial.html for seamless updates. Handler returns partial for HTMX requests, full redirect for regular requests."
         },
         {
             "id": "US-010",
@@ -165,8 +165,8 @@
                 "Typecheck passes"
             ],
             "priority": 10,
-            "passes": false,
-            "notes": ""
+            "passes": true,
+            "notes": "Added AgendaEvent struct with title, start, end, calendar_name, isAllDay fields. Added GetAgendaEvents method that fetches from all connected calendars (Google and CalDAV/iCloud). Events sorted by start time. Errors handled gracefully (skip failed calendars, continue with others)."
         },
         {
             "id": "US-011",
@@ -182,8 +182,8 @@
                 "Verify in browser using dev-browser skill"
             ],
             "priority": 11,
-            "passes": false,
-            "notes": ""
+            "passes": true,
+            "notes": "Added Agenda handler to dashboard.go that loads events using host timezone. Created dashboard_agenda.html template with table display showing time, event title, duration, and source calendar. All-day events shown with badge. Empty state displayed when no events. Added duration() template helper function. Agenda link added to sidebar near Bookings."
         },
         {
             "id": "US-012",
@@ -199,8 +199,8 @@
                 "Verify in browser using dev-browser skill"
             ],
             "priority": 12,
-            "passes": false,
-            "notes": ""
+            "passes": true,
+            "notes": "Added view parameter handling, AgendaDayGroup struct for grouping events by day, week boundary calculation (Monday to Sunday), conditional template rendering for week vs today views with day headers showing weekday name and date."
         },
         {
             "id": "US-013",
@@ -214,8 +214,8 @@
                 "Verify in browser using dev-browser skill"
             ],
             "priority": 13,
-            "passes": false,
-            "notes": ""
+            "passes": true,
+            "notes": "Already implemented as part of US-011 - Agenda link added to sidebar in dashboard.html layout, positioned directly after Bookings link."
         },
         {
             "id": "US-014",
@@ -229,8 +229,8 @@
                 "Typecheck passes"
             ],
             "priority": 14,
-            "passes": false,
-            "notes": ""
+            "passes": true,
+            "notes": "Added is_archived column to bookings table (PostgreSQL and SQLite migrations). Updated Booking model with IsArchived field. Updated repository methods (Create, GetByID, GetByToken, GetByHostID, GetByHostIDAndTimeRange, GetBookingsNeedingReminder, Update) to include is_archived. GetByHostID now accepts includeArchived parameter with filtering logic. Updated BookingService and dashboard handlers to support the new parameter."
         },
         {
             "id": "US-015",

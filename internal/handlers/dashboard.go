@@ -26,8 +26,8 @@ func (h *DashboardHandler) Home(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get upcoming bookings
-	bookings, _ := h.handlers.services.Booking.GetBookings(r.Context(), host.Host.ID, nil)
+	// Get upcoming bookings (exclude archived)
+	bookings, _ := h.handlers.services.Booking.GetBookings(r.Context(), host.Host.ID, nil, false)
 
 	// Get pending bookings count
 	pending, _ := h.handlers.services.Booking.GetPendingBookings(r.Context(), host.Host.ID)
@@ -470,7 +470,9 @@ func (h *DashboardHandler) Bookings(w http.ResponseWriter, r *http.Request) {
 		status = &s
 	}
 
-	bookings, _ := h.handlers.services.Booking.GetBookings(r.Context(), host.Host.ID, status)
+	// Check if we should include archived bookings
+	showArchived := r.URL.Query().Get("archived") == "true"
+	bookings, _ := h.handlers.services.Booking.GetBookings(r.Context(), host.Host.ID, status, showArchived)
 	templates, _ := h.handlers.services.Template.GetTemplates(r.Context(), host.Host.ID)
 
 	// Create template map for display
