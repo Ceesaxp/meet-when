@@ -47,8 +47,8 @@
                 "Verify in browser using dev-browser skill"
             ],
             "priority": 3,
-            "passes": false,
-            "notes": ""
+            "passes": true,
+            "notes": "Implemented in commit aea68b7. Rewrote availability section to render days dynamically via JavaScript. Added 'Add interval' button, 'Remove' button, time inputs for each interval. Maximum 2 intervals enforced via MAX_INTERVALS_PER_DAY constant. Backward compatible with old single start/end format."
         },
         {
             "id": "US-004",
@@ -62,8 +62,8 @@
                 "Verify in browser using dev-browser skill"
             ],
             "priority": 4,
-            "passes": false,
-            "notes": ""
+            "passes": true,
+            "notes": "Already implemented in commit aea68b7 as part of US-003. The addInterval() JavaScript function in dashboard_template_form.html contains the smart defaults logic: if first interval ends <= 12:00, defaults to 13:00-17:00; otherwise starts 1 hour after first interval ends for 3 hours (capped at 23:00)."
         },
         {
             "id": "US-005",

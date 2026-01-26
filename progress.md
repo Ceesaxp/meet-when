@@ -644,3 +644,46 @@ The following features from the requirements document are already fully implemen
   - Slots from multiple intervals need to be sorted after generation since intervals may not be in order
 
 ---
+
+## 2026-01-26 - US-003 - Update UI to support multiple intervals per day
+- What was implemented:
+  - Rewrote availability section in template form to render days dynamically via JavaScript
+  - Added `renderAvailabilityDays()` function that creates day elements with dynamic interval management
+  - Added `createIntervalElement()` function to generate time range inputs for each interval
+  - Added "+ Add interval" button that appears only when a day has fewer than 2 intervals
+  - Added "Remove" button on each interval (hidden when only one interval exists)
+  - Time inputs (`interval-start`, `interval-end`) for each interval's start and end times
+  - Maximum of 2 intervals per day enforced via `MAX_INTERVALS_PER_DAY` constant
+  - Backward compatible: supports both old format (single start/end) and new format (intervals array)
+  - Smart defaults for second interval: if first ends at or before 12:00, defaults to 13:00-17:00
+  - CSS styles for `.intervals-container`, `.btn-add-interval`, `.btn-remove-interval`, `.day-header`
+- Files changed:
+  - `templates/pages/dashboard_template_form.html` - Rewrote availability section (~300 lines of JS changes)
+  - `static/css/style.css` - Added ~50 lines of styles for interval UI elements
+- **Learnings for future iterations:**
+  - Dynamic DOM generation in JavaScript allows more flexible UI without server round trips
+  - The `renderAvailabilityDays()` pattern: generate all days in a loop, supporting both existing data and defaults
+  - Use closure pattern `function(d) { return function() { ... } }(day)` to capture loop variables in event handlers
+  - Smart defaults logic includes edge cases: what if first interval ends late? Cap at 23:00
+  - The `initializeAvailabilityRules()` calls `renderAvailabilityDays()` twice: once for structure, once after checking if custom availability is enabled
+
+---
+
+## 2026-01-26 - US-004 - Implement smart defaults for second interval
+- What was implemented:
+  - This feature was already implemented as part of US-003 (commit aea68b7)
+  - The `addInterval()` JavaScript function in `dashboard_template_form.html` lines 567-614 contains the smart defaults logic
+  - When first interval ends at or before 12:00, second interval defaults to 13:00-17:00
+  - When first interval ends after 12:00, second interval defaults to first interval end time + 1 hour, for 3 hours duration
+  - End time is capped at 23:00 to prevent invalid times
+  - Time inputs are editable immediately after the interval is added
+- Files changed:
+  - No new files changed - implementation was part of US-003
+  - PRD updated to mark US-004 as passing
+- **Learnings for future iterations:**
+  - The smart defaults feature was bundled with US-003's interval UI implementation
+  - When implementing UI features, consider what reasonable defaults users would expect and implement them proactively
+  - String comparison works for time values in "HH:MM" format (e.g., `firstEnd <= '12:00'`)
+  - Using `padStart(2, '0')` ensures consistent time formatting
+
+---
