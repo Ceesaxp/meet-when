@@ -2,11 +2,17 @@ package services
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/meet-when/meet-when/internal/config"
@@ -16,12 +22,17 @@ import (
 )
 
 var (
-	ErrInvalidCredentials = errors.New("invalid email or password")
-	ErrEmailExists        = errors.New("email already registered")
-	ErrTenantExists       = errors.New("tenant slug already exists")
-	ErrInvalidEmail       = errors.New("invalid email format")
-	ErrWeakPassword       = errors.New("password must be at least 8 characters")
+	ErrInvalidCredentials     = errors.New("invalid email or password")
+	ErrEmailExists            = errors.New("email already registered")
+	ErrTenantExists           = errors.New("tenant slug already exists")
+	ErrInvalidEmail           = errors.New("invalid email format")
+	ErrWeakPassword           = errors.New("password must be at least 8 characters")
+	ErrInvalidSelectionToken  = errors.New("invalid or expired selection token")
+	ErrHostNotFound           = errors.New("host not found")
 )
+
+// SelectionTokenExpiry is the duration for which selection tokens are valid
+const SelectionTokenExpiry = 5 * time.Minute
 
 // AuthService handles authentication operations
 type AuthService struct {
@@ -172,16 +183,18 @@ type SimplifiedLoginInput struct {
 
 // OrgOption represents an organization option for multi-org users
 type OrgOption struct {
-	TenantID   string
-	TenantSlug string
-	TenantName string
-	HostID     string
+	TenantID       string
+	TenantSlug     string
+	TenantName     string
+	HostID         string
+	SelectionToken string // Token to use when selecting this org
 }
 
 // SimplifiedLoginResult represents the result of a simplified login attempt
 type SimplifiedLoginResult struct {
 	RequiresOrgSelection bool           // True if user has multiple orgs and must select one
 	AvailableOrgs        []OrgOption    // Populated when RequiresOrgSelection is true
+	SelectionToken       string         // Token for completing org selection (when RequiresOrgSelection is true)
 	SessionToken         string         // Populated when single org match (direct login)
 	Host                 *models.Host   // Populated when single org match
 	Tenant               *models.Tenant // Populated when single org match
@@ -301,11 +314,18 @@ func (s *AuthService) SimplifiedLogin(ctx context.Context, input SimplifiedLogin
 			continue // Skip hosts with missing tenants
 		}
 
+		// Generate a selection token for this org option
+		selectionToken, err := s.generateSelectionToken(host.ID)
+		if err != nil {
+			return nil, err
+		}
+
 		availableOrgs = append(availableOrgs, OrgOption{
-			TenantID:   tenant.ID,
-			TenantSlug: tenant.Slug,
-			TenantName: tenant.Name,
-			HostID:     host.ID,
+			TenantID:       tenant.ID,
+			TenantSlug:     tenant.Slug,
+			TenantName:     tenant.Name,
+			HostID:         host.ID,
+			SelectionToken: selectionToken,
 		})
 	}
 
@@ -383,4 +403,116 @@ func (s *AuthService) UpdateHost(ctx context.Context, host *models.Host) error {
 // CompleteOnboarding marks a host's onboarding as complete
 func (s *AuthService) CompleteOnboarding(ctx context.Context, hostID string) error {
 	return s.repos.Host.UpdateOnboardingCompleted(ctx, hostID, true)
+}
+
+// generateSelectionToken creates a short-lived cryptographically signed token for org selection.
+// The token format is: base64(hostID:expiry:signature)
+// This approach doesn't require storing tokens in a database - the signature validates authenticity.
+func (s *AuthService) generateSelectionToken(hostID string) (string, error) {
+	expiry := time.Now().Add(SelectionTokenExpiry).Unix()
+	payload := fmt.Sprintf("%s:%d", hostID, expiry)
+
+	// Create HMAC signature using the encryption key
+	mac := hmac.New(sha256.New, []byte(s.cfg.App.EncryptionKey))
+	mac.Write([]byte(payload))
+	signature := hex.EncodeToString(mac.Sum(nil))
+
+	// Combine payload and signature
+	token := fmt.Sprintf("%s:%s", payload, signature)
+	return base64.URLEncoding.EncodeToString([]byte(token)), nil
+}
+
+// validateSelectionToken validates a selection token and returns the host ID if valid.
+// Returns an error if the token is invalid, expired, or tampered with.
+func (s *AuthService) validateSelectionToken(token string) (string, error) {
+	// Decode the base64 token
+	decoded, err := base64.URLEncoding.DecodeString(token)
+	if err != nil {
+		return "", ErrInvalidSelectionToken
+	}
+
+	// Parse the token parts: hostID:expiry:signature
+	parts := strings.Split(string(decoded), ":")
+	if len(parts) != 3 {
+		return "", ErrInvalidSelectionToken
+	}
+
+	hostID := parts[0]
+	expiryStr := parts[1]
+	providedSignature := parts[2]
+
+	// Validate expiry
+	expiry, err := strconv.ParseInt(expiryStr, 10, 64)
+	if err != nil {
+		return "", ErrInvalidSelectionToken
+	}
+	if time.Now().Unix() > expiry {
+		return "", ErrInvalidSelectionToken
+	}
+
+	// Verify signature
+	payload := fmt.Sprintf("%s:%s", hostID, expiryStr)
+	mac := hmac.New(sha256.New, []byte(s.cfg.App.EncryptionKey))
+	mac.Write([]byte(payload))
+	expectedSignature := hex.EncodeToString(mac.Sum(nil))
+
+	if !hmac.Equal([]byte(providedSignature), []byte(expectedSignature)) {
+		return "", ErrInvalidSelectionToken
+	}
+
+	return hostID, nil
+}
+
+// CompleteOrgSelectionInput represents the input for completing org selection
+type CompleteOrgSelectionInput struct {
+	HostID         string
+	SelectionToken string
+}
+
+// CompleteOrgSelection completes the login flow after a user selects their organization.
+// It validates the selection token to ensure the request is legitimate (not enumeration attack).
+func (s *AuthService) CompleteOrgSelection(ctx context.Context, input CompleteOrgSelectionInput) (*HostWithTenant, string, error) {
+	// Validate the selection token
+	tokenHostID, err := s.validateSelectionToken(input.SelectionToken)
+	if err != nil {
+		return nil, "", err
+	}
+
+	// The host ID in the token must match the requested host ID
+	// This prevents using a valid token for one host to access a different host
+	if tokenHostID != input.HostID {
+		return nil, "", ErrInvalidSelectionToken
+	}
+
+	// Get the host
+	host, err := s.repos.Host.GetByID(ctx, input.HostID)
+	if err != nil {
+		return nil, "", err
+	}
+	if host == nil {
+		return nil, "", ErrHostNotFound
+	}
+
+	// Get the tenant
+	tenant, err := s.repos.Tenant.GetByID(ctx, host.TenantID)
+	if err != nil {
+		return nil, "", err
+	}
+	if tenant == nil {
+		return nil, "", ErrInvalidCredentials
+	}
+
+	// Create session
+	sessionToken, err := s.session.CreateSession(ctx, host.ID)
+	if err != nil {
+		return nil, "", err
+	}
+
+	// Audit log
+	s.auditLog.Log(ctx, tenant.ID, &host.ID, "host.login", "host", host.ID, nil, "via org selection")
+
+	return &HostWithTenant{
+		Host:   host,
+		Tenant: tenant,
+	}, sessionToken, nil
 }
