@@ -38,6 +38,19 @@
             <p>When are you typically available for meetings? You can always adjust this later.</p>
 
             <form method="POST" action="/onboarding/working-hours" class="form">
+                <div class="form-group">
+                    <label for="timezone-search">Your Timezone</label>
+                    <div class="tz-picker-container">
+                        <input type="text" id="timezone-search" class="tz-picker-input"
+                               placeholder="Search for a timezone..." autocomplete="off">
+                        <input type="hidden" id="timezone" name="timezone" value="{{.Host.Timezone}}">
+                        <div id="timezone-results" class="tz-picker-dropdown" style="display: none;"></div>
+                    </div>
+                    <small id="timezone-detected-hint" class="form-help" style="display: none;">
+                        <span class="detected-indicator">Detected from your browser</span> - you can change this if needed
+                    </small>
+                </div>
+
                 <table class="working-hours-table">
                     <thead>
                         <tr>
@@ -230,8 +243,74 @@
     </div>
 </div>
 
+<script src="/static/js/timezone-picker.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // ===== Timezone Picker Initialization (Step 1) =====
+    var timezoneSearchInput = document.getElementById('timezone-search');
+    if (timezoneSearchInput) {
+        var currentHostTimezone = '{{.Host.Timezone}}';
+        var wasAutoDetected = false;
+
+        var picker = new TimezonePicker({
+            inputId: 'timezone-search',
+            hiddenInputId: 'timezone',
+            dropdownId: 'timezone-results',
+            onSelect: function(tz) {
+                // When user manually selects a timezone, hide the detected hint
+                var hint = document.getElementById('timezone-detected-hint');
+                if (hint) {
+                    hint.style.display = 'none';
+                }
+            }
+        });
+        picker.init();
+
+        // Auto-detect timezone if host doesn't have one set
+        if (!currentHostTimezone) {
+            try {
+                var detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                if (detectedTimezone) {
+                    // Wait for timezone data to load, then set the detected timezone
+                    var checkLoaded = setInterval(function() {
+                        if (picker.timezones.length > 0) {
+                            clearInterval(checkLoaded);
+                            picker.setTimezone(detectedTimezone);
+                            wasAutoDetected = true;
+
+                            // Show the detected hint
+                            var hint = document.getElementById('timezone-detected-hint');
+                            if (hint) {
+                                hint.style.display = 'block';
+                            }
+                        }
+                    }, 100);
+
+                    // Timeout after 5 seconds
+                    setTimeout(function() {
+                        clearInterval(checkLoaded);
+                    }, 5000);
+                }
+            } catch (e) {
+                // Detection failed, leave field empty for manual selection
+                console.log('Timezone detection not supported:', e);
+            }
+        } else {
+            // Host already has a timezone, set it
+            var checkLoaded = setInterval(function() {
+                if (picker.timezones.length > 0) {
+                    clearInterval(checkLoaded);
+                    picker.setTimezone(currentHostTimezone);
+                }
+            }, 100);
+
+            setTimeout(function() {
+                clearInterval(checkLoaded);
+            }, 5000);
+        }
+    }
+
+    // ===== Location Type Handler (Step 3) =====
     const locationSelect = document.getElementById('location_type');
     const customLocationGroup = document.getElementById('custom_location_group');
     const customLocationInput = document.getElementById('custom_location');
@@ -254,7 +333,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Auto-generate slug from name
+    // ===== Auto-generate slug from name (Step 3) =====
     const nameInput = document.getElementById('name');
     const slugInput = document.getElementById('slug');
     if (nameInput && slugInput) {
@@ -433,6 +512,17 @@ document.addEventListener('DOMContentLoaded', function() {
     align-items: center;
     gap: 8px;
     cursor: pointer;
+}
+
+/* Timezone detected indicator */
+.detected-indicator {
+    color: var(--success-color);
+    font-weight: 500;
+}
+
+#timezone-detected-hint {
+    margin-top: 6px;
+    color: #666;
 }
 </style>
 {{end}}

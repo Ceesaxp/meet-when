@@ -99,8 +99,8 @@
                 "Verify in browser using dev-browser skill"
             ],
             "priority": 6,
-            "passes": false,
-            "notes": ""
+            "passes": true,
+            "notes": "Added timezone picker to onboarding Step 1 (Working Hours). Uses Intl.DateTimeFormat().resolvedOptions().timeZone for auto-detection. Shows 'Detected from your browser' indicator when auto-detected. User can change timezone via searchable picker before submitting. Timezone is saved when working hours are submitted."
         },
         {
             "id": "US-007",

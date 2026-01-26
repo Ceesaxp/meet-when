@@ -108,6 +108,16 @@ func (h *OnboardingHandler) SaveWorkingHours(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// Save timezone if provided
+	timezone := r.FormValue("timezone")
+	if timezone != "" {
+		host.Host.Timezone = timezone
+		if err := h.handlers.services.Auth.UpdateHost(r.Context(), host.Host); err != nil {
+			log.Printf("[ONBOARDING] Failed to update host timezone: %v", err)
+			// Continue anyway, timezone is not critical
+		}
+	}
+
 	now := models.Now()
 	var hours []*models.WorkingHours
 
