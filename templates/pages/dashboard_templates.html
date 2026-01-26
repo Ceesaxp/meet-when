@@ -39,6 +39,17 @@ function copyTemplateLink(btn, url) {
             <span>{{index .Durations 0}} min</span>
             <span>{{.LocationType}}</span>
         </div>
+        {{$counts := index $.Data.BookingCounts .ID}}
+        <div class="template-bookings">
+            {{if $counts}}
+            <span class="booking-count">{{$counts.Total}} booking{{if ne $counts.Total 1}}s{{end}}</span>
+            {{if or $counts.Pending $counts.Confirmed}}
+            <span class="booking-breakdown">({{if $counts.Pending}}{{$counts.Pending}} pending{{end}}{{if and $counts.Pending $counts.Confirmed}}, {{end}}{{if $counts.Confirmed}}{{$counts.Confirmed}} confirmed{{end}})</span>
+            {{end}}
+            {{else}}
+            <span class="booking-count">0 bookings</span>
+            {{end}}
+        </div>
         <div class="template-actions">
             <button type="button" class="btn btn-sm btn-copy" onclick="copyTemplateLink(this, '{{$.BaseURL}}/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}')">Copy Link</button>
             <a href="/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}" target="_blank" class="btn btn-sm">Preview</a>

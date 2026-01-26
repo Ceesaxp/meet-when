@@ -490,7 +490,23 @@ a:hover {
     gap: 1rem;
     font-size: 0.75rem;
     color: var(--text-light);
+    margin-bottom: 0.5rem;
+}
+
+.template-bookings {
+    font-size: 0.75rem;
+    color: var(--text-light);
     margin-bottom: 1rem;
+}
+
+.template-bookings .booking-count {
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.template-bookings .booking-breakdown {
+    color: var(--text-light);
+    margin-left: 0.25rem;
 }
 
 .template-actions {

@@ -459,6 +459,11 @@ func (s *BookingService) RescheduleBooking(ctx context.Context, input Reschedule
 	return details, oldStartTime, nil
 }
 
+// GetBookingCountsByHostID returns booking counts grouped by template for a given host
+func (s *BookingService) GetBookingCountsByHostID(ctx context.Context, hostID string) (map[string]*repository.BookingCount, error) {
+	return s.repos.Booking.GetBookingCountsByHostID(ctx, hostID)
+}
+
 // processConfirmedBooking handles post-confirmation actions
 func (s *BookingService) processConfirmedBooking(ctx context.Context, details *BookingWithDetails) error {
 	log.Printf("[BOOKING] processConfirmedBooking: booking=%s template=%s calendar=%s",

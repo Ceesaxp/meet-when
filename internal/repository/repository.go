@@ -745,6 +745,57 @@ func (r *BookingRepository) MarkReminderSent(ctx context.Context, bookingID stri
 	return err
 }
 
+// BookingCount holds the count of bookings by status for a template
+type BookingCount struct {
+	TemplateID string
+	Total      int
+	Pending    int
+	Confirmed  int
+}
+
+// GetBookingCountsByHostID returns booking counts grouped by template for a given host
+func (r *BookingRepository) GetBookingCountsByHostID(ctx context.Context, hostID string) (map[string]*BookingCount, error) {
+	query := q(r.driver, `
+		SELECT template_id, status, COUNT(*) as count
+		FROM bookings
+		WHERE host_id = $1
+		GROUP BY template_id, status
+	`)
+	rows, err := r.db.QueryContext(ctx, query, hostID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error closing rows: %v", err)
+		}
+	}()
+
+	counts := make(map[string]*BookingCount)
+	for rows.Next() {
+		var templateID string
+		var status string
+		var count int
+		if err := rows.Scan(&templateID, &status, &count); err != nil {
+			return nil, err
+		}
+
+		if _, ok := counts[templateID]; !ok {
+			counts[templateID] = &BookingCount{TemplateID: templateID}
+		}
+
+		counts[templateID].Total += count
+		switch status {
+		case "pending":
+			counts[templateID].Pending = count
+		case "confirmed":
+			counts[templateID].Confirmed = count
+		}
+	}
+
+	return counts, nil
+}
+
 // SessionRepository handles session database operations
 type SessionRepository struct {
 	db     *sql.DB

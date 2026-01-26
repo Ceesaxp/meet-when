@@ -167,13 +167,15 @@ func (h *DashboardHandler) Templates(w http.ResponseWriter, r *http.Request) {
 	}
 
 	templates, _ := h.handlers.services.Template.GetTemplates(r.Context(), host.Host.ID)
+	bookingCounts, _ := h.handlers.services.Booking.GetBookingCountsByHostID(r.Context(), host.Host.ID)
 
 	h.handlers.render(w, "dashboard_templates.html", PageData{
 		Title:  "Meeting Templates",
 		Host:   host.Host,
 		Tenant: host.Tenant,
 		Data: map[string]interface{}{
-			"Templates": templates,
+			"Templates":     templates,
+			"BookingCounts": bookingCounts,
 		},
 	})
 }
