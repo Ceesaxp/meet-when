@@ -48,9 +48,12 @@ func main() {
 	// Initialize services
 	svc := services.New(cfg, repos)
 
-	// Start background reminder service
+	// Start background services
 	svc.Reminder.Start()
 	defer svc.Reminder.Stop()
+
+	svc.CalendarSync.Start()
+	defer svc.CalendarSync.Stop()
 
 	// Initialize handlers
 	h := handlers.New(cfg, svc)

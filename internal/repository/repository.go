@@ -283,6 +283,43 @@ func (r *CalendarRepository) UpdateSyncStatus(ctx context.Context, calendarID st
 	return err
 }
 
+// GetAll returns all calendar connections across all hosts (for background sync)
+func (r *CalendarRepository) GetAll(ctx context.Context) ([]*models.CalendarConnection, error) {
+	query := q(r.driver, `
+		SELECT id, host_id, provider, name, calendar_id, access_token, refresh_token,
+		       token_expiry, caldav_url, caldav_username, caldav_password, is_default,
+		       last_synced_at, COALESCE(sync_status, 'unknown'), COALESCE(sync_error, ''),
+		       created_at, updated_at
+		FROM calendar_connections
+		ORDER BY created_at ASC
+	`)
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error closing rows: %v", err)
+		}
+	}()
+
+	var calendars []*models.CalendarConnection
+	for rows.Next() {
+		cal := &models.CalendarConnection{}
+		err := rows.Scan(
+			&cal.ID, &cal.HostID, &cal.Provider, &cal.Name, &cal.CalendarID,
+			&cal.AccessToken, &cal.RefreshToken, &cal.TokenExpiry,
+			&cal.CalDAVURL, &cal.CalDAVUsername, &cal.CalDAVPassword,
+			&cal.IsDefault, &cal.LastSyncedAt, &cal.SyncStatus, &cal.SyncError,
+			&cal.CreatedAt, &cal.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		calendars = append(calendars, cal)
+	}
+	return calendars, nil
+}
+
 func (r *CalendarRepository) Delete(ctx context.Context, id string) error {
 	query := q(r.driver, `DELETE FROM calendar_connections WHERE id = $1`)
 	_, err := r.db.ExecContext(ctx, query, id)

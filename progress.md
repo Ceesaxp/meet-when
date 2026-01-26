@@ -821,3 +821,50 @@ The following features from the requirements document are already fully implemen
   - Always verify acceptance criteria even when work appears to be bundled with another feature
 
 ---
+
+## 2026-01-26 - US-006 - Auto-detect timezone during onboarding
+- What was implemented:
+  - Added timezone picker to onboarding Step 1 (Working Hours page)
+  - Reused the existing `TimezonePicker` JavaScript component from `static/js/timezone-picker.js`
+  - Auto-detects timezone using `Intl.DateTimeFormat().resolvedOptions().timeZone` on page load
+  - Shows "Detected from your browser" indicator when timezone is auto-detected
+  - Indicator hidden when user manually selects a different timezone
+  - Falls back gracefully if detection fails (catch block, leaves field empty for manual selection)
+  - Saves timezone to host profile when working hours form is submitted
+  - User can change timezone via searchable picker before submitting
+- Files changed:
+  - `templates/pages/onboarding.html` - Added timezone picker UI to Step 1, JavaScript for auto-detection and initialization
+  - `internal/handlers/onboarding.go` - Updated SaveWorkingHours to also save the detected/selected timezone
+- **Learnings for future iterations:**
+  - The `TimezonePicker` component was already built for US-004, making integration straightforward
+  - Use `setInterval` with a check for `picker.timezones.length > 0` to wait for async data loading before setting timezone
+  - Always add a timeout to interval checks to prevent infinite loops if data never loads
+  - The onboarding flow is in 3 steps: Working Hours → Calendar → First Template. Timezone fits naturally in Step 1 since it affects availability context
+  - The `plans/` directory is gitignored, so PRD updates are local only
+
+---
+
+## 2026-01-26 - US-007 - Add background calendar sync scheduler
+- What was implemented:
+  - Created `CalendarSyncService` in `internal/services/calendar_sync.go` following the `ReminderService` pattern
+  - Background goroutine starts when server launches and runs every 15 minutes
+  - Added `GetAll` method to `CalendarRepository` to fetch all calendar connections across all hosts
+  - Added `SyncCalendar` method to `CalendarService` for syncing individual calendars (used by background job)
+  - Added `GetAllCalendars` method to `CalendarService` as a wrapper for repository access
+  - Service iterates through all calendar connections, calling sync logic for each
+  - Updates `last_synced_at` timestamp on success, `sync_status` to failed with error message on failure
+  - Graceful shutdown via `sync.WaitGroup` and stop channel
+  - Logs sync progress: starting count, success/failure counts at completion
+- Files changed:
+  - `internal/repository/repository.go` - Added `GetAll` method to CalendarRepository (~30 lines)
+  - `internal/services/calendar.go` - Added `SyncCalendar` and `GetAllCalendars` methods (~40 lines)
+  - `internal/services/calendar_sync.go` - New file with CalendarSyncService (~90 lines)
+  - `internal/services/services.go` - Added CalendarSync to Services struct and initialization
+  - `cmd/server/main.go` - Added Start/Stop calls for CalendarSync service
+- **Learnings for future iterations:**
+  - The `ReminderService` pattern is the standard for background jobs: WaitGroup, stop channel, ticker, immediate run on startup
+  - Better to add public methods to the target service (`CalendarService.SyncCalendar`) than access private methods from another service
+  - The `GetAll` repository method doesn't filter by tenant/host since background sync needs all calendars
+  - Using `defer svc.CalendarSync.Stop()` ensures proper shutdown sequence when server receives SIGINT/SIGTERM
+
+---
