@@ -291,7 +291,8 @@ The following features from the requirements document are already fully implemen
 - **Learnings for future iterations:**
   - SQLite uses INTEGER for booleans (0/1), while PostgreSQL uses BOOLEAN - migrations need to be separate for each driver
   - The reminder window is 23-25 hours to ensure bookings don't slip through the 15-minute check intervals
-  - Using COALESCE(reminder_sent, 0) in queries handles NULL values from existing rows before migration
+  - Using COALESCE(reminder_sent, false) in queries handles NULL values from existing rows before migration
+  - PostgreSQL does not allow mixing types in COALESCE, hence must match to field types, e.g. COALESCE(is_boolean_var, false), but COALESCE(string_var, '')
   - Background services should use sync.WaitGroup for graceful shutdown to ensure clean exit
   - The SendBookingReminder follows the same pattern as sendInviteeConfirmation - check for custom template, render placeholders, fall back to default
 
@@ -799,5 +800,24 @@ The following features from the requirements document are already fully implemen
   - Sticky region headers (`position: sticky`) improve usability in long dropdown lists
   - `scrollIntoView({ block: 'nearest' })` ensures keyboard-selected items are visible without jarring scroll jumps
   - HTML escaping is critical when rendering user-filtered results to prevent XSS
+
+---
+
+## 2026-01-26 - US-005 - Integrate timezone picker into settings page
+- What was implemented:
+  - This feature was already fully implemented as part of US-004 (commit b0f0576)
+  - The TimezonePicker component is integrated into `dashboard_settings.html`
+  - Current timezone is pre-populated via `initialValue: '{{.Host.Timezone}}'` and `setTimezone()` method
+  - Hidden input with `name="timezone"` ensures value is submitted with form
+  - Works with existing PUT form submission via `_method=PUT` override
+  - Dropdown styles are consistent with form inputs (max-height: 300px with scroll)
+  - Typecheck passes
+- Files changed:
+  - No new files changed - implementation was part of US-004
+  - PRD updated to mark US-005 as passing
+- **Learnings for future iterations:**
+  - When implementing a component (US-004), integration into the target page (US-005) can often be done simultaneously
+  - The progress notes in US-004 mentioned "Integrated into dashboard settings page" which indicated US-005 was complete
+  - Always verify acceptance criteria even when work appears to be bundled with another feature
 
 ---
