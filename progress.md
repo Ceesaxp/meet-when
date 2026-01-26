@@ -166,3 +166,22 @@ The following features from the requirements document are already fully implemen
   - For confirmed bookings, need to delete old calendar event before creating new one to avoid duplicates
 
 ---
+
+## 2026-01-26 - US-006 - Add agenda/subject field to booking form
+- What was implemented:
+  - Added 'Meeting Subject/Agenda' optional textarea to the public booking form
+  - Agenda is stored in `booking.answers` JSON field with key `"agenda"`
+  - Display agenda in host notification emails (both booking requested and confirmed emails)
+  - Include agenda in calendar event descriptions (Google Calendar API, CalDAV, and ICS attachments)
+- Files changed:
+  - `templates/pages/public_template.html` - Added agenda textarea field in booking form
+  - `internal/handlers/public.go` - Updated CreateBooking to always initialize answers map and store agenda
+  - `internal/services/email.go` - Added agenda section to SendBookingRequested, sendHostConfirmation, and generateICS
+  - `internal/services/calendar.go` - Added agenda to description in createGoogleEvent and createCalDAVEvent
+- **Learnings for future iterations:**
+  - The `Answers` field on Booking uses `models.JSONMap` which is a `map[string]interface{}` - need type assertion when reading values
+  - CalDAV/ICS uses escaped newlines (`\\n`) in DESCRIPTION field, while Google Calendar API accepts regular newlines
+  - The existing custom questions parser in CreateBooking had issues with `string(rune(i))` for indices > 9 - same bug fixed in US-004
+  - Always initialize the answers map even if no custom questions, to ensure agenda can be stored
+
+---

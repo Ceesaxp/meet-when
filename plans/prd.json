@@ -96,8 +96,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": "PRD Section 6.3 requires free-text agenda field"
+      "passes": true,
+      "notes": "Implemented agenda textarea on booking form, stored in answers['agenda'], displayed in host emails and calendar event descriptions"
     },
     {
       "id": "US-007",
