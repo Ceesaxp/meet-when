@@ -1824,6 +1824,16 @@ body.modal-open {
     cursor: default;
 }
 
+/* Archived booking row styling */
+.bookings-table .booking-row.archived {
+    opacity: 0.6;
+    background-color: var(--bg-color);
+}
+
+.bookings-table .booking-row.archived:hover {
+    opacity: 0.8;
+}
+
 /* Searchable Timezone Picker Component */
 .tz-picker-container {
     position: relative;

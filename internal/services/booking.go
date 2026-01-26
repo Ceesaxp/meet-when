@@ -464,6 +464,30 @@ func (s *BookingService) GetBookingCountsByHostID(ctx context.Context, hostID st
 	return s.repos.Booking.GetBookingCountsByHostID(ctx, hostID)
 }
 
+// ArchiveBooking archives a cancelled or rejected booking
+func (s *BookingService) ArchiveBooking(ctx context.Context, hostID, tenantID, bookingID string) error {
+	booking, err := s.repos.Booking.GetByID(ctx, bookingID)
+	if err != nil || booking == nil || booking.HostID != hostID {
+		return ErrBookingNotFound
+	}
+
+	// Only allow archiving cancelled or rejected bookings
+	if booking.Status != models.BookingStatusCancelled && booking.Status != models.BookingStatusRejected {
+		return errors.New("only cancelled or rejected bookings can be archived")
+	}
+
+	booking.IsArchived = true
+
+	if err := s.repos.Booking.Update(ctx, booking); err != nil {
+		return err
+	}
+
+	// Audit log
+	s.auditLog.Log(ctx, tenantID, &hostID, "booking.archived", "booking", bookingID, nil, "")
+
+	return nil
+}
+
 // processConfirmedBooking handles post-confirmation actions
 func (s *BookingService) processConfirmedBooking(ctx context.Context, details *BookingWithDetails) error {
 	log.Printf("[BOOKING] processConfirmedBooking: booking=%s template=%s calendar=%s",

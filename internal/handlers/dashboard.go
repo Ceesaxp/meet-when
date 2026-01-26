@@ -561,6 +561,37 @@ func (h *DashboardHandler) CancelBooking(w http.ResponseWriter, r *http.Request)
 	h.handlers.redirect(w, r, "/dashboard/bookings")
 }
 
+// ArchiveBooking archives a cancelled or rejected booking
+func (h *DashboardHandler) ArchiveBooking(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	bookingID := r.PathValue("id")
+	err := h.handlers.services.Booking.ArchiveBooking(r.Context(), host.Host.ID, host.Tenant.ID, bookingID)
+
+	// For HTMX requests, return empty content (row disappears)
+	if r.Header.Get("HX-Request") == "true" {
+		if err != nil {
+			http.Error(w, "Failed to archive booking", http.StatusBadRequest)
+			return
+		}
+		// Return empty response - the row will be removed via hx-swap="outerHTML"
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// For regular requests, redirect
+	if err != nil {
+		h.handlers.redirect(w, r, "/dashboard/bookings?error=archive_failed")
+		return
+	}
+
+	h.handlers.redirect(w, r, "/dashboard/bookings")
+}
+
 // Settings renders the settings page
 func (h *DashboardHandler) Settings(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())

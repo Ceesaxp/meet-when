@@ -28,7 +28,7 @@
     </thead>
     <tbody>
         {{range .Data.Bookings}}
-        <tr class="booking-row" data-booking-id="{{.ID}}" onclick="openBookingModal('{{.ID}}')">
+        <tr class="booking-row{{if .IsArchived}} archived{{end}}" id="booking-row-{{.ID}}" data-booking-id="{{.ID}}" onclick="openBookingModal('{{.ID}}')">
             <td>
                 {{formatDate .StartTime}}<br>
                 <small>{{formatTime .StartTime}} - {{formatTime .EndTime}}</small>
@@ -62,6 +62,14 @@
                     <input type="hidden" name="reason" value="">
                     <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Cancel this booking?')">Cancel</button>
                 </form>
+                {{else if or (eq .Status "cancelled") (eq .Status "rejected")}}
+                {{if not .IsArchived}}
+                <button type="button" class="btn btn-sm btn-outline"
+                    hx-post="/dashboard/bookings/{{.ID}}/archive"
+                    hx-target="#booking-row-{{.ID}}"
+                    hx-swap="outerHTML"
+                    hx-confirm="Archive this booking?">Archive</button>
+                {{end}}
                 {{end}}
             </td>
         </tr>
