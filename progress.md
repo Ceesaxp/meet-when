@@ -438,3 +438,24 @@ The following features from the requirements document are already fully implemen
   - Template data access in nested templates: pass data through `StepData` map and access via `$stepData := .Data.StepData`
 
 ---
+
+## 2026-01-26 - US-015 - Add copy booking link button
+- What was implemented:
+  - Added "Copy Link" button to each template card in the Meeting Types list
+  - Improved dashboard home's "Copy Link" button with visual feedback instead of alert
+  - Both buttons show "Copied!" confirmation with green color for 2 seconds
+  - Button changes back to original state after timeout
+  - Graceful error handling with console logging and fallback alert
+  - Added CSS styles for `.btn-copy` (primary color) and `.btn-copied` (success color) states
+- Files changed:
+  - `templates/pages/dashboard_templates.html` - Added Copy Link button and copyTemplateLink() function
+  - `templates/pages/dashboard_home.html` - Updated copyLink() function with visual feedback
+  - `static/css/style.css` - Added btn-copy and btn-copied styles with hover state
+- **Learnings for future iterations:**
+  - The `navigator.clipboard.writeText()` returns a Promise - use `.then()/.catch()` for proper error handling
+  - Go templates can pass JavaScript string literals directly: `onclick="copyTemplateLink(this, '{{$.BaseURL}}/...')"`
+  - Use `btn.textContent` instead of `innerHTML` for simple text changes
+  - Adding/removing CSS classes via `classList.add()/remove()` is cleaner than manipulating style directly
+  - The `alert()` was replaced with in-place visual feedback for better UX
+
+---
