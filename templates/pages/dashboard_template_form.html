@@ -168,98 +168,8 @@
         </div>
 
         <div id="availability-rules-container" style="display: none;">
-            <div class="availability-days">
-                <div class="availability-day" data-day="0">
-                    <label class="checkbox-label">
-                        <input type="checkbox" class="day-enabled" data-day="0" onchange="updateAvailabilityRules()">
-                        <span>Sunday</span>
-                    </label>
-                    <div class="day-time-ranges" style="display: none;">
-                        <div class="time-range">
-                            <input type="time" class="day-start" data-day="0" value="09:00" onchange="updateAvailabilityRules()">
-                            <span>to</span>
-                            <input type="time" class="day-end" data-day="0" value="17:00" onchange="updateAvailabilityRules()">
-                        </div>
-                    </div>
-                </div>
-                <div class="availability-day" data-day="1">
-                    <label class="checkbox-label">
-                        <input type="checkbox" class="day-enabled" data-day="1" onchange="updateAvailabilityRules()">
-                        <span>Monday</span>
-                    </label>
-                    <div class="day-time-ranges" style="display: none;">
-                        <div class="time-range">
-                            <input type="time" class="day-start" data-day="1" value="09:00" onchange="updateAvailabilityRules()">
-                            <span>to</span>
-                            <input type="time" class="day-end" data-day="1" value="17:00" onchange="updateAvailabilityRules()">
-                        </div>
-                    </div>
-                </div>
-                <div class="availability-day" data-day="2">
-                    <label class="checkbox-label">
-                        <input type="checkbox" class="day-enabled" data-day="2" onchange="updateAvailabilityRules()">
-                        <span>Tuesday</span>
-                    </label>
-                    <div class="day-time-ranges" style="display: none;">
-                        <div class="time-range">
-                            <input type="time" class="day-start" data-day="2" value="09:00" onchange="updateAvailabilityRules()">
-                            <span>to</span>
-                            <input type="time" class="day-end" data-day="2" value="17:00" onchange="updateAvailabilityRules()">
-                        </div>
-                    </div>
-                </div>
-                <div class="availability-day" data-day="3">
-                    <label class="checkbox-label">
-                        <input type="checkbox" class="day-enabled" data-day="3" onchange="updateAvailabilityRules()">
-                        <span>Wednesday</span>
-                    </label>
-                    <div class="day-time-ranges" style="display: none;">
-                        <div class="time-range">
-                            <input type="time" class="day-start" data-day="3" value="09:00" onchange="updateAvailabilityRules()">
-                            <span>to</span>
-                            <input type="time" class="day-end" data-day="3" value="17:00" onchange="updateAvailabilityRules()">
-                        </div>
-                    </div>
-                </div>
-                <div class="availability-day" data-day="4">
-                    <label class="checkbox-label">
-                        <input type="checkbox" class="day-enabled" data-day="4" onchange="updateAvailabilityRules()">
-                        <span>Thursday</span>
-                    </label>
-                    <div class="day-time-ranges" style="display: none;">
-                        <div class="time-range">
-                            <input type="time" class="day-start" data-day="4" value="09:00" onchange="updateAvailabilityRules()">
-                            <span>to</span>
-                            <input type="time" class="day-end" data-day="4" value="17:00" onchange="updateAvailabilityRules()">
-                        </div>
-                    </div>
-                </div>
-                <div class="availability-day" data-day="5">
-                    <label class="checkbox-label">
-                        <input type="checkbox" class="day-enabled" data-day="5" onchange="updateAvailabilityRules()">
-                        <span>Friday</span>
-                    </label>
-                    <div class="day-time-ranges" style="display: none;">
-                        <div class="time-range">
-                            <input type="time" class="day-start" data-day="5" value="09:00" onchange="updateAvailabilityRules()">
-                            <span>to</span>
-                            <input type="time" class="day-end" data-day="5" value="17:00" onchange="updateAvailabilityRules()">
-                        </div>
-                    </div>
-                </div>
-                <div class="availability-day" data-day="6">
-                    <label class="checkbox-label">
-                        <input type="checkbox" class="day-enabled" data-day="6" onchange="updateAvailabilityRules()">
-                        <span>Saturday</span>
-                    </label>
-                    <div class="day-time-ranges" style="display: none;">
-                        <div class="time-range">
-                            <input type="time" class="day-start" data-day="6" value="09:00" onchange="updateAvailabilityRules()">
-                            <span>to</span>
-                            <input type="time" class="day-end" data-day="6" value="17:00" onchange="updateAvailabilityRules()">
-                        </div>
-                    </div>
-                </div>
+            <div class="availability-days" id="availability-days-container">
+                <!-- Days will be rendered by JavaScript -->
             </div>
         </div>
         <input type="hidden" name="availability_rules" id="availability_rules_json">
@@ -488,6 +398,8 @@ document.querySelector('form').addEventListener('submit', function() {
 
 // Availability Rules Builder
 var availabilityRules = null;
+var dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+var MAX_INTERVALS_PER_DAY = 2;
 
 // Initialize availability rules from template data
 {{if .Data.Template}}{{if .Data.Template.AvailabilityRules}}
@@ -509,6 +421,7 @@ function toggleCustomAvailability() {
             availabilityRules = { enabled: true, days: {} };
         }
         availabilityRules.enabled = true;
+        renderAvailabilityDays();
     } else {
         container.style.display = 'none';
         if (availabilityRules) {
@@ -516,6 +429,237 @@ function toggleCustomAvailability() {
         }
     }
     updateAvailabilityHiddenInput();
+}
+
+function renderAvailabilityDays() {
+    var container = document.getElementById('availability-days-container');
+    container.innerHTML = '';
+
+    for (var day = 0; day <= 6; day++) {
+        var dayData = (availabilityRules && availabilityRules.days && availabilityRules.days[day]) || null;
+        var isEnabled = dayData && dayData.enabled;
+        var intervals = [];
+
+        if (dayData) {
+            // Support new format (intervals array) or old format (single start/end)
+            if (dayData.intervals && dayData.intervals.length > 0) {
+                intervals = dayData.intervals;
+            } else if (dayData.start && dayData.end) {
+                intervals = [{ start: dayData.start, end: dayData.end }];
+            }
+        }
+
+        // Default interval if day is enabled but no intervals exist
+        if (isEnabled && intervals.length === 0) {
+            intervals = [{ start: '09:00', end: '17:00' }];
+        }
+
+        var dayDiv = document.createElement('div');
+        dayDiv.className = 'availability-day';
+        dayDiv.setAttribute('data-day', day);
+
+        var dayHeader = document.createElement('div');
+        dayHeader.className = 'day-header';
+        dayHeader.innerHTML = `
+            <label class="checkbox-label">
+                <input type="checkbox" class="day-enabled" data-day="${day}" onchange="toggleDay(${day})" ${isEnabled ? 'checked' : ''}>
+                <span>${dayNames[day]}</span>
+            </label>
+        `;
+        dayDiv.appendChild(dayHeader);
+
+        var timeRangesDiv = document.createElement('div');
+        timeRangesDiv.className = 'day-time-ranges';
+        timeRangesDiv.id = 'day-time-ranges-' + day;
+        timeRangesDiv.style.display = isEnabled ? 'block' : 'none';
+
+        // Render intervals
+        var intervalsContainer = document.createElement('div');
+        intervalsContainer.className = 'intervals-container';
+        intervalsContainer.id = 'intervals-container-' + day;
+
+        if (isEnabled && intervals.length > 0) {
+            intervals.forEach(function(interval, idx) {
+                intervalsContainer.appendChild(createIntervalElement(day, idx, interval.start, interval.end, intervals.length));
+            });
+        } else {
+            // Default interval for when day gets enabled
+            intervalsContainer.appendChild(createIntervalElement(day, 0, '09:00', '17:00', 1));
+        }
+
+        timeRangesDiv.appendChild(intervalsContainer);
+
+        // Add interval button (shown only if less than MAX_INTERVALS_PER_DAY intervals)
+        var addIntervalBtn = document.createElement('button');
+        addIntervalBtn.type = 'button';
+        addIntervalBtn.className = 'btn btn-sm btn-add-interval';
+        addIntervalBtn.id = 'add-interval-btn-' + day;
+        addIntervalBtn.textContent = '+ Add interval';
+        addIntervalBtn.onclick = function(d) {
+            return function() { addInterval(d); };
+        }(day);
+        addIntervalBtn.style.display = (isEnabled && intervals.length < MAX_INTERVALS_PER_DAY) ? 'inline-block' : 'none';
+        timeRangesDiv.appendChild(addIntervalBtn);
+
+        dayDiv.appendChild(timeRangesDiv);
+        container.appendChild(dayDiv);
+    }
+}
+
+function createIntervalElement(day, index, start, end, totalIntervals) {
+    var intervalDiv = document.createElement('div');
+    intervalDiv.className = 'time-range';
+    intervalDiv.setAttribute('data-day', day);
+    intervalDiv.setAttribute('data-index', index);
+
+    var startInput = document.createElement('input');
+    startInput.type = 'time';
+    startInput.className = 'interval-start';
+    startInput.value = start;
+    startInput.onchange = function() { updateAvailabilityRules(); };
+
+    var toSpan = document.createElement('span');
+    toSpan.textContent = 'to';
+
+    var endInput = document.createElement('input');
+    endInput.type = 'time';
+    endInput.className = 'interval-end';
+    endInput.value = end;
+    endInput.onchange = function() { updateAvailabilityRules(); };
+
+    intervalDiv.appendChild(startInput);
+    intervalDiv.appendChild(toSpan);
+    intervalDiv.appendChild(endInput);
+
+    // Remove button (only show if more than 1 interval)
+    if (totalIntervals > 1) {
+        var removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn btn-sm btn-remove-interval';
+        removeBtn.textContent = 'Remove';
+        removeBtn.onclick = function(d, i) {
+            return function() { removeInterval(d, i); };
+        }(day, index);
+        intervalDiv.appendChild(removeBtn);
+    }
+
+    return intervalDiv;
+}
+
+function toggleDay(day) {
+    var checkbox = document.querySelector('.day-enabled[data-day="' + day + '"]');
+    var timeRangesDiv = document.getElementById('day-time-ranges-' + day);
+    var addIntervalBtn = document.getElementById('add-interval-btn-' + day);
+
+    if (checkbox.checked) {
+        timeRangesDiv.style.display = 'block';
+        // Show add interval button if less than max intervals
+        var intervalsContainer = document.getElementById('intervals-container-' + day);
+        var currentIntervals = intervalsContainer.querySelectorAll('.time-range').length;
+        addIntervalBtn.style.display = currentIntervals < MAX_INTERVALS_PER_DAY ? 'inline-block' : 'none';
+    } else {
+        timeRangesDiv.style.display = 'none';
+    }
+
+    updateAvailabilityRules();
+}
+
+function addInterval(day) {
+    var intervalsContainer = document.getElementById('intervals-container-' + day);
+    var currentIntervals = intervalsContainer.querySelectorAll('.time-range');
+    var currentCount = currentIntervals.length;
+
+    if (currentCount >= MAX_INTERVALS_PER_DAY) {
+        return;
+    }
+
+    // Get smart default times based on first interval
+    var firstInterval = currentIntervals[0];
+    var firstStart = firstInterval.querySelector('.interval-start').value;
+    var firstEnd = firstInterval.querySelector('.interval-end').value;
+
+    var newStart, newEnd;
+    // If first interval ends at or before 12:00, default to afternoon (13:00-17:00)
+    if (firstEnd <= '12:00') {
+        newStart = '13:00';
+        newEnd = '17:00';
+    } else {
+        // Otherwise, start 1 hour after first interval ends, for 3 hours
+        var endParts = firstEnd.split(':');
+        var endHour = parseInt(endParts[0], 10);
+        var endMin = parseInt(endParts[1], 10);
+        var newStartHour = endHour + 1;
+        var newEndHour = newStartHour + 3;
+        if (newEndHour > 23) newEndHour = 23;
+        newStart = String(newStartHour).padStart(2, '0') + ':' + String(endMin).padStart(2, '0');
+        newEnd = String(newEndHour).padStart(2, '0') + ':' + String(endMin).padStart(2, '0');
+    }
+
+    var newIndex = currentCount;
+    var newTotal = currentCount + 1;
+
+    // Add new interval
+    intervalsContainer.appendChild(createIntervalElement(day, newIndex, newStart, newEnd, newTotal));
+
+    // Update remove buttons on existing intervals (they now need remove buttons)
+    updateRemoveButtons(day);
+
+    // Hide add interval button if we've reached max
+    var addIntervalBtn = document.getElementById('add-interval-btn-' + day);
+    if (newTotal >= MAX_INTERVALS_PER_DAY) {
+        addIntervalBtn.style.display = 'none';
+    }
+
+    updateAvailabilityRules();
+}
+
+function removeInterval(day, index) {
+    var intervalsContainer = document.getElementById('intervals-container-' + day);
+    var intervals = intervalsContainer.querySelectorAll('.time-range');
+
+    if (intervals.length <= 1) {
+        return; // Can't remove the last interval
+    }
+
+    // Remove the interval at the given index
+    intervals[index].remove();
+
+    // Re-index remaining intervals and update remove buttons
+    updateRemoveButtons(day);
+
+    // Show add interval button
+    var addIntervalBtn = document.getElementById('add-interval-btn-' + day);
+    addIntervalBtn.style.display = 'inline-block';
+
+    updateAvailabilityRules();
+}
+
+function updateRemoveButtons(day) {
+    var intervalsContainer = document.getElementById('intervals-container-' + day);
+    var intervals = intervalsContainer.querySelectorAll('.time-range');
+    var totalIntervals = intervals.length;
+
+    intervals.forEach(function(interval, idx) {
+        interval.setAttribute('data-index', idx);
+
+        // Remove existing remove button if any
+        var existingBtn = interval.querySelector('.btn-remove-interval');
+        if (existingBtn) {
+            existingBtn.remove();
+        }
+
+        // Add remove button if more than 1 interval
+        if (totalIntervals > 1) {
+            var removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn btn-sm btn-remove-interval';
+            removeBtn.textContent = 'Remove';
+            removeBtn.onclick = function(d, i) {
+                return function() { removeInterval(d, i); };
+            }(day, idx);
+            interval.appendChild(removeBtn);
+        }
+    });
 }
 
 function updateAvailabilityRules() {
@@ -526,19 +670,24 @@ function updateAvailabilityRules() {
     var days = {};
     for (var day = 0; day <= 6; day++) {
         var enabledCheckbox = document.querySelector('.day-enabled[data-day="' + day + '"]');
-        var startInput = document.querySelector('.day-start[data-day="' + day + '"]');
-        var endInput = document.querySelector('.day-end[data-day="' + day + '"]');
-        var timeRangesDiv = enabledCheckbox.closest('.availability-day').querySelector('.day-time-ranges');
 
-        if (enabledCheckbox.checked) {
-            timeRangesDiv.style.display = 'block';
+        if (enabledCheckbox && enabledCheckbox.checked) {
+            var intervalsContainer = document.getElementById('intervals-container-' + day);
+            var intervalElements = intervalsContainer.querySelectorAll('.time-range');
+            var intervals = [];
+
+            intervalElements.forEach(function(el) {
+                var start = el.querySelector('.interval-start').value;
+                var end = el.querySelector('.interval-end').value;
+                if (start && end) {
+                    intervals.push({ start: start, end: end });
+                }
+            });
+
             days[day] = {
                 enabled: true,
-                start: startInput.value,
-                end: endInput.value
+                intervals: intervals
             };
-        } else {
-            timeRangesDiv.style.display = 'none';
         }
     }
 
@@ -558,26 +707,15 @@ function updateAvailabilityHiddenInput() {
 }
 
 function initializeAvailabilityRules() {
-    if (availabilityRules && availabilityRules.enabled && availabilityRules.days) {
+    // Render the days first
+    renderAvailabilityDays();
+
+    if (availabilityRules && availabilityRules.enabled) {
         // Enable custom availability checkbox
         document.getElementById('use_custom_availability').checked = true;
         document.getElementById('availability-rules-container').style.display = 'block';
-
-        // Set up each day
-        for (var day in availabilityRules.days) {
-            var dayData = availabilityRules.days[day];
-            if (dayData.enabled) {
-                var enabledCheckbox = document.querySelector('.day-enabled[data-day="' + day + '"]');
-                var startInput = document.querySelector('.day-start[data-day="' + day + '"]');
-                var endInput = document.querySelector('.day-end[data-day="' + day + '"]');
-                var timeRangesDiv = enabledCheckbox.closest('.availability-day').querySelector('.day-time-ranges');
-
-                enabledCheckbox.checked = true;
-                startInput.value = dayData.start || '09:00';
-                endInput.value = dayData.end || '17:00';
-                timeRangesDiv.style.display = 'block';
-            }
-        }
+        // Re-render with the actual data
+        renderAvailabilityDays();
     }
     updateAvailabilityHiddenInput();
 }
