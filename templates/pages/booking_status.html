@@ -44,10 +44,18 @@
                 <strong>Duration:</strong>
                 {{.Data.Booking.Duration}} minutes
             </div>
-            {{if and (eq .Data.Booking.Status "confirmed") .Data.Booking.ConferenceLink}}
+            {{if eq .Data.Booking.Status "confirmed"}}
             <div class="booking-detail">
                 <strong>Location:</strong>
+                {{if eq .Data.Template.LocationType "phone"}}
+                Call {{.Data.Template.CustomLocation}}
+                {{else if eq .Data.Template.LocationType "custom"}}
+                {{.Data.Template.CustomLocation}}
+                {{else if .Data.Booking.ConferenceLink}}
                 <a href="{{.Data.Booking.ConferenceLink}}" target="_blank">{{.Data.Booking.ConferenceLink}}</a>
+                {{else}}
+                {{if eq .Data.Template.LocationType "google_meet"}}Google Meet (link will be in calendar invite){{else if eq .Data.Template.LocationType "zoom"}}Zoom (link will be in calendar invite){{end}}
+                {{end}}
             </div>
             {{end}}
         </div>

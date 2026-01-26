@@ -180,8 +180,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 11,
-      "passes": false,
-      "notes": "Phone provider constant exists but UI needs implementation"
+      "passes": true,
+      "notes": "Implemented phone-specific label and placeholder in template form, 'Call [number]' display on public booking page, booking status page, confirmation emails, ICS attachments, and calendar events (Google Calendar and CalDAV)"
     },
     {
       "id": "US-012",

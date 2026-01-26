@@ -456,9 +456,15 @@ func (s *CalendarService) createGoogleEvent(ctx context.Context, cal *models.Cal
 		"attendees": attendees,
 	}
 
-	// Add conference link if available
-	if details.Booking.ConferenceLink != "" {
+	// Add location based on location type
+	if details.Template.LocationType == models.ConferencingProviderPhone {
+		if details.Template.CustomLocation != "" {
+			event["location"] = "Call " + details.Template.CustomLocation
+		}
+	} else if details.Booking.ConferenceLink != "" {
 		event["location"] = details.Booking.ConferenceLink
+	} else if details.Template.CustomLocation != "" {
+		event["location"] = details.Template.CustomLocation
 	}
 
 	// Add Google Meet if that's the location type and no link exists
@@ -906,6 +912,18 @@ func parseICSDuration(line string) (time.Duration, bool) {
 func (s *CalendarService) createCalDAVEvent(ctx context.Context, cal *models.CalendarConnection, details *BookingWithDetails) (string, error) {
 	eventUID := uuid.New().String()
 
+	// Build location string
+	location := ""
+	if details.Template.LocationType == models.ConferencingProviderPhone {
+		if details.Template.CustomLocation != "" {
+			location = "Call " + details.Template.CustomLocation
+		}
+	} else if details.Booking.ConferenceLink != "" {
+		location = details.Booking.ConferenceLink
+	} else if details.Template.CustomLocation != "" {
+		location = details.Template.CustomLocation
+	}
+
 	// Build description with template description and agenda if provided
 	description := details.Template.Description
 	if details.Booking.Answers != nil {
@@ -927,6 +945,7 @@ DTSTART:%s
 DTEND:%s
 SUMMARY:%s
 DESCRIPTION:%s
+LOCATION:%s
 ORGANIZER:mailto:%s
 ATTENDEE:mailto:%s
 END:VEVENT
@@ -936,6 +955,7 @@ END:VCALENDAR`,
 		details.Booking.EndTime.UTC().Format("20060102T150405Z"),
 		details.Template.Name+" with "+details.Booking.InviteeName,
 		description,
+		location,
 		details.Host.Email,
 		details.Booking.InviteeEmail,
 	)

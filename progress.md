@@ -296,3 +296,28 @@ The following features from the requirements document are already fully implemen
   - The SendBookingReminder follows the same pattern as sendInviteeConfirmation - check for custom template, render placeholders, fall back to default
 
 ---
+
+## 2026-01-26 - US-011 - Add phone location type to templates
+- What was implemented:
+  - Updated template form to show "Phone Number" label and phone-specific placeholder when phone location type is selected
+  - Added helper text explaining the phone number will be shown to invitees
+  - JavaScript dynamically updates label, placeholder, and helper text based on location type selection
+  - Public booking page now shows "Call [number]" instead of just "Phone" for phone location type
+  - Booking status page shows "Call [number]" for confirmed bookings with phone location
+  - All email templates (confirmation, reschedule, reminder) display "Call [number]" format for phone locations
+  - ICS calendar attachments include "Call [number]" in LOCATION field
+  - Google Calendar events include "Call [number]" in location field
+  - CalDAV events now include LOCATION field with proper phone formatting
+- Files changed:
+  - `templates/pages/dashboard_template_form.html` - Added dynamic label, placeholder, and helper text for phone location
+  - `templates/pages/public_template.html` - Updated to show "Call [number]" for phone location
+  - `templates/pages/booking_status.html` - Updated location display with phone support
+  - `internal/services/email.go` - Added models import, updated 5 location-building code blocks to format phone with "Call" prefix
+  - `internal/services/calendar.go` - Updated createGoogleEvent and createCalDAVEvent to use "Call [number]" format for phone
+- **Learnings for future iterations:**
+  - The `ConferencingProviderPhone` constant already existed in models - the phone option was already in the dropdown, just needed UI polish
+  - Location building logic appeared in 5+ places in email.go - a helper function could reduce duplication
+  - CalDAV events were missing LOCATION field entirely - added it with this change
+  - The conferencing service returns `CustomLocation` as `ConferenceLink` for phone/custom types, but UI should still format it as "Call [number]"
+
+---

@@ -113,10 +113,12 @@
         </div>
 
         <div class="form-group" id="custom_location_group" style="{{if .Data.Template}}{{if or (eq .Data.Template.LocationType "phone") (eq .Data.Template.LocationType "custom")}}{{else}}display:none{{end}}{{else}}display:none{{end}}">
-            <label for="custom_location">Location Details</label>
+            <label for="custom_location" id="custom_location_label">{{if .Data.Template}}{{if eq .Data.Template.LocationType "phone"}}Phone Number{{else}}Location Details{{end}}{{else}}Location Details{{end}}</label>
             <input type="text" id="custom_location" name="custom_location"
                    value="{{if .Data.Template}}{{.Data.Template.CustomLocation}}{{end}}"
-                   placeholder="Phone number or address">
+                   placeholder="{{if .Data.Template}}{{if eq .Data.Template.LocationType "phone"}}Enter your phone number{{else}}Address or custom location{{end}}{{else}}Address or custom location{{end}}"
+                   id="custom_location_input">
+            <small class="form-help" id="phone_help" style="{{if .Data.Template}}{{if eq .Data.Template.LocationType "phone"}}{{else}}display:none{{end}}{{else}}display:none{{end}}">The phone number will be displayed to invitees so they know where to call.</small>
         </div>
     </div>
 
@@ -349,10 +351,23 @@ Best regards"></textarea>
 <script>
 document.getElementById('location_type').addEventListener('change', function() {
     var customGroup = document.getElementById('custom_location_group');
-    if (this.value === 'phone' || this.value === 'custom') {
+    var label = document.getElementById('custom_location_label');
+    var input = document.getElementById('custom_location');
+    var phoneHelp = document.getElementById('phone_help');
+
+    if (this.value === 'phone') {
         customGroup.style.display = 'block';
+        label.textContent = 'Phone Number';
+        input.placeholder = 'Enter your phone number';
+        phoneHelp.style.display = 'block';
+    } else if (this.value === 'custom') {
+        customGroup.style.display = 'block';
+        label.textContent = 'Location Details';
+        input.placeholder = 'Address or custom location';
+        phoneHelp.style.display = 'none';
     } else {
         customGroup.style.display = 'none';
+        phoneHelp.style.display = 'none';
     }
 });
 

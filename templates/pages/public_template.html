@@ -36,7 +36,7 @@
                     <span>
                         {{if eq .Data.Template.LocationType "google_meet"}}Google Meet{{end}}
                         {{if eq .Data.Template.LocationType "zoom"}}Zoom{{end}}
-                        {{if eq .Data.Template.LocationType "phone"}}Phone{{end}}
+                        {{if eq .Data.Template.LocationType "phone"}}Call {{.Data.Template.CustomLocation}}{{end}}
                         {{if eq .Data.Template.LocationType "custom"}}{{.Data.Template.CustomLocation}}{{end}}
                     </span>
                 </div>

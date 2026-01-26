@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/meet-when/meet-when/internal/config"
+	"github.com/meet-when/meet-when/internal/models"
 )
 
 // EmailTemplate represents a custom email template with subject and body
@@ -78,7 +79,12 @@ func (s *EmailService) buildEmailTemplateData(details *BookingWithDetails, timez
 	startTime := details.Booking.StartTime.In(timezone)
 
 	location := "To be determined"
-	if details.Booking.ConferenceLink != "" {
+	if details.Template.LocationType == models.ConferencingProviderPhone {
+		// Format phone location with "Call" prefix
+		if details.Template.CustomLocation != "" {
+			location = "Call " + details.Template.CustomLocation
+		}
+	} else if details.Booking.ConferenceLink != "" {
 		location = details.Booking.ConferenceLink
 	} else if details.Template.CustomLocation != "" {
 		location = details.Template.CustomLocation
@@ -230,7 +236,11 @@ func (s *EmailService) sendHostConfirmation(ctx context.Context, details *Bookin
 	startTime := details.Booking.StartTime.In(hostLoc)
 
 	location := "To be determined"
-	if details.Booking.ConferenceLink != "" {
+	if details.Template.LocationType == models.ConferencingProviderPhone {
+		if details.Template.CustomLocation != "" {
+			location = "Call " + details.Template.CustomLocation
+		}
+	} else if details.Booking.ConferenceLink != "" {
 		location = details.Booking.ConferenceLink
 	} else if details.Template.CustomLocation != "" {
 		location = details.Template.CustomLocation
@@ -423,7 +433,11 @@ func (s *EmailService) sendInviteeRescheduleNotification(ctx context.Context, de
 	newTimeFormatted := details.Booking.StartTime.In(inviteeLoc).Format("Monday, January 2, 2006 at 3:04 PM MST")
 
 	location := "To be determined"
-	if details.Booking.ConferenceLink != "" {
+	if details.Template.LocationType == models.ConferencingProviderPhone {
+		if details.Template.CustomLocation != "" {
+			location = "Call " + details.Template.CustomLocation
+		}
+	} else if details.Booking.ConferenceLink != "" {
 		location = details.Booking.ConferenceLink
 	} else if details.Template.CustomLocation != "" {
 		location = details.Template.CustomLocation
@@ -554,7 +568,11 @@ func (s *EmailService) sendHostRescheduleNotification(ctx context.Context, detai
 	newTimeFormatted := details.Booking.StartTime.In(hostLoc).Format("Monday, January 2, 2006 at 3:04 PM MST")
 
 	location := "To be determined"
-	if details.Booking.ConferenceLink != "" {
+	if details.Template.LocationType == models.ConferencingProviderPhone {
+		if details.Template.CustomLocation != "" {
+			location = "Call " + details.Template.CustomLocation
+		}
+	} else if details.Booking.ConferenceLink != "" {
 		location = details.Booking.ConferenceLink
 	} else if details.Template.CustomLocation != "" {
 		location = details.Template.CustomLocation
@@ -597,7 +615,11 @@ Meet When`,
 // generateICS creates an ICS calendar attachment
 func (s *EmailService) generateICS(details *BookingWithDetails) string {
 	location := ""
-	if details.Booking.ConferenceLink != "" {
+	if details.Template.LocationType == models.ConferencingProviderPhone {
+		if details.Template.CustomLocation != "" {
+			location = "Call " + details.Template.CustomLocation
+		}
+	} else if details.Booking.ConferenceLink != "" {
 		location = details.Booking.ConferenceLink
 	} else if details.Template.CustomLocation != "" {
 		location = details.Template.CustomLocation
