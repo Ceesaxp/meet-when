@@ -759,7 +759,7 @@ func (r *BookingRepository) GetBookingsNeedingReminder(ctx context.Context, star
 		       created_at, updated_at
 		FROM bookings
 		WHERE status = 'confirmed'
-		  AND (reminder_sent = 0 OR reminder_sent IS NULL)
+		  AND (reminder_sent = false OR reminder_sent IS NULL)
 		  AND start_time >= $1
 		  AND start_time <= $2
 		ORDER BY start_time ASC

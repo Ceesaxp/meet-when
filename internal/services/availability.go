@@ -300,11 +300,11 @@ func (s *AvailabilityService) getSlotsForDay(
 
 	for _, wh := range dayWorkingHours {
 		// Parse working hours times
-		startTime, err := time.ParseInLocation("15:04", wh.StartTime, hostLoc)
+		startTime, err := time.ParseInLocation("15:04", wh.StartTime[:5], hostLoc)
 		if err != nil {
 			continue
 		}
-		endTime, err := time.ParseInLocation("15:04", wh.EndTime, hostLoc)
+		endTime, err := time.ParseInLocation("15:04", wh.EndTime[:5], hostLoc)
 		if err != nil {
 			continue
 		}
