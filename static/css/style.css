@@ -1108,3 +1108,76 @@ a:hover {
         grid-template-columns: 1fr;
     }
 }
+
+/* Audit Logs */
+.audit-details details {
+    cursor: pointer;
+}
+
+.audit-details summary {
+    color: var(--primary-color);
+    font-size: 0.875rem;
+}
+
+.audit-details .details-json {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background-color: var(--bg-color);
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.text-muted {
+    color: var(--text-light);
+}
+
+.filter-label {
+    margin-right: 0.5rem;
+    font-weight: 500;
+    color: var(--text-light);
+}
+
+/* Pagination */
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding: 1rem;
+}
+
+.page-info {
+    color: var(--text-light);
+    font-size: 0.875rem;
+}
+
+.subtitle {
+    color: var(--text-light);
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+/* Badge colors for audit actions */
+.badge-create {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.badge-update {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.badge-delete {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.badge-login, .badge-logout, .badge-register {
+    background-color: #8b5cf6;
+    color: white;
+}

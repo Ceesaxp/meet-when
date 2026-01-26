@@ -1,0 +1,78 @@
+{{define "dashboard_audit_logs.html"}}
+{{template "dashboard" .}}
+{{end}}
+
+{{define "content"}}
+<div class="page-header">
+    <h1>Audit Logs</h1>
+    <p class="subtitle">Activity history for your organization</p>
+</div>
+
+<div class="filter-bar">
+    <span class="filter-label">Filter by action:</span>
+    <a href="/dashboard/audit-logs" class="btn btn-sm {{if eq .Data.ActionFilter ""}}btn-primary{{end}}">All</a>
+    <a href="/dashboard/audit-logs?action=create" class="btn btn-sm {{if eq .Data.ActionFilter "create"}}btn-primary{{end}}">Create</a>
+    <a href="/dashboard/audit-logs?action=update" class="btn btn-sm {{if eq .Data.ActionFilter "update"}}btn-primary{{end}}">Update</a>
+    <a href="/dashboard/audit-logs?action=delete" class="btn btn-sm {{if eq .Data.ActionFilter "delete"}}btn-primary{{end}}">Delete</a>
+</div>
+
+{{if .Data.Logs}}
+<table class="table">
+    <thead>
+        <tr>
+            <th>Timestamp</th>
+            <th>Action</th>
+            <th>Entity Type</th>
+            <th>Details</th>
+            <th>IP Address</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Data.Logs}}
+        <tr>
+            <td>
+                {{formatDateTime .CreatedAt}}<br>
+            </td>
+            <td>
+                <span class="badge badge-{{.Action}}">{{.Action}}</span>
+            </td>
+            <td>{{.EntityType}}</td>
+            <td class="audit-details">
+                {{if .Details}}
+                <details>
+                    <summary>View details</summary>
+                    <pre class="details-json">{{range $key, $value := .Details}}{{$key}}: {{$value}}
+{{end}}</pre>
+                </details>
+                {{else}}
+                <span class="text-muted">-</span>
+                {{end}}
+            </td>
+            <td><code>{{.IPAddress}}</code></td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+
+<!-- Pagination -->
+{{if gt .Data.TotalPages 1}}
+<div class="pagination">
+    {{if gt .Data.Page 1}}
+    <a href="/dashboard/audit-logs?page={{sub .Data.Page 1}}{{if .Data.ActionFilter}}&action={{.Data.ActionFilter}}{{end}}" class="btn btn-sm">&laquo; Previous</a>
+    {{end}}
+
+    <span class="page-info">Page {{.Data.Page}} of {{.Data.TotalPages}} ({{.Data.TotalCount}} total entries)</span>
+
+    {{if lt .Data.Page .Data.TotalPages}}
+    <a href="/dashboard/audit-logs?page={{add .Data.Page 1}}{{if .Data.ActionFilter}}&action={{.Data.ActionFilter}}{{end}}" class="btn btn-sm">Next &raquo;</a>
+    {{end}}
+</div>
+{{end}}
+
+{{else}}
+<div class="empty-state">
+    <h3>No audit logs found</h3>
+    <p>{{if .Data.ActionFilter}}No {{.Data.ActionFilter}} events found.{{else}}No activity has been logged yet.{{end}}</p>
+</div>
+{{end}}
+{{end}}

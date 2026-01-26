@@ -114,6 +114,9 @@ func main() {
 	dashboard.HandleFunc("PUT /dashboard/settings", h.Dashboard.UpdateSettings)
 	dashboard.HandleFunc("PUT /dashboard/settings/working-hours", h.Dashboard.UpdateWorkingHours)
 
+	// Audit logs (admin only)
+	dashboard.HandleFunc("GET /dashboard/audit-logs", h.Dashboard.AuditLogs)
+
 	// Apply auth middleware to dashboard
 	mux.Handle("/dashboard", middleware.RequireAuth(svc.Session)(dashboard))
 	mux.Handle("/dashboard/", middleware.RequireAuth(svc.Session)(dashboard))

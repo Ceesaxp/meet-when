@@ -69,8 +69,8 @@ func (s *ReminderService) checkAndSendReminders() {
 	// We use a 1-hour window (24-25 hours) to ensure we don't miss any bookings
 	// and don't send reminders too early
 	now := time.Now().UTC()
-	reminderWindowStart := now.Add(23 * time.Hour)  // Start checking 23 hours from now
-	reminderWindowEnd := now.Add(25 * time.Hour)    // Up to 25 hours from now
+	reminderWindowStart := now.Add(23 * time.Hour) // Start checking 23 hours from now
+	reminderWindowEnd := now.Add(25 * time.Hour)   // Up to 25 hours from now
 
 	bookings, err := s.repos.Booking.GetBookingsNeedingReminder(ctx, reminderWindowStart, reminderWindowEnd)
 	if err != nil {

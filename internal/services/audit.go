@@ -42,3 +42,8 @@ func (s *AuditLogService) Log(ctx context.Context, tenantID string, hostID *stri
 func (s *AuditLogService) GetLogs(ctx context.Context, tenantID string, limit, offset int) ([]*models.AuditLog, error) {
 	return s.repos.AuditLog.GetByTenantID(ctx, tenantID, limit, offset)
 }
+
+// GetLogsCount returns the total count of audit logs for a tenant
+func (s *AuditLogService) GetLogsCount(ctx context.Context, tenantID string) (int, error) {
+	return s.repos.AuditLog.CountByTenantID(ctx, tenantID)
+}

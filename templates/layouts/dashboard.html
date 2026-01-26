@@ -19,6 +19,9 @@
             <li><a href="/dashboard/bookings" class="nav-link">Bookings</a></li>
             <li><a href="/dashboard/calendars" class="nav-link">Calendars</a></li>
             <li><a href="/dashboard/settings" class="nav-link">Settings</a></li>
+            {{if .Host.IsAdmin}}
+            <li><a href="/dashboard/audit-logs" class="nav-link">Audit Logs</a></li>
+            {{end}}
         </ul>
         <div class="sidebar-footer">
             <div class="user-info">

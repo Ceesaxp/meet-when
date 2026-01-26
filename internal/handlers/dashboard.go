@@ -614,3 +614,61 @@ func parseIntOrDefault(s string, defaultValue int) int {
 	}
 	return defaultValue
 }
+
+// AuditLogs renders the audit log viewer page (admin only)
+func (h *DashboardHandler) AuditLogs(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	// Admin-only access
+	if !host.Host.IsAdmin {
+		h.handlers.error(w, r, http.StatusForbidden, "Access denied. Admin privileges required.")
+		return
+	}
+
+	// Pagination parameters
+	page := parseIntOrDefault(r.URL.Query().Get("page"), 1)
+	if page < 1 {
+		page = 1
+	}
+	perPage := 25
+	offset := (page - 1) * perPage
+
+	// Action filter
+	actionFilter := r.URL.Query().Get("action")
+
+	// Get audit logs
+	logs, err := h.handlers.services.AuditLog.GetLogs(r.Context(), host.Tenant.ID, perPage, offset)
+	if err != nil {
+		log.Printf("Error fetching audit logs: %v", err)
+		logs = []*models.AuditLog{}
+	}
+
+	// Get total count for pagination
+	totalCount, err := h.handlers.services.AuditLog.GetLogsCount(r.Context(), host.Tenant.ID)
+	if err != nil {
+		log.Printf("Error counting audit logs: %v", err)
+		totalCount = 0
+	}
+
+	totalPages := (totalCount + perPage - 1) / perPage
+	if totalPages < 1 {
+		totalPages = 1
+	}
+
+	h.handlers.render(w, "dashboard_audit_logs.html", PageData{
+		Title:  "Audit Logs",
+		Host:   host.Host,
+		Tenant: host.Tenant,
+		Data: map[string]interface{}{
+			"Logs":         logs,
+			"Page":         page,
+			"TotalPages":   totalPages,
+			"TotalCount":   totalCount,
+			"ActionFilter": actionFilter,
+		},
+	})
+}

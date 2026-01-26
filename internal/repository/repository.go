@@ -904,3 +904,10 @@ func (r *AuditLogRepository) GetByTenantID(ctx context.Context, tenantID string,
 	}
 	return logs, nil
 }
+
+func (r *AuditLogRepository) CountByTenantID(ctx context.Context, tenantID string) (int, error) {
+	query := q(r.driver, `SELECT COUNT(*) FROM audit_logs WHERE tenant_id = $1`)
+	var count int
+	err := r.db.QueryRowContext(ctx, query, tenantID).Scan(&count)
+	return count, err
+}
