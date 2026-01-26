@@ -1097,3 +1097,288 @@ func (s *CalendarService) deleteCalDAVEvent(ctx context.Context, cal *models.Cal
 
 	return nil
 }
+
+// AgendaEvent represents a calendar event for the agenda view
+type AgendaEvent struct {
+	Title        string    `json:"title"`
+	Start        time.Time `json:"start"`
+	End          time.Time `json:"end"`
+	CalendarName string    `json:"calendar_name"`
+	IsAllDay     bool      `json:"is_all_day"`
+}
+
+// GetAgendaEvents returns events from all connected calendars for a host within the given time range
+func (s *CalendarService) GetAgendaEvents(ctx context.Context, hostID string, startDate, endDate time.Time) ([]AgendaEvent, error) {
+	calendars, err := s.repos.Calendar.GetByHostID(ctx, hostID)
+	if err != nil {
+		return nil, err
+	}
+
+	var allEvents []AgendaEvent
+
+	for _, cal := range calendars {
+		var events []AgendaEvent
+		var fetchErr error
+
+		switch cal.Provider {
+		case models.CalendarProviderGoogle:
+			events, fetchErr = s.getGoogleAgendaEvents(ctx, cal, startDate, endDate)
+		case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
+			events, fetchErr = s.getCalDAVAgendaEvents(ctx, cal, startDate, endDate)
+		}
+
+		if fetchErr != nil {
+			// Log but continue with other calendars (handle errors gracefully)
+			log.Printf("Failed to fetch agenda events from calendar %s (%s): %v", cal.Name, cal.ID, fetchErr)
+			continue
+		}
+
+		allEvents = append(allEvents, events...)
+	}
+
+	// Sort events by start time
+	sortAgendaEvents(allEvents)
+
+	return allEvents, nil
+}
+
+// sortAgendaEvents sorts events by start time
+func sortAgendaEvents(events []AgendaEvent) {
+	for i := 0; i < len(events); i++ {
+		for j := i + 1; j < len(events); j++ {
+			if events[j].Start.Before(events[i].Start) {
+				events[i], events[j] = events[j], events[i]
+			}
+		}
+	}
+}
+
+// getGoogleAgendaEvents fetches events from Google Calendar for the agenda view
+func (s *CalendarService) getGoogleAgendaEvents(ctx context.Context, cal *models.CalendarConnection, start, end time.Time) ([]AgendaEvent, error) {
+	if err := s.refreshGoogleToken(cal); err != nil {
+		return nil, err
+	}
+
+	// Use events.list API to get full event details
+	url := fmt.Sprintf(
+		"https://www.googleapis.com/calendar/v3/calendars/%s/events?timeMin=%s&timeMax=%s&singleEvents=true&orderBy=startTime",
+		cal.CalendarID,
+		start.Format(time.RFC3339),
+		end.Format(time.RFC3339),
+	)
+
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Authorization", "Bearer "+cal.AccessToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, ErrCalendarAuth
+	}
+
+	var result struct {
+		Items []struct {
+			Summary string `json:"summary"`
+			Start   struct {
+				DateTime string `json:"dateTime"`
+				Date     string `json:"date"`
+			} `json:"start"`
+			End struct {
+				DateTime string `json:"dateTime"`
+				Date     string `json:"date"`
+			} `json:"end"`
+		} `json:"items"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	var events []AgendaEvent
+	for _, item := range result.Items {
+		var startTime, endTime time.Time
+		var isAllDay bool
+
+		// Check if it's an all-day event (uses date instead of dateTime)
+		if item.Start.Date != "" {
+			isAllDay = true
+			startTime, _ = time.Parse("2006-01-02", item.Start.Date)
+			endTime, _ = time.Parse("2006-01-02", item.End.Date)
+		} else {
+			startTime, _ = time.Parse(time.RFC3339, item.Start.DateTime)
+			endTime, _ = time.Parse(time.RFC3339, item.End.DateTime)
+		}
+
+		events = append(events, AgendaEvent{
+			Title:        item.Summary,
+			Start:        startTime,
+			End:          endTime,
+			CalendarName: cal.Name,
+			IsAllDay:     isAllDay,
+		})
+	}
+
+	return events, nil
+}
+
+// getCalDAVAgendaEvents fetches events from CalDAV/iCloud for the agenda view
+func (s *CalendarService) getCalDAVAgendaEvents(ctx context.Context, cal *models.CalendarConnection, start, end time.Time) ([]AgendaEvent, error) {
+	// Use calendar-query REPORT to fetch VEVENTs in the time range
+	query := fmt.Sprintf(`<?xml version="1.0" encoding="utf-8" ?>
+<C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <D:prop>
+    <D:getetag/>
+    <C:calendar-data/>
+  </D:prop>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VEVENT">
+        <C:time-range start="%s" end="%s"/>
+      </C:comp-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>`,
+		start.Format("20060102T150405Z"),
+		end.Format("20060102T150405Z"),
+	)
+
+	req, err := http.NewRequest("REPORT", cal.CalDAVURL, strings.NewReader(query))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.SetBasicAuth(cal.CalDAVUsername, cal.CalDAVPassword)
+	req.Header.Set("Content-Type", "application/xml; charset=utf-8")
+	req.Header.Set("Depth", "1")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("CalDAV request failed: %w", err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, ErrCalendarAuth
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	// Extract agenda events from VCALENDAR data in the response
+	events := parseCalDAVAgendaResponse(string(body), cal.Name, start, end)
+	return events, nil
+}
+
+// parseCalDAVAgendaResponse extracts agenda events from CalDAV XML response containing VCALENDAR data
+func parseCalDAVAgendaResponse(body string, calendarName string, rangeStart, rangeEnd time.Time) []AgendaEvent {
+	var events []AgendaEvent
+
+	calDataParts := extractCalendarData(body)
+
+	for _, icsData := range calDataParts {
+		parsedEvents := parseVEventsForAgenda(icsData, calendarName, rangeStart, rangeEnd)
+		events = append(events, parsedEvents...)
+	}
+
+	return events
+}
+
+// parseVEventsForAgenda extracts VEVENT details for the agenda view from ICS data
+func parseVEventsForAgenda(icsData string, calendarName string, rangeStart, rangeEnd time.Time) []AgendaEvent {
+	var events []AgendaEvent
+
+	// Split into lines and unfold
+	lines := unfoldICSLines(icsData)
+
+	var inEvent bool
+	var eventStart, eventEnd time.Time
+	var eventTitle string
+	var hasStart, hasEnd bool
+	var isAllDay bool
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		if line == "BEGIN:VEVENT" {
+			inEvent = true
+			hasStart = false
+			hasEnd = false
+			isAllDay = false
+			eventStart = time.Time{}
+			eventEnd = time.Time{}
+			eventTitle = ""
+			continue
+		}
+
+		if line == "END:VEVENT" {
+			if inEvent && hasStart && hasEnd {
+				// Check if event overlaps with our query range
+				if eventEnd.After(rangeStart) && eventStart.Before(rangeEnd) {
+					events = append(events, AgendaEvent{
+						Title:        eventTitle,
+						Start:        eventStart,
+						End:          eventEnd,
+						CalendarName: calendarName,
+						IsAllDay:     isAllDay,
+					})
+				}
+			}
+			inEvent = false
+			continue
+		}
+
+		if !inEvent {
+			continue
+		}
+
+		// Parse SUMMARY (title)
+		if strings.HasPrefix(line, "SUMMARY") {
+			colonIdx := strings.Index(line, ":")
+			if colonIdx != -1 {
+				eventTitle = strings.TrimSpace(line[colonIdx+1:])
+			}
+		}
+
+		// Parse DTSTART
+		if strings.HasPrefix(line, "DTSTART") {
+			// Check if it's an all-day event
+			if strings.Contains(line, "VALUE=DATE") && !strings.Contains(line, "VALUE=DATE-TIME") {
+				isAllDay = true
+			}
+			if t, ok := parseICSDateTime(line); ok {
+				eventStart = t
+				hasStart = true
+			}
+		}
+
+		// Parse DTEND
+		if strings.HasPrefix(line, "DTEND") {
+			if t, ok := parseICSDateTime(line); ok {
+				eventEnd = t
+				hasEnd = true
+			}
+		}
+
+		// Handle DURATION if DTEND is not present
+		if strings.HasPrefix(line, "DURATION") && hasStart && !hasEnd {
+			if d, ok := parseICSDuration(line); ok {
+				eventEnd = eventStart.Add(d)
+				hasEnd = true
+			}
+		}
+	}
+
+	return events
+}
