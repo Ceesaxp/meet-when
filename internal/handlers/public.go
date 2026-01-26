@@ -400,7 +400,9 @@ func (h *PublicHandler) DownloadICS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=\"meeting.ics\"")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(ics))
+	if _, err := w.Write([]byte(ics)); err != nil {
+		log.Printf("Error writing ICS response: %v", err)
+	}
 }
 
 // ReschedulePage shows the reschedule page
