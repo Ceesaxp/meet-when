@@ -8,11 +8,31 @@
 </div>
 
 <div class="filter-bar">
-    <a href="/dashboard/bookings" class="btn btn-sm {{if eq .Data.Filter ""}}btn-primary{{end}}">All</a>
-    <a href="/dashboard/bookings?filter=pending" class="btn btn-sm {{if eq .Data.Filter "pending"}}btn-primary{{end}}">Pending</a>
-    <a href="/dashboard/bookings?filter=confirmed" class="btn btn-sm {{if eq .Data.Filter "confirmed"}}btn-primary{{end}}">Confirmed</a>
-    <a href="/dashboard/bookings?filter=cancelled" class="btn btn-sm {{if eq .Data.Filter "cancelled"}}btn-primary{{end}}">Cancelled</a>
+    <div class="filter-buttons">
+        <a href="/dashboard/bookings{{if .Data.ShowArchived}}?archived=true{{end}}" class="btn btn-sm {{if eq .Data.Filter ""}}btn-primary{{end}}">All ({{.Data.AllCount}})</a>
+        <a href="/dashboard/bookings?filter=pending{{if .Data.ShowArchived}}&archived=true{{end}}" class="btn btn-sm {{if eq .Data.Filter "pending"}}btn-primary{{end}}">Pending ({{.Data.PendingCount}})</a>
+        <a href="/dashboard/bookings?filter=confirmed{{if .Data.ShowArchived}}&archived=true{{end}}" class="btn btn-sm {{if eq .Data.Filter "confirmed"}}btn-primary{{end}}">Confirmed ({{.Data.ConfirmedCount}})</a>
+        <a href="/dashboard/bookings?filter=cancelled{{if .Data.ShowArchived}}&archived=true{{end}}" class="btn btn-sm {{if eq .Data.Filter "cancelled"}}btn-primary{{end}}">Cancelled ({{.Data.CancelledCount}})</a>
+    </div>
+    <div class="filter-options">
+        <label class="checkbox-label">
+            <input type="checkbox" id="show-archived" {{if .Data.ShowArchived}}checked{{end}} onchange="toggleArchived(this)">
+            Show archived
+        </label>
+    </div>
 </div>
+
+<script>
+function toggleArchived(checkbox) {
+    const url = new URL(window.location.href);
+    if (checkbox.checked) {
+        url.searchParams.set('archived', 'true');
+    } else {
+        url.searchParams.delete('archived');
+    }
+    window.location.href = url.toString();
+}
+</script>
 
 {{if .Data.Bookings}}
 <table class="table bookings-table">

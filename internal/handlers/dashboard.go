@@ -481,14 +481,37 @@ func (h *DashboardHandler) Bookings(w http.ResponseWriter, r *http.Request) {
 		templateMap[t.ID] = t
 	}
 
+	// Calculate counts for filter bar (always exclude archived for accurate counts)
+	allBookings, _ := h.handlers.services.Booking.GetBookings(r.Context(), host.Host.ID, nil, false)
+	pendingStatus := models.BookingStatusPending
+	pendingBookings, _ := h.handlers.services.Booking.GetBookings(r.Context(), host.Host.ID, &pendingStatus, false)
+	confirmedStatus := models.BookingStatusConfirmed
+	confirmedBookings, _ := h.handlers.services.Booking.GetBookings(r.Context(), host.Host.ID, &confirmedStatus, false)
+	cancelledStatus := models.BookingStatusCancelled
+	cancelledBookings, _ := h.handlers.services.Booking.GetBookings(r.Context(), host.Host.ID, &cancelledStatus, false)
+
+	// Count archivable bookings (cancelled or rejected, not yet archived)
+	archivableCount := 0
+	for _, b := range allBookings {
+		if (b.Status == models.BookingStatusCancelled || b.Status == models.BookingStatusRejected) && !b.IsArchived {
+			archivableCount++
+		}
+	}
+
 	h.handlers.render(w, "dashboard_bookings.html", PageData{
 		Title:  "Bookings",
 		Host:   host.Host,
 		Tenant: host.Tenant,
 		Data: map[string]interface{}{
-			"Bookings":  bookings,
-			"Templates": templateMap,
-			"Filter":    filter,
+			"Bookings":        bookings,
+			"Templates":       templateMap,
+			"Filter":          filter,
+			"ShowArchived":    showArchived,
+			"AllCount":        len(allBookings),
+			"PendingCount":    len(pendingBookings),
+			"ConfirmedCount":  len(confirmedBookings),
+			"CancelledCount":  len(cancelledBookings),
+			"ArchivableCount": archivableCount,
 		},
 	})
 }
