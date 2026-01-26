@@ -431,9 +431,20 @@ func (s *CalendarService) createGoogleEvent(ctx context.Context, cal *models.Cal
 		}
 	}
 
+	// Build description with template description and agenda if provided
+	description := details.Template.Description
+	if details.Booking.Answers != nil {
+		if agenda, ok := details.Booking.Answers["agenda"].(string); ok && agenda != "" {
+			if description != "" {
+				description += "\n\n"
+			}
+			description += "Agenda:\n" + agenda
+		}
+	}
+
 	event := map[string]interface{}{
 		"summary":     details.Template.Name + " with " + details.Booking.InviteeName,
-		"description": details.Template.Description,
+		"description": description,
 		"start": map[string]string{
 			"dateTime": details.Booking.StartTime.Format(time.RFC3339),
 			"timeZone": "UTC",
@@ -895,6 +906,17 @@ func parseICSDuration(line string) (time.Duration, bool) {
 func (s *CalendarService) createCalDAVEvent(ctx context.Context, cal *models.CalendarConnection, details *BookingWithDetails) (string, error) {
 	eventUID := uuid.New().String()
 
+	// Build description with template description and agenda if provided
+	description := details.Template.Description
+	if details.Booking.Answers != nil {
+		if agenda, ok := details.Booking.Answers["agenda"].(string); ok && agenda != "" {
+			if description != "" {
+				description += "\\n\\n"
+			}
+			description += "Agenda:\\n" + strings.ReplaceAll(agenda, "\n", "\\n")
+		}
+	}
+
 	// Build iCalendar event
 	ics := fmt.Sprintf(`BEGIN:VCALENDAR
 VERSION:2.0
@@ -913,7 +935,7 @@ END:VCALENDAR`,
 		details.Booking.StartTime.UTC().Format("20060102T150405Z"),
 		details.Booking.EndTime.UTC().Format("20060102T150405Z"),
 		details.Template.Name+" with "+details.Booking.InviteeName,
-		details.Template.Description,
+		description,
 		details.Host.Email,
 		details.Booking.InviteeEmail,
 	)

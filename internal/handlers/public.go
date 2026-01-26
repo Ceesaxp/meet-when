@@ -263,9 +263,8 @@ func (h *PublicHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse custom answers
-	var answers models.JSONMap
+	answers := make(models.JSONMap)
 	if template.InviteeQuestions != nil {
-		answers = make(models.JSONMap)
 		for i, q := range template.InviteeQuestions {
 			if qMap, ok := q.(map[string]interface{}); ok {
 				if fieldName, ok := qMap["field"].(string); ok {
@@ -273,6 +272,11 @@ func (h *PublicHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+	}
+
+	// Store agenda/subject if provided
+	if agenda := r.FormValue("agenda"); agenda != "" {
+		answers["agenda"] = agenda
 	}
 
 	input := services.CreateBookingInput{

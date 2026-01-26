@@ -31,6 +31,14 @@ func (s *EmailService) SendBookingRequested(ctx context.Context, details *Bookin
 	hostLoc, _ := time.LoadLocation(details.Host.Timezone)
 	startTime := details.Booking.StartTime.In(hostLoc)
 
+	// Extract agenda if provided
+	agendaSection := ""
+	if details.Booking.Answers != nil {
+		if agenda, ok := details.Booking.Answers["agenda"].(string); ok && agenda != "" {
+			agendaSection = fmt.Sprintf("\nAgenda:\n%s\n", agenda)
+		}
+	}
+
 	body := fmt.Sprintf(`Hello %s,
 
 You have a new booking request:
@@ -39,7 +47,7 @@ Meeting: %s
 From: %s (%s)
 When: %s
 Duration: %d minutes
-
+%s
 Please log in to approve or reject this request:
 %s/dashboard/bookings
 
@@ -51,6 +59,7 @@ Meet When`,
 		details.Booking.InviteeEmail,
 		startTime.Format("Monday, January 2, 2006 at 3:04 PM MST"),
 		details.Booking.Duration,
+		agendaSection,
 		s.cfg.Server.BaseURL,
 	)
 
@@ -138,6 +147,14 @@ func (s *EmailService) sendHostConfirmation(ctx context.Context, details *Bookin
 		location = details.Template.CustomLocation
 	}
 
+	// Extract agenda if provided
+	agendaSection := ""
+	if details.Booking.Answers != nil {
+		if agenda, ok := details.Booking.Answers["agenda"].(string); ok && agenda != "" {
+			agendaSection = fmt.Sprintf("\nAgenda:\n%s\n", agenda)
+		}
+	}
+
 	body := fmt.Sprintf(`Hello %s,
 
 A meeting has been confirmed:
@@ -147,7 +164,7 @@ With: %s (%s)
 When: %s
 Duration: %d minutes
 Location: %s
-
+%s
 View all bookings: %s/dashboard/bookings
 
 Best regards,
@@ -159,6 +176,7 @@ Meet When`,
 		startTime.Format("Monday, January 2, 2006 at 3:04 PM MST"),
 		details.Booking.Duration,
 		location,
+		agendaSection,
 		s.cfg.Server.BaseURL,
 	)
 
@@ -424,6 +442,17 @@ func (s *EmailService) generateICS(details *BookingWithDetails) string {
 		location = details.Template.CustomLocation
 	}
 
+	// Build description with template description and agenda if provided
+	description := details.Template.Description
+	if details.Booking.Answers != nil {
+		if agenda, ok := details.Booking.Answers["agenda"].(string); ok && agenda != "" {
+			if description != "" {
+				description += "\n\n"
+			}
+			description += "Agenda:\n" + agenda
+		}
+	}
+
 	ics := fmt.Sprintf(`BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//MeetWhen//EN
@@ -445,7 +474,7 @@ END:VCALENDAR`,
 		details.Booking.EndTime.UTC().Format("20060102T150405Z"),
 		details.Template.Name,
 		details.Host.Name,
-		escapeICS(details.Template.Description),
+		escapeICS(description),
 		escapeICS(location),
 		details.Host.Name,
 		details.Host.Email,
