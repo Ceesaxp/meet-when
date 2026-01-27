@@ -48,6 +48,21 @@ func q(driver, query string) string {
 	return query
 }
 
+// nullStr converts sql.NullString to string (empty string if NULL)
+func nullStr(ns sql.NullString) string {
+	if ns.Valid {
+		return ns.String
+	}
+	return ""
+}
+
+// logQueryError logs a database query error with context for debugging
+func logQueryError(operation, entity string, err error, args ...interface{}) {
+	if err != nil && err != sql.ErrNoRows {
+		log.Printf("[DB ERROR] %s %s failed: %v (args: %v)", operation, entity, err, args)
+	}
+}
+
 // TenantRepository handles tenant database operations
 type TenantRepository struct {
 	db     *sql.DB
@@ -498,9 +513,10 @@ func (r *TemplateRepository) Create(ctx context.Context, tmpl *models.MeetingTem
 
 func (r *TemplateRepository) GetByID(ctx context.Context, id string) (*models.MeetingTemplate, error) {
 	tmpl := &models.MeetingTemplate{}
+	var calendarID sql.NullString
 	query := q(r.driver, `
 		SELECT id, host_id, slug, name, description, durations, location_type,
-		       custom_location, COALESCE(calendar_id, ''), requires_approval, min_notice_minutes,
+		       custom_location, calendar_id, requires_approval, min_notice_minutes,
 		       max_schedule_days, pre_buffer_minutes, post_buffer_minutes,
 		       availability_rules, invitee_questions, confirmation_email, reminder_email,
 		       is_active, COALESCE(is_private, false), created_at, updated_at
@@ -508,7 +524,7 @@ func (r *TemplateRepository) GetByID(ctx context.Context, id string) (*models.Me
 	`)
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&tmpl.ID, &tmpl.HostID, &tmpl.Slug, &tmpl.Name, &tmpl.Description,
-		&tmpl.Durations, &tmpl.LocationType, &tmpl.CustomLocation, &tmpl.CalendarID,
+		&tmpl.Durations, &tmpl.LocationType, &tmpl.CustomLocation, &calendarID,
 		&tmpl.RequiresApproval, &tmpl.MinNoticeMinutes, &tmpl.MaxScheduleDays,
 		&tmpl.PreBufferMinutes, &tmpl.PostBufferMinutes, &tmpl.AvailabilityRules,
 		&tmpl.InviteeQuestions, &tmpl.ConfirmationEmail, &tmpl.ReminderEmail,
@@ -516,14 +532,20 @@ func (r *TemplateRepository) GetByID(ctx context.Context, id string) (*models.Me
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
-	return tmpl, err
+	if err != nil {
+		logQueryError("GetByID", "meeting_template", err, id)
+		return nil, err
+	}
+	tmpl.CalendarID = nullStr(calendarID)
+	return tmpl, nil
 }
 
 func (r *TemplateRepository) GetByHostAndSlug(ctx context.Context, hostID, slug string) (*models.MeetingTemplate, error) {
 	tmpl := &models.MeetingTemplate{}
+	var calendarID sql.NullString
 	query := q(r.driver, `
 		SELECT id, host_id, slug, name, description, durations, location_type,
-		       custom_location, COALESCE(calendar_id, ''), requires_approval, min_notice_minutes,
+		       custom_location, calendar_id, requires_approval, min_notice_minutes,
 		       max_schedule_days, pre_buffer_minutes, post_buffer_minutes,
 		       availability_rules, invitee_questions, confirmation_email, reminder_email,
 		       is_active, COALESCE(is_private, false), created_at, updated_at
@@ -531,7 +553,7 @@ func (r *TemplateRepository) GetByHostAndSlug(ctx context.Context, hostID, slug 
 	`)
 	err := r.db.QueryRowContext(ctx, query, hostID, slug).Scan(
 		&tmpl.ID, &tmpl.HostID, &tmpl.Slug, &tmpl.Name, &tmpl.Description,
-		&tmpl.Durations, &tmpl.LocationType, &tmpl.CustomLocation, &tmpl.CalendarID,
+		&tmpl.Durations, &tmpl.LocationType, &tmpl.CustomLocation, &calendarID,
 		&tmpl.RequiresApproval, &tmpl.MinNoticeMinutes, &tmpl.MaxScheduleDays,
 		&tmpl.PreBufferMinutes, &tmpl.PostBufferMinutes, &tmpl.AvailabilityRules,
 		&tmpl.InviteeQuestions, &tmpl.ConfirmationEmail, &tmpl.ReminderEmail,
@@ -539,13 +561,18 @@ func (r *TemplateRepository) GetByHostAndSlug(ctx context.Context, hostID, slug 
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
-	return tmpl, err
+	if err != nil {
+		logQueryError("GetByHostAndSlug", "meeting_template", err, hostID, slug)
+		return nil, err
+	}
+	tmpl.CalendarID = nullStr(calendarID)
+	return tmpl, nil
 }
 
 func (r *TemplateRepository) GetByHostID(ctx context.Context, hostID string) ([]*models.MeetingTemplate, error) {
 	query := q(r.driver, `
 		SELECT id, host_id, slug, name, description, durations, location_type,
-		       custom_location, COALESCE(calendar_id, ''), requires_approval, min_notice_minutes,
+		       custom_location, calendar_id, requires_approval, min_notice_minutes,
 		       max_schedule_days, pre_buffer_minutes, post_buffer_minutes,
 		       availability_rules, invitee_questions, confirmation_email, reminder_email,
 		       is_active, COALESCE(is_private, false), created_at, updated_at
@@ -554,6 +581,7 @@ func (r *TemplateRepository) GetByHostID(ctx context.Context, hostID string) ([]
 	`)
 	rows, err := r.db.QueryContext(ctx, query, hostID)
 	if err != nil {
+		logQueryError("GetByHostID", "meeting_template", err, hostID)
 		return nil, err
 	}
 	defer func() {
@@ -565,16 +593,19 @@ func (r *TemplateRepository) GetByHostID(ctx context.Context, hostID string) ([]
 	var templates []*models.MeetingTemplate
 	for rows.Next() {
 		tmpl := &models.MeetingTemplate{}
+		var calendarID sql.NullString
 		err := rows.Scan(
 			&tmpl.ID, &tmpl.HostID, &tmpl.Slug, &tmpl.Name, &tmpl.Description,
-			&tmpl.Durations, &tmpl.LocationType, &tmpl.CustomLocation, &tmpl.CalendarID,
+			&tmpl.Durations, &tmpl.LocationType, &tmpl.CustomLocation, &calendarID,
 			&tmpl.RequiresApproval, &tmpl.MinNoticeMinutes, &tmpl.MaxScheduleDays,
 			&tmpl.PreBufferMinutes, &tmpl.PostBufferMinutes, &tmpl.AvailabilityRules,
 			&tmpl.InviteeQuestions, &tmpl.ConfirmationEmail, &tmpl.ReminderEmail,
 			&tmpl.IsActive, &tmpl.IsPrivate, &tmpl.CreatedAt, &tmpl.UpdatedAt)
 		if err != nil {
+			logQueryError("GetByHostID", "meeting_template (scan)", err, hostID)
 			return nil, err
 		}
+		tmpl.CalendarID = nullStr(calendarID)
 		templates = append(templates, tmpl)
 	}
 	return templates, nil
