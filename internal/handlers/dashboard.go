@@ -47,6 +47,7 @@ func (h *DashboardHandler) Home(w http.ResponseWriter, r *http.Request) {
 		Tenant:       host.Tenant,
 		ActiveNav:    "home",
 		PendingCount: len(pending),
+		BaseURL:      h.handlers.cfg.Server.BaseURL,
 		Data: map[string]interface{}{
 			"Bookings":     bookings,
 			"PendingCount": len(pending),
@@ -221,6 +222,7 @@ func (h *DashboardHandler) Templates(w http.ResponseWriter, r *http.Request) {
 		Tenant:       host.Tenant,
 		ActiveNav:    "templates",
 		PendingCount: h.getPendingCount(r, host.Host.ID),
+		BaseURL:      h.handlers.cfg.Server.BaseURL,
 		Data: map[string]interface{}{
 			"Templates":     templates,
 			"BookingCounts": bookingCounts,
