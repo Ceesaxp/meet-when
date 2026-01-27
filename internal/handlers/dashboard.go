@@ -781,7 +781,7 @@ func (h *DashboardHandler) UpdateSettings(w http.ResponseWriter, r *http.Request
 	h.handlers.redirect(w, r, "/dashboard/settings?success=updated")
 }
 
-// UpdateWorkingHours updates working hours
+// UpdateWorkingHours updates working hours and timezone
 func (h *DashboardHandler) UpdateWorkingHours(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())
 	if host == nil {
@@ -792,6 +792,15 @@ func (h *DashboardHandler) UpdateWorkingHours(w http.ResponseWriter, r *http.Req
 	if err := r.ParseForm(); err != nil {
 		h.handlers.redirect(w, r, "/dashboard/settings?error=invalid_form")
 		return
+	}
+
+	// Update timezone if provided
+	if timezone := r.FormValue("timezone"); timezone != "" {
+		host.Host.Timezone = timezone
+		if err := h.handlers.services.Auth.UpdateHost(r.Context(), host.Host); err != nil {
+			h.handlers.redirect(w, r, "/dashboard/settings?error=update_failed")
+			return
+		}
 	}
 
 	now := models.Now()
