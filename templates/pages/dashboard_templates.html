@@ -4,72 +4,103 @@
 
 {{define "content"}}
 <div class="page-header">
-    <h1>Meeting Types</h1>
-    <a href="/dashboard/templates/new" class="btn btn-primary">New Meeting Type</a>
+    <div>
+        <h1 class="page-title">Meeting Types</h1>
+        <p class="page-subtitle">Create different meeting types for various purposes</p>
+    </div>
+    <a href="/dashboard/templates/new" class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        New Meeting Type
+    </a>
 </div>
 
 {{if .Data.Templates}}
 <script>
 function copyTemplateLink(btn, url) {
     navigator.clipboard.writeText(url).then(function() {
-        var originalText = btn.textContent;
-        btn.textContent = 'Copied!';
+        var originalHTML = btn.innerHTML;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
         btn.classList.add('btn-copied');
         setTimeout(function() {
-            btn.textContent = originalText;
+            btn.innerHTML = originalHTML;
             btn.classList.remove('btn-copied');
         }, 2000);
     }).catch(function(err) {
         console.error('Failed to copy: ', err);
-        alert('Failed to copy link');
     });
 }
 </script>
-<div class="template-grid">
+<div class="templates-grid">
     {{range .Data.Templates}}
     <div class="template-card {{if not .IsActive}}inactive{{end}}">
         <div class="template-header">
-            <h3>{{.Name}}</h3>
+            <h3 class="template-title">{{.Name}}</h3>
             {{if not .IsActive}}
             <span class="badge badge-inactive">Inactive</span>
             {{end}}
         </div>
+        {{if .Description}}
         <p class="template-description">{{.Description}}</p>
+        {{end}}
         <div class="template-meta">
-            <span>{{index .Durations 0}} min</span>
-            <span>{{.LocationType}}</span>
+            <div class="meta-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                {{index .Durations 0}} min
+            </div>
+            <div class="meta-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="23 7 16 12 23 17 23 7"/>
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                </svg>
+                {{if eq (printf "%s" .LocationType) "google_meet"}}Google Meet{{else if eq (printf "%s" .LocationType) "zoom"}}Zoom{{else if eq (printf "%s" .LocationType) "phone"}}Phone Call{{else}}{{.LocationType}}{{end}}
+            </div>
         </div>
         {{$counts := index $.Data.BookingCounts .ID}}
-        <div class="template-bookings">
-            {{if $counts}}
-            <span class="booking-count">{{$counts.Total}} booking{{if ne $counts.Total 1}}s{{end}}</span>
-            {{if or $counts.Pending $counts.Confirmed}}
-            <span class="booking-breakdown">({{if $counts.Pending}}{{$counts.Pending}} pending{{end}}{{if and $counts.Pending $counts.Confirmed}}, {{end}}{{if $counts.Confirmed}}{{$counts.Confirmed}} confirmed{{end}})</span>
-            {{end}}
-            {{else}}
-            <span class="booking-count">0 bookings</span>
-            {{end}}
+        <div class="template-stats">
+            <span class="stats-text">
+                <strong>{{if $counts}}{{$counts.Total}}{{else}}0{{end}}</strong> booking{{if or (not $counts) (ne $counts.Total 1)}}s{{end}}
+                {{if and $counts (or $counts.Pending $counts.Confirmed)}}
+                &middot; {{if $counts.Pending}}{{$counts.Pending}} pending{{end}}{{if and $counts.Pending $counts.Confirmed}}, {{end}}{{if $counts.Confirmed}}{{$counts.Confirmed}} confirmed{{end}}
+                {{end}}
+            </span>
         </div>
         <div class="template-actions">
-            <button type="button" class="btn btn-sm btn-copy" onclick="copyTemplateLink(this, '{{$.BaseURL}}/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}')">Copy Link</button>
-            <a href="/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}" target="_blank" class="btn btn-sm">Preview</a>
-            <a href="/dashboard/templates/{{.ID}}" class="btn btn-sm">Edit</a>
+            <button type="button" class="btn-sm" onclick="copyTemplateLink(this, '{{$.BaseURL}}/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}')">Copy Link</button>
+            <a href="/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}" target="_blank" class="btn-sm">Preview</a>
+            <a href="/dashboard/templates/{{.ID}}" class="btn-sm">Edit</a>
             <form action="/dashboard/templates/{{.ID}}/duplicate" method="POST" style="display:inline">
-                <button type="submit" class="btn btn-sm">Duplicate</button>
+                <button type="submit" class="btn-sm">Duplicate</button>
             </form>
             <form action="/dashboard/templates/{{.ID}}" method="POST" style="display:inline">
                 <input type="hidden" name="_method" value="DELETE">
-                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this meeting type?')">Delete</button>
+                <button type="submit" class="btn-sm btn-danger" onclick="return confirm('Delete this meeting type?')">Delete</button>
             </form>
         </div>
     </div>
     {{end}}
 </div>
 {{else}}
-<div class="empty-state">
+<div class="empty-state-card">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+        <line x1="3" y1="9" x2="21" y2="9"/>
+        <line x1="9" y1="21" x2="9" y2="9"/>
+    </svg>
     <h3>No meeting types yet</h3>
     <p>Create your first meeting type to start accepting bookings.</p>
-    <a href="/dashboard/templates/new" class="btn btn-primary">Create Meeting Type</a>
+    <a href="/dashboard/templates/new" class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Create Meeting Type
+    </a>
 </div>
 {{end}}
 {{end}}

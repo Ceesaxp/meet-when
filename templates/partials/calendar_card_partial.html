@@ -2,53 +2,72 @@
 <div class="calendar-card {{if eq (printf "%s" .SyncStatus) "failed"}}calendar-card-error{{end}}" id="calendar-card-{{.ID}}">
     <div class="calendar-info">
         <div class="calendar-header">
-            <strong>{{.Name}}</strong>
-            {{if eq (printf "%s" .Provider) "google"}}<span class="badge badge-google">Google Calendar</span>
-            {{else if eq (printf "%s" .Provider) "icloud"}}<span class="badge badge-icloud">iCloud</span>
-            {{else}}<span class="badge">CalDAV</span>{{end}}
-            {{if .IsDefault}}<span class="badge badge-primary">Default</span>{{end}}
+            <span class="calendar-name">{{.Name}}</span>
+            <div class="calendar-badges">
+                {{if eq (printf "%s" .Provider) "google"}}<span class="badge badge-google">Google</span>
+                {{else if eq (printf "%s" .Provider) "icloud"}}<span class="badge badge-icloud">iCloud</span>
+                {{else}}<span class="badge">CalDAV</span>{{end}}
+                {{if .IsDefault}}<span class="badge badge-primary">Default</span>{{end}}
+            </div>
         </div>
         <div class="calendar-sync-status">
             {{if eq (printf "%s" .SyncStatus) "synced"}}
-                <span class="sync-indicator sync-ok" title="Sync successful">&#10003;</span>
-                {{if .LastSyncedAt}}
-                <span class="sync-time">Synced {{timeAgo .LastSyncedAt}}</span>
-                {{else}}
-                <span class="sync-time">Synced</span>
-                {{end}}
+            <span class="sync-indicator sync-ok">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+            </span>
+            <span class="sync-time">{{if .LastSyncedAt}}Synced {{timeAgo .LastSyncedAt}}{{else}}Synced{{end}}</span>
             {{else if eq (printf "%s" .SyncStatus) "failed"}}
-                <span class="sync-indicator sync-error" title="Sync failed - click for details" onclick="toggleCalendarError(this)">&#9888;</span>
-                <span class="sync-time sync-error-text sync-error-clickable" onclick="toggleCalendarError(this)">Sync failed - click for details</span>
+            <span class="sync-indicator sync-error" onclick="toggleCalendarError(this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+            </span>
+            <span class="sync-time sync-error-clickable" onclick="toggleCalendarError(this)">Sync failed - click for details</span>
             {{else}}
-                <span class="sync-indicator sync-unknown" title="Not synced yet">&#8635;</span>
-                <span class="sync-time">Never synced</span>
+            <span class="sync-indicator sync-pending">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <polyline points="23 4 23 10 17 10"/>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+            </span>
+            <span class="sync-time">Never synced</span>
             {{end}}
         </div>
         {{if and (eq (printf "%s" .SyncStatus) "failed") .SyncError}}
         <div class="calendar-error-message" style="display: none;">
-            <span class="error-icon">&#9888;</span>
-            <span class="error-text">{{.SyncError}}</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span>{{.SyncError}}</span>
         </div>
         {{end}}
     </div>
     <div class="calendar-actions">
-        <button type="button" class="btn btn-sm btn-refresh"
+        <button type="button" class="btn-sm btn-secondary"
                 hx-post="/dashboard/calendars/{{.ID}}/refresh"
                 hx-target="#calendar-card-{{.ID}}"
                 hx-swap="outerHTML"
-                hx-indicator="#refresh-spinner-{{.ID}}"
-                title="Refresh sync status">
-            <span class="refresh-icon">&#8635;</span>
-            <span class="refresh-text">Refresh</span>
-            <span id="refresh-spinner-{{.ID}}" class="htmx-indicator refresh-spinner"></span>
+                hx-indicator="#refresh-spinner-{{.ID}}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <polyline points="23 4 23 10 17 10"/>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+            Refresh
+            <span id="refresh-spinner-{{.ID}}" class="htmx-indicator">...</span>
         </button>
         {{if not .IsDefault}}
         <form action="/dashboard/calendars/{{.ID}}/default" method="POST" style="display:inline">
-            <button type="submit" class="btn btn-sm">Set Default</button>
+            <button type="submit" class="btn-sm btn-secondary">Set Default</button>
         </form>
         {{end}}
         <form action="/dashboard/calendars/{{.ID}}/disconnect" method="POST" style="display:inline">
-            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Disconnect this calendar?')">Disconnect</button>
+            <button type="submit" class="btn-sm btn-danger" onclick="return confirm('Disconnect this calendar?')">Disconnect</button>
         </form>
     </div>
 </div>

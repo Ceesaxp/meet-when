@@ -115,13 +115,15 @@ func duration(start, end interface{}) string {
 
 // PageData represents common page data
 type PageData struct {
-	Title       string
-	Description string
-	BaseURL     string
-	Host        interface{}
-	Tenant      interface{}
-	Flash       *FlashMessage
-	Data        interface{}
+	Title        string
+	Description  string
+	BaseURL      string
+	Host         interface{}
+	Tenant       interface{}
+	Flash        *FlashMessage
+	Data         interface{}
+	ActiveNav    string // For dashboard navigation highlighting
+	PendingCount int    // For showing pending bookings badge
 }
 
 // FlashMessage represents a flash message

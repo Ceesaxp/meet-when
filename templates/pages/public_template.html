@@ -6,207 +6,253 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}} | Meet When</title>
     <meta name="description" content="{{.Description}}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
 <body class="public-page booking-page">
     <div class="booking-container">
-        <div class="booking-sidebar">
-            <a href="/m/{{.Tenant.Slug}}/{{.Host.Slug}}" class="back-link">&larr; Back</a>
-            <h1>{{.Host.Name}}</h1>
-            <h2>{{.Data.Template.Name}}</h2>
-            {{if .Data.Template.Description}}
-            <p>{{.Data.Template.Description}}</p>
-            {{end}}
-            <div class="meeting-details">
-                <div class="detail">
-                    <strong>Duration:</strong>
-                    {{if gt (len .Data.Template.Durations) 1}}
-                    <select id="duration" onchange="loadSlots()">
-                        {{range .Data.Template.Durations}}
-                        <option value="{{.}}">{{.}} minutes</option>
-                        {{end}}
-                    </select>
-                    {{else}}
-                    <span id="duration-display">{{index .Data.Template.Durations 0}} minutes</span>
-                    {{end}}
+        <nav class="booking-nav">
+            <a href="/m/{{.Tenant.Slug}}/{{.Host.Slug}}" class="back-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                {{.Host.Name}}
+            </a>
+            <span class="step-counter">Step <span id="current-step">1</span> of 2</span>
+        </nav>
+
+        <div class="booking-layout">
+            <aside class="booking-sidebar">
+                <div class="sidebar-header">
+                    <p class="host-name">{{.Host.Name}}</p>
+                    <h1 class="meeting-title">{{.Data.Template.Name}}</h1>
                 </div>
-                <div class="detail">
-                    <strong>Location:</strong>
-                    <span>
+
+                <div class="sidebar-meta">
+                    <div class="meta-row">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 6v6l4 2"/>
+                        </svg>
+                        {{if gt (len .Data.Template.Durations) 1}}
+                        <select id="duration" class="duration-select" onchange="loadSlots()">
+                            {{range .Data.Template.Durations}}
+                            <option value="{{.}}">{{.}} minutes</option>
+                            {{end}}
+                        </select>
+                        {{else}}
+                        <span id="duration-display">{{index .Data.Template.Durations 0}} minutes</span>
+                        {{end}}
+                    </div>
+                    <div class="meta-row">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                            <polygon points="23 7 16 12 23 17 23 7"/>
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                        </svg>
                         {{if eq .Data.Template.LocationType "google_meet"}}Google Meet{{end}}
                         {{if eq .Data.Template.LocationType "zoom"}}Zoom{{end}}
                         {{if eq .Data.Template.LocationType "phone"}}Call {{.Data.Template.CustomLocation}}{{end}}
                         {{if eq .Data.Template.LocationType "custom"}}{{.Data.Template.CustomLocation}}{{end}}
-                    </span>
-                </div>
-            </div>
-        </div>
-
-        <div class="booking-main">
-            {{if .Flash}}
-            <div class="alert alert-{{.Flash.Type}}">{{.Flash.Message}}</div>
-            {{end}}
-
-            <div id="booking-step-1" class="booking-step">
-                <h3>Select a Date & Time</h3>
-                <div class="timezone-selector">
-                    <span class="timezone-display">
-                        <span id="timezone-label">Detecting timezone...</span>
-                        <a href="#" id="timezone-change-link" class="timezone-change" onclick="showTimezoneSelector(event)">Change</a>
-                    </span>
-                    <div id="timezone-dropdown" class="timezone-dropdown" style="display: none;">
-                        <select id="timezone" onchange="updateTimezone()">
-                            <optgroup label="Common">
-                                <option value="UTC">UTC</option>
-                                <option value="America/New_York">Eastern Time (US)</option>
-                                <option value="America/Chicago">Central Time (US)</option>
-                                <option value="America/Denver">Mountain Time (US)</option>
-                                <option value="America/Los_Angeles">Pacific Time (US)</option>
-                                <option value="America/Anchorage">Alaska</option>
-                                <option value="Pacific/Honolulu">Hawaii</option>
-                            </optgroup>
-                            <optgroup label="Europe">
-                                <option value="Europe/London">London</option>
-                                <option value="Europe/Paris">Paris</option>
-                                <option value="Europe/Berlin">Berlin</option>
-                                <option value="Europe/Amsterdam">Amsterdam</option>
-                                <option value="Europe/Rome">Rome</option>
-                                <option value="Europe/Madrid">Madrid</option>
-                                <option value="Europe/Stockholm">Stockholm</option>
-                                <option value="Europe/Moscow">Moscow</option>
-                                <option value="Europe/Athens">Athens</option>
-                                <option value="Europe/Warsaw">Warsaw</option>
-                                <option value="Europe/Bucharest">Bucharest</option>
-                            </optgroup>
-                            <optgroup label="Asia">
-                                <option value="Asia/Tokyo">Tokyo</option>
-                                <option value="Asia/Seoul">Seoul</option>
-                                <option value="Asia/Shanghai">Shanghai / Beijing</option>
-                                <option value="Asia/Hong_Kong">Hong Kong</option>
-                                <option value="Asia/Singapore">Singapore</option>
-                                <option value="Asia/Kolkata">India (IST)</option>
-                                <option value="Asia/Dubai">Dubai</option>
-                                <option value="Asia/Bangkok">Bangkok</option>
-                                <option value="Asia/Jakarta">Jakarta</option>
-                                <option value="Asia/Manila">Manila</option>
-                                <option value="Asia/Taipei">Taipei</option>
-                            </optgroup>
-                            <optgroup label="Pacific">
-                                <option value="Australia/Sydney">Sydney</option>
-                                <option value="Australia/Melbourne">Melbourne</option>
-                                <option value="Australia/Brisbane">Brisbane</option>
-                                <option value="Australia/Perth">Perth</option>
-                                <option value="Pacific/Auckland">Auckland</option>
-                                <option value="Pacific/Fiji">Fiji</option>
-                            </optgroup>
-                            <optgroup label="Americas">
-                                <option value="America/Toronto">Toronto</option>
-                                <option value="America/Vancouver">Vancouver</option>
-                                <option value="America/Mexico_City">Mexico City</option>
-                                <option value="America/Bogota">Bogota</option>
-                                <option value="America/Lima">Lima</option>
-                                <option value="America/Sao_Paulo">São Paulo</option>
-                                <option value="America/Buenos_Aires">Buenos Aires</option>
-                                <option value="America/Santiago">Santiago</option>
-                            </optgroup>
-                            <optgroup label="Africa / Middle East">
-                                <option value="Africa/Cairo">Cairo</option>
-                                <option value="Africa/Johannesburg">Johannesburg</option>
-                                <option value="Africa/Lagos">Lagos</option>
-                                <option value="Africa/Nairobi">Nairobi</option>
-                                <option value="Asia/Jerusalem">Jerusalem</option>
-                                <option value="Asia/Riyadh">Riyadh</option>
-                            </optgroup>
-                        </select>
+                    </div>
+                    <div class="meta-row selected" id="selected-slot-display" style="display: none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8" y1="2" x2="8" y2="6"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                        <span id="selected-slot-text"></span>
                     </div>
                 </div>
 
-                <div id="slots-container"
-                     hx-swap="innerHTML">
-                    <div class="loading">Loading available times...</div>
+                {{if .Data.Template.Description}}
+                <div class="sidebar-description">
+                    <p>{{.Data.Template.Description}}</p>
                 </div>
-            </div>
+                {{end}}
+            </aside>
 
-            <div id="booking-step-2" class="booking-step" style="display:none">
-                <h3>Enter Your Details</h3>
-                <form method="POST" action="/m/{{.Tenant.Slug}}/{{.Host.Slug}}/{{.Data.Template.Slug}}/book" class="booking-form">
-                    <input type="hidden" name="start_time" id="selected_start_time">
-                    <input type="hidden" name="timezone" id="form_timezone">
-                    <input type="hidden" name="duration" id="form_duration">
+            <main class="booking-main">
+                {{if .Flash}}
+                <div class="alert alert-{{.Flash.Type}}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    {{.Flash.Message}}
+                </div>
+                {{end}}
 
-                    <div class="selected-time" id="selected-time-display"></div>
-
-                    <div class="form-group">
-                        <label for="name">Your Name *</label>
-                        <input type="text" id="name" name="name" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="email">Email *</label>
-                        <input type="email" id="email" name="email" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="phone">Phone (optional)</label>
-                        <input type="tel" id="phone" name="phone">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="additional_guests">Additional Guests (optional)</label>
-                        <textarea id="additional_guests" name="additional_guests" rows="2"
-                                  placeholder="Enter email addresses, one per line"></textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="agenda">Meeting Subject/Agenda (optional)</label>
-                        <textarea id="agenda" name="agenda" rows="3"
-                                  placeholder="What would you like to discuss?"></textarea>
-                    </div>
-
-                    {{if .Data.Template.InviteeQuestions}}
-                    <div class="custom-questions-section">
-                        <h4>Additional Information</h4>
-                        {{range $index, $question := .Data.Template.InviteeQuestions}}
-                        {{$qMap := toMap $question}}
-                        {{if $qMap}}
-                        <div class="form-group">
-                            <label for="question_{{$index}}">
-                                {{index $qMap "label"}}
-                                {{if index $qMap "required"}}*{{end}}
-                            </label>
-                            {{if eq (index $qMap "type") "textarea"}}
-                            <textarea id="question_{{$index}}" name="question_{{$index}}" rows="3"
-                                      {{if index $qMap "required"}}required{{end}}></textarea>
-                            {{else if eq (index $qMap "type") "select"}}
-                            <select id="question_{{$index}}" name="question_{{$index}}"
-                                    {{if index $qMap "required"}}required{{end}}>
-                                <option value="">Select an option</option>
-                                {{$options := index $qMap "options"}}
-                                {{if $options}}
-                                {{range $options}}
-                                <option value="{{.}}">{{.}}</option>
-                                {{end}}
-                                {{end}}
+                <div id="booking-step-1" class="booking-step">
+                    <div class="timezone-selector">
+                        <span class="timezone-label" id="timezone-label">Detecting timezone...</span>
+                        <button type="button" class="timezone-change" onclick="showTimezoneSelector(event)">Change</button>
+                        <div id="timezone-dropdown" class="timezone-dropdown" style="display: none;">
+                            <select id="timezone" class="form-input" onchange="updateTimezone()">
+                                <optgroup label="Common">
+                                    <option value="UTC">UTC</option>
+                                    <option value="America/New_York">Eastern Time (US)</option>
+                                    <option value="America/Chicago">Central Time (US)</option>
+                                    <option value="America/Denver">Mountain Time (US)</option>
+                                    <option value="America/Los_Angeles">Pacific Time (US)</option>
+                                    <option value="America/Anchorage">Alaska</option>
+                                    <option value="Pacific/Honolulu">Hawaii</option>
+                                </optgroup>
+                                <optgroup label="Europe">
+                                    <option value="Europe/London">London</option>
+                                    <option value="Europe/Paris">Paris</option>
+                                    <option value="Europe/Berlin">Berlin</option>
+                                    <option value="Europe/Amsterdam">Amsterdam</option>
+                                    <option value="Europe/Rome">Rome</option>
+                                    <option value="Europe/Madrid">Madrid</option>
+                                    <option value="Europe/Stockholm">Stockholm</option>
+                                    <option value="Europe/Moscow">Moscow</option>
+                                    <option value="Europe/Athens">Athens</option>
+                                    <option value="Europe/Warsaw">Warsaw</option>
+                                    <option value="Europe/Bucharest">Bucharest</option>
+                                </optgroup>
+                                <optgroup label="Asia">
+                                    <option value="Asia/Tokyo">Tokyo</option>
+                                    <option value="Asia/Seoul">Seoul</option>
+                                    <option value="Asia/Shanghai">Shanghai / Beijing</option>
+                                    <option value="Asia/Hong_Kong">Hong Kong</option>
+                                    <option value="Asia/Singapore">Singapore</option>
+                                    <option value="Asia/Kolkata">India (IST)</option>
+                                    <option value="Asia/Dubai">Dubai</option>
+                                    <option value="Asia/Bangkok">Bangkok</option>
+                                    <option value="Asia/Jakarta">Jakarta</option>
+                                    <option value="Asia/Manila">Manila</option>
+                                    <option value="Asia/Taipei">Taipei</option>
+                                </optgroup>
+                                <optgroup label="Pacific">
+                                    <option value="Australia/Sydney">Sydney</option>
+                                    <option value="Australia/Melbourne">Melbourne</option>
+                                    <option value="Australia/Brisbane">Brisbane</option>
+                                    <option value="Australia/Perth">Perth</option>
+                                    <option value="Pacific/Auckland">Auckland</option>
+                                    <option value="Pacific/Fiji">Fiji</option>
+                                </optgroup>
+                                <optgroup label="Americas">
+                                    <option value="America/Toronto">Toronto</option>
+                                    <option value="America/Vancouver">Vancouver</option>
+                                    <option value="America/Mexico_City">Mexico City</option>
+                                    <option value="America/Bogota">Bogota</option>
+                                    <option value="America/Lima">Lima</option>
+                                    <option value="America/Sao_Paulo">Sao Paulo</option>
+                                    <option value="America/Buenos_Aires">Buenos Aires</option>
+                                    <option value="America/Santiago">Santiago</option>
+                                </optgroup>
+                                <optgroup label="Africa / Middle East">
+                                    <option value="Africa/Cairo">Cairo</option>
+                                    <option value="Africa/Johannesburg">Johannesburg</option>
+                                    <option value="Africa/Lagos">Lagos</option>
+                                    <option value="Africa/Nairobi">Nairobi</option>
+                                    <option value="Asia/Jerusalem">Jerusalem</option>
+                                    <option value="Asia/Riyadh">Riyadh</option>
+                                </optgroup>
                             </select>
-                            {{else}}
-                            <input type="text" id="question_{{$index}}" name="question_{{$index}}"
-                                   {{if index $qMap "required"}}required{{end}}>
+                        </div>
+                    </div>
+
+                    <div id="slots-container" hx-swap="innerHTML">
+                        <div class="loading">
+                            <div class="loading-spinner"></div>
+                            <span>Loading available times...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="booking-step-2" class="booking-step" style="display:none">
+                    <div class="section-title">Enter Your Details</div>
+                    <form method="POST" action="/m/{{.Tenant.Slug}}/{{.Host.Slug}}/{{.Data.Template.Slug}}/book" class="booking-form">
+                        <input type="hidden" name="start_time" id="selected_start_time">
+                        <input type="hidden" name="timezone" id="form_timezone">
+                        <input type="hidden" name="duration" id="form_duration">
+
+                        <div class="form-group">
+                            <label class="form-label" for="name">Your Name *</label>
+                            <input type="text" id="name" name="name" class="form-input" required placeholder="John Doe">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="email">Email *</label>
+                            <input type="email" id="email" name="email" class="form-input" required placeholder="you@example.com">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="phone">Phone (optional)</label>
+                            <input type="tel" id="phone" name="phone" class="form-input" placeholder="+1 (555) 000-0000">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="additional_guests">Additional Guests (optional)</label>
+                            <textarea id="additional_guests" name="additional_guests" class="form-input" rows="2"
+                                      placeholder="Enter email addresses, one per line"></textarea>
+                            <p class="form-hint">One email per line for additional attendees</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="agenda">Meeting Subject/Agenda (optional)</label>
+                            <textarea id="agenda" name="agenda" class="form-input" rows="3"
+                                      placeholder="What would you like to discuss?"></textarea>
+                        </div>
+
+                        {{if .Data.Template.InviteeQuestions}}
+                        <div class="custom-questions-section">
+                            <div class="section-title">Additional Information</div>
+                            {{range $index, $question := .Data.Template.InviteeQuestions}}
+                            {{$qMap := toMap $question}}
+                            {{if $qMap}}
+                            <div class="form-group">
+                                <label class="form-label" for="question_{{$index}}">
+                                    {{index $qMap "label"}}
+                                    {{if index $qMap "required"}}*{{end}}
+                                </label>
+                                {{if eq (index $qMap "type") "textarea"}}
+                                <textarea id="question_{{$index}}" name="question_{{$index}}" class="form-input" rows="3"
+                                          {{if index $qMap "required"}}required{{end}}></textarea>
+                                {{else if eq (index $qMap "type") "select"}}
+                                <select id="question_{{$index}}" name="question_{{$index}}" class="form-input"
+                                        {{if index $qMap "required"}}required{{end}}>
+                                    <option value="">Select an option</option>
+                                    {{$options := index $qMap "options"}}
+                                    {{if $options}}
+                                    {{range $options}}
+                                    <option value="{{.}}">{{.}}</option>
+                                    {{end}}
+                                    {{end}}
+                                </select>
+                                {{else}}
+                                <input type="text" id="question_{{$index}}" name="question_{{$index}}" class="form-input"
+                                       {{if index $qMap "required"}}required{{end}}>
+                                {{end}}
+                            </div>
+                            {{end}}
                             {{end}}
                         </div>
                         {{end}}
-                        {{end}}
-                    </div>
-                    {{end}}
 
-                    <div class="form-actions">
-                        <button type="button" onclick="showStep(1)" class="btn">Back</button>
-                        <button type="submit" class="btn btn-primary">
-                            {{if .Data.Template.RequiresApproval}}Request Booking{{else}}Confirm Booking{{end}}
-                        </button>
-                    </div>
-                </form>
-            </div>
+                        <div class="form-actions">
+                            <button type="button" onclick="showStep(1)" class="btn btn-secondary">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                                </svg>
+                                Back
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                {{if .Data.Template.RequiresApproval}}Request Booking{{else}}Confirm Booking{{end}}
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </main>
         </div>
     </div>
 
@@ -330,20 +376,30 @@
             document.getElementById('selected_start_time').value = startTime;
             document.getElementById('form_timezone').value = currentTimezone;
             document.getElementById('form_duration').value = getSelectedDuration();
-            document.getElementById('selected-time-display').textContent = displayTime;
+
+            // Update sidebar selected slot display
+            document.getElementById('selected-slot-text').textContent = displayTime;
+            document.getElementById('selected-slot-display').style.display = 'flex';
+
             showStep(2);
         }
 
         function showStep(step) {
             document.getElementById('booking-step-1').style.display = step === 1 ? 'block' : 'none';
             document.getElementById('booking-step-2').style.display = step === 2 ? 'block' : 'none';
+            document.getElementById('current-step').textContent = step;
+
+            // Hide/show selected slot in sidebar
+            if (step === 1) {
+                document.getElementById('selected-slot-display').style.display = 'none';
+            }
         }
 
         // Close dropdown when clicking outside
         document.addEventListener('click', function(event) {
             var dropdown = document.getElementById('timezone-dropdown');
-            var changeLink = document.getElementById('timezone-change-link');
-            if (!dropdown.contains(event.target) && event.target !== changeLink) {
+            var changeBtn = document.querySelector('.timezone-change');
+            if (!dropdown.contains(event.target) && event.target !== changeBtn) {
                 dropdown.style.display = 'none';
             }
         });

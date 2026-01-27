@@ -18,6 +18,12 @@ type DashboardHandler struct {
 	handlers *Handlers
 }
 
+// getPendingCount returns the count of pending bookings for the host
+func (h *DashboardHandler) getPendingCount(r *http.Request, hostID string) int {
+	pending, _ := h.handlers.services.Booking.GetPendingBookings(r.Context(), hostID)
+	return len(pending)
+}
+
 // Home renders the dashboard home page
 func (h *DashboardHandler) Home(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())
@@ -36,9 +42,11 @@ func (h *DashboardHandler) Home(w http.ResponseWriter, r *http.Request) {
 	templates, _ := h.handlers.services.Template.GetTemplates(r.Context(), host.Host.ID)
 
 	h.handlers.render(w, "dashboard_home.html", PageData{
-		Title:  "Dashboard",
-		Host:   host.Host,
-		Tenant: host.Tenant,
+		Title:        "Dashboard",
+		Host:         host.Host,
+		Tenant:       host.Tenant,
+		ActiveNav:    "home",
+		PendingCount: len(pending),
 		Data: map[string]interface{}{
 			"Bookings":     bookings,
 			"PendingCount": len(pending),
@@ -69,9 +77,11 @@ func (h *DashboardHandler) Calendars(w http.ResponseWriter, r *http.Request) {
 	zoomAuthURL := h.handlers.services.Conferencing.GetZoomAuthURL(host.Host.ID)
 
 	h.handlers.render(w, "dashboard_calendars.html", PageData{
-		Title:  "Calendars & Integrations",
-		Host:   host.Host,
-		Tenant: host.Tenant,
+		Title:        "Calendars & Integrations",
+		Host:         host.Host,
+		Tenant:       host.Tenant,
+		ActiveNav:    "calendars",
+		PendingCount: h.getPendingCount(r, host.Host.ID),
 		Data: map[string]interface{}{
 			"Calendars":     calendars,
 			"Conferencing":  conferencing,
@@ -206,9 +216,11 @@ func (h *DashboardHandler) Templates(w http.ResponseWriter, r *http.Request) {
 	bookingCounts, _ := h.handlers.services.Booking.GetBookingCountsByHostID(r.Context(), host.Host.ID)
 
 	h.handlers.render(w, "dashboard_templates.html", PageData{
-		Title:  "Meeting Templates",
-		Host:   host.Host,
-		Tenant: host.Tenant,
+		Title:        "Meeting Templates",
+		Host:         host.Host,
+		Tenant:       host.Tenant,
+		ActiveNav:    "templates",
+		PendingCount: h.getPendingCount(r, host.Host.ID),
 		Data: map[string]interface{}{
 			"Templates":     templates,
 			"BookingCounts": bookingCounts,
@@ -227,9 +239,11 @@ func (h *DashboardHandler) NewTemplatePage(w http.ResponseWriter, r *http.Reques
 	calendars, _ := h.handlers.services.Calendar.GetCalendars(r.Context(), host.Host.ID)
 
 	h.handlers.render(w, "dashboard_template_form.html", PageData{
-		Title:  "New Meeting Template",
-		Host:   host.Host,
-		Tenant: host.Tenant,
+		Title:        "New Meeting Template",
+		Host:         host.Host,
+		Tenant:       host.Tenant,
+		ActiveNav:    "templates",
+		PendingCount: h.getPendingCount(r, host.Host.ID),
 		Data: map[string]interface{}{
 			"Template":  nil,
 			"Calendars": calendars,
@@ -303,10 +317,12 @@ func (h *DashboardHandler) CreateTemplate(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		calendars, _ := h.handlers.services.Calendar.GetCalendars(r.Context(), host.Host.ID)
 		h.handlers.render(w, "dashboard_template_form.html", PageData{
-			Title:  "New Meeting Template",
-			Host:   host.Host,
-			Tenant: host.Tenant,
-			Flash:  &FlashMessage{Type: "error", Message: "Failed to create template: " + err.Error()},
+			Title:        "New Meeting Template",
+			Host:         host.Host,
+			Tenant:       host.Tenant,
+			ActiveNav:    "templates",
+			PendingCount: h.getPendingCount(r, host.Host.ID),
+			Flash:        &FlashMessage{Type: "error", Message: "Failed to create template: " + err.Error()},
 			Data: map[string]interface{}{
 				"Template":  nil,
 				"Calendars": calendars,
@@ -337,9 +353,11 @@ func (h *DashboardHandler) EditTemplatePage(w http.ResponseWriter, r *http.Reque
 	calendars, _ := h.handlers.services.Calendar.GetCalendars(r.Context(), host.Host.ID)
 
 	h.handlers.render(w, "dashboard_template_form.html", PageData{
-		Title:  "Edit Template",
-		Host:   host.Host,
-		Tenant: host.Tenant,
+		Title:        "Edit Template",
+		Host:         host.Host,
+		Tenant:       host.Tenant,
+		ActiveNav:    "templates",
+		PendingCount: h.getPendingCount(r, host.Host.ID),
 		Data: map[string]interface{}{
 			"Template":  template,
 			"Calendars": calendars,
@@ -499,9 +517,11 @@ func (h *DashboardHandler) Bookings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.handlers.render(w, "dashboard_bookings.html", PageData{
-		Title:  "Bookings",
-		Host:   host.Host,
-		Tenant: host.Tenant,
+		Title:        "Bookings",
+		Host:         host.Host,
+		Tenant:       host.Tenant,
+		ActiveNav:    "bookings",
+		PendingCount: len(pendingBookings),
 		Data: map[string]interface{}{
 			"Bookings":        bookings,
 			"Templates":       templateMap,
@@ -713,10 +733,12 @@ func (h *DashboardHandler) Settings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.handlers.render(w, "dashboard_settings.html", PageData{
-		Title:  "Settings",
-		Host:   host.Host,
-		Tenant: host.Tenant,
-		Flash:  flash,
+		Title:        "Settings",
+		Host:         host.Host,
+		Tenant:       host.Tenant,
+		ActiveNav:    "settings",
+		PendingCount: h.getPendingCount(r, host.Host.ID),
+		Flash:        flash,
 		Data: map[string]interface{}{
 			"WorkingHours": hoursByDay,
 			"DayNames":     []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"},
@@ -759,7 +781,7 @@ func (h *DashboardHandler) UpdateSettings(w http.ResponseWriter, r *http.Request
 	h.handlers.redirect(w, r, "/dashboard/settings?success=updated")
 }
 
-// UpdateWorkingHours updates working hours
+// UpdateWorkingHours updates working hours and timezone
 func (h *DashboardHandler) UpdateWorkingHours(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())
 	if host == nil {
@@ -770,6 +792,15 @@ func (h *DashboardHandler) UpdateWorkingHours(w http.ResponseWriter, r *http.Req
 	if err := r.ParseForm(); err != nil {
 		h.handlers.redirect(w, r, "/dashboard/settings?error=invalid_form")
 		return
+	}
+
+	// Update timezone if provided
+	if timezone := r.FormValue("timezone"); timezone != "" {
+		host.Host.Timezone = timezone
+		if err := h.handlers.services.Auth.UpdateHost(r.Context(), host.Host); err != nil {
+			h.handlers.redirect(w, r, "/dashboard/settings?error=update_failed")
+			return
+		}
 	}
 
 	now := models.Now()
@@ -879,9 +910,11 @@ func (h *DashboardHandler) AuditLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.handlers.render(w, "dashboard_audit_logs.html", PageData{
-		Title:  "Audit Logs",
-		Host:   host.Host,
-		Tenant: host.Tenant,
+		Title:        "Audit Logs",
+		Host:         host.Host,
+		Tenant:       host.Tenant,
+		ActiveNav:    "audit-logs",
+		PendingCount: h.getPendingCount(r, host.Host.ID),
 		Data: map[string]interface{}{
 			"Logs":         logs,
 			"Page":         page,
@@ -963,9 +996,11 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.handlers.render(w, "dashboard_agenda.html", PageData{
-		Title:  "Agenda",
-		Host:   host.Host,
-		Tenant: host.Tenant,
+		Title:        "Agenda",
+		Host:         host.Host,
+		Tenant:       host.Tenant,
+		ActiveNav:    "agenda",
+		PendingCount: h.getPendingCount(r, host.Host.ID),
 		Data: map[string]interface{}{
 			"Events":    events,
 			"DayGroups": dayGroups,

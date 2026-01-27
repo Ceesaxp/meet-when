@@ -1,46 +1,107 @@
 {{define "reschedule_slots_partial.html"}}
-<div class="slots-wrapper">
-    {{if .Slots}}
-    <div class="date-navigation">
-        <button onclick="navigateWeek(-1)" class="btn btn-sm">&larr; Previous</button>
-        <span>{{formatDate .StartDate}} - {{formatDate .EndDate}}</span>
-        <button onclick="navigateWeek(1)" class="btn btn-sm">Next &rarr;</button>
-    </div>
-
-    <div class="slots-grid">
-        {{range $date, $slots := .Slots}}
-        <div class="date-column">
-            <h4>{{formatDate (index $slots 0).Start}}</h4>
-            <div class="time-slots">
-                {{range $slots}}
-                <button type="button" class="slot-btn"
-                        onclick="selectSlot('{{.Start.Format "2006-01-02T15:04:05Z07:00"}}', '{{formatDateTime .Start}}')">
-                    {{formatTime .Start}}
+<div class="calendar-wrapper">
+    <div class="calendar">
+        <div class="section-title">Select a New Date</div>
+        <div class="calendar-nav">
+            <span class="calendar-month">{{.MonthDisplay}}</span>
+            <div class="nav-btns">
+                {{if .CanGoPrev}}
+                <button type="button" class="nav-btn" onclick="navigateMonth('{{.PrevMonth}}')" aria-label="Previous month">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 18l-6-6 6-6"/>
+                    </svg>
+                </button>
+                {{else}}
+                <button type="button" class="nav-btn" disabled aria-label="Previous month">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 18l-6-6 6-6"/>
+                    </svg>
                 </button>
                 {{end}}
+                <button type="button" class="nav-btn" onclick="navigateMonth('{{.NextMonth}}')" aria-label="Next month">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 18l6-6-6-6"/>
+                    </svg>
+                </button>
             </div>
         </div>
-        {{end}}
+
+        <div class="calendar-grid" role="grid" aria-label="Calendar">
+            <div class="weekday" role="columnheader">Sun</div>
+            <div class="weekday" role="columnheader">Mon</div>
+            <div class="weekday" role="columnheader">Tue</div>
+            <div class="weekday" role="columnheader">Wed</div>
+            <div class="weekday" role="columnheader">Thu</div>
+            <div class="weekday" role="columnheader">Fri</div>
+            <div class="weekday" role="columnheader">Sat</div>
+
+            {{range .CalendarWeeks}}
+                {{range .}}
+                    {{if .IsInMonth}}
+                        {{if and (not .IsPast) .HasSlots}}
+                        <div class="day available{{if .IsSelected}} selected{{end}}{{if .IsToday}} today{{end}}"
+                             role="gridcell" tabindex="0"
+                             onclick="selectDate('{{.Date.Format "2006-01-02"}}')"
+                             onkeydown="if(event.key==='Enter')selectDate('{{.Date.Format "2006-01-02"}}')">{{.DayNum}}</div>
+                        {{else}}
+                        <div class="day disabled{{if .IsToday}} today{{end}}" role="gridcell">{{.DayNum}}</div>
+                        {{end}}
+                    {{else}}
+                    <div class="day disabled" role="gridcell"></div>
+                    {{end}}
+                {{end}}
+            {{end}}
+        </div>
     </div>
-    {{else}}
-    <div class="no-slots">
-        <p>No available times for this week.</p>
-        <button onclick="navigateWeek(1)" class="btn btn-sm">Check next week &rarr;</button>
+
+    {{if .SelectedSlots}}
+    <div class="time-slots-section">
+        <div class="time-slots-header">
+            <span class="section-title">Select a Time</span>
+            <span class="selected-date">{{.SelectedDisplay}}</span>
+        </div>
+        <div class="time-slots" role="listbox" aria-label="Available times">
+            {{range .SelectedSlots}}
+            <button type="button" class="time-slot" role="option" tabindex="0"
+                    onclick="selectSlot('{{.Start.Format "2006-01-02T15:04:05Z07:00"}}', '{{formatDateTime .Start}}')">
+                {{formatTime .Start}}
+            </button>
+            {{end}}
+        </div>
+    </div>
+    {{else if not .SelectedDate.IsZero}}
+    <div class="time-slots-section">
+        <div class="time-slots-header">
+            <span class="section-title">Select a Time</span>
+            <span class="selected-date">{{.SelectedDisplay}}</span>
+        </div>
+        <div class="no-slots">
+            <p>No available times on this day.</p>
+        </div>
     </div>
     {{end}}
 </div>
 
 <script>
-var currentStartDate = '{{.StartDate.Format "2006-01-02"}}';
+var currentMonth = '{{.MonthValue}}';
+var currentSelectedDate = '{{if not .SelectedDate.IsZero}}{{.SelectedDate.Format "2006-01-02"}}{{end}}';
 var rescheduleToken = '{{.Token}}';
 
-function navigateWeek(direction) {
-    var date = new Date(currentStartDate);
-    date.setDate(date.getDate() + (direction * 7));
-    var newDate = date.toISOString().split('T')[0];
+function navigateMonth(month) {
     var tz = document.getElementById('timezone').value;
     var duration = getSelectedDuration();
-    htmx.ajax('GET', '/booking/' + rescheduleToken + '/reschedule/slots?date=' + newDate + '&timezone=' + tz + '&duration=' + duration, {target: '#slots-container'});
+    var url = '/booking/' + rescheduleToken + '/reschedule/slots?month=' + month + '&timezone=' + encodeURIComponent(tz) + '&duration=' + duration;
+    if (currentSelectedDate) {
+        url += '&selected=' + currentSelectedDate;
+    }
+    htmx.ajax('GET', url, {target: '#slots-container'});
+}
+
+function selectDate(date) {
+    currentSelectedDate = date;
+    var tz = document.getElementById('timezone').value;
+    var duration = getSelectedDuration();
+    htmx.ajax('GET', '/booking/' + rescheduleToken + '/reschedule/slots?month=' + currentMonth + '&selected=' + date + '&timezone=' + encodeURIComponent(tz) + '&duration=' + duration, {target: '#slots-container'});
 }
 </script>
 {{end}}

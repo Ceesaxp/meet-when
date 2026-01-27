@@ -4,67 +4,63 @@
 
 {{define "content"}}
 <div class="page-header">
-    <h1>Agenda</h1>
-    <div class="page-header-subtitle">
-        {{if eq .Data.View "week"}}
-        Week of {{formatDate (index .Data.DayGroups 0).Date}}
-        {{else}}
-        {{formatDate .Data.Today}}
-        {{end}}
+    <div>
+        <h1 class="page-title">Agenda</h1>
+        <p class="page-subtitle">
+            {{if eq .Data.View "week"}}
+            Week of {{formatDate (index .Data.DayGroups 0).Date}}
+            {{else}}
+            {{formatDate .Data.Today}}
+            {{end}}
+        </p>
     </div>
 </div>
 
-<div class="filter-bar">
-    <a href="/dashboard/agenda" class="btn btn-sm {{if eq .Data.View "today"}}btn-primary{{end}}">Today</a>
-    <a href="/dashboard/agenda?view=week" class="btn btn-sm {{if eq .Data.View "week"}}btn-primary{{end}}">This Week</a>
+<div class="view-tabs">
+    <a href="/dashboard/agenda" class="view-tab {{if eq .Data.View "today"}}active{{end}}">Today</a>
+    <a href="/dashboard/agenda?view=week" class="view-tab {{if eq .Data.View "week"}}active{{end}}">This Week</a>
 </div>
 
 {{if eq .Data.View "week"}}
-{{/* Week view - events grouped by day */}}
+<!-- Week view - events grouped by day -->
 <div class="agenda-week">
     {{range .Data.DayGroups}}
-    <div class="agenda-day-group">
+    <div class="day-group">
         <div class="day-header">
             <span class="day-name">{{.Date.Weekday}}</span>
             <span class="day-date">{{formatDate .Date}}</span>
         </div>
         {{if .Events}}
-        <table class="table agenda-table">
-            <tbody>
-                {{range .Events}}
-                <tr class="agenda-event {{if .IsAllDay}}all-day-event{{end}}">
-                    <td class="event-time">
-                        {{if .IsAllDay}}
-                        <span class="all-day-badge">All Day</span>
-                        {{else}}
-                        {{formatTime .Start}} - {{formatTime .End}}
-                        {{end}}
-                    </td>
-                    <td class="event-title">
-                        {{if .Title}}{{.Title}}{{else}}<em>No title</em>{{end}}
-                    </td>
-                    <td class="event-duration">
-                        {{if not .IsAllDay}}
-                        {{duration .Start .End}}
-                        {{end}}
-                    </td>
-                    <td class="event-calendar">
-                        <span class="calendar-badge">{{.CalendarName}}</span>
-                    </td>
-                </tr>
-                {{end}}
-            </tbody>
-        </table>
+        <div class="events-list">
+            {{range .Events}}
+            <div class="event-item {{if .IsAllDay}}all-day{{end}}">
+                <div class="event-time">
+                    {{if .IsAllDay}}
+                    <span class="all-day-badge">All Day</span>
+                    {{else}}
+                    <div class="event-time-range">{{formatTime .Start}} - {{formatTime .End}}</div>
+                    <div class="event-duration">{{duration .Start .End}}</div>
+                    {{end}}
+                </div>
+                <div class="event-content">
+                    <div class="event-title">{{if .Title}}{{.Title}}{{else}}(No title){{end}}</div>
+                    <div class="event-details">
+                        <span class="event-calendar">{{.CalendarName}}</span>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+        </div>
         {{else}}
-        <p class="no-events-day">No events</p>
+        <div class="no-events">No events scheduled</div>
         {{end}}
     </div>
     {{end}}
 </div>
 {{else}}
-{{/* Today view */}}
+<!-- Today view -->
 {{if .Data.Events}}
-<div class="agenda-list">
+<div class="table-container">
     <table class="table agenda-table">
         <thead>
             <tr>
@@ -76,23 +72,27 @@
         </thead>
         <tbody>
             {{range .Data.Events}}
-            <tr class="agenda-event {{if .IsAllDay}}all-day-event{{end}}">
-                <td class="event-time">
+            <tr class="{{if .IsAllDay}}all-day-row{{end}}">
+                <td class="event-time-cell">
                     {{if .IsAllDay}}
                     <span class="all-day-badge">All Day</span>
                     {{else}}
-                    {{formatTime .Start}} - {{formatTime .End}}
+                    <div class="event-times">
+                        <span class="event-time">{{formatTime .Start}}</span>
+                        <span class="event-time-separator">-</span>
+                        <span class="event-time">{{formatTime .End}}</span>
+                    </div>
                     {{end}}
                 </td>
-                <td class="event-title">
-                    {{if .Title}}{{.Title}}{{else}}<em>No title</em>{{end}}
+                <td class="event-title-cell">
+                    {{if .Title}}{{.Title}}{{else}}<em class="no-title">(No title)</em>{{end}}
                 </td>
-                <td class="event-duration">
+                <td class="event-duration-cell">
                     {{if not .IsAllDay}}
                     {{duration .Start .End}}
                     {{end}}
                 </td>
-                <td class="event-calendar">
+                <td>
                     <span class="calendar-badge">{{.CalendarName}}</span>
                 </td>
             </tr>
@@ -102,142 +102,15 @@
 </div>
 {{else}}
 <div class="empty-state">
-    <div class="empty-state-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="16" y1="2" x2="16" y2="6"></line>
-            <line x1="8" y1="2" x2="8" y2="6"></line>
-            <line x1="3" y1="10" x2="21" y2="10"></line>
-        </svg>
-    </div>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48" height="48">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+    </svg>
     <h3>No events today</h3>
     <p>Your schedule is clear for today. Enjoy your free time!</p>
 </div>
 {{end}}
 {{end}}
-
-<style>
-.page-header-subtitle {
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    margin-top: 0.25rem;
-}
-
-.agenda-list {
-    margin-top: 1rem;
-}
-
-.agenda-table {
-    width: 100%;
-}
-
-.agenda-event {
-    transition: background-color 0.15s ease;
-}
-
-.agenda-event:hover {
-    background-color: var(--bg-hover, #f5f5f5);
-}
-
-.all-day-event {
-    background-color: var(--bg-muted, #f9f9f9);
-}
-
-.event-time {
-    white-space: nowrap;
-    font-weight: 500;
-    width: 160px;
-}
-
-.event-title {
-    font-weight: 500;
-}
-
-.event-title em {
-    color: var(--text-muted);
-    font-weight: normal;
-}
-
-.event-duration {
-    color: var(--text-muted);
-    width: 100px;
-}
-
-.event-calendar {
-    width: 150px;
-}
-
-.all-day-badge {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    background-color: var(--primary-light, #e3f2fd);
-    color: var(--primary, #2196f3);
-    border-radius: 4px;
-    font-size: 0.8rem;
-    font-weight: 500;
-}
-
-.calendar-badge {
-    display: inline-block;
-    padding: 0.15rem 0.4rem;
-    background-color: var(--bg-muted, #f0f0f0);
-    border-radius: 4px;
-    font-size: 0.85rem;
-}
-
-.empty-state-icon {
-    color: var(--text-muted);
-    margin-bottom: 1rem;
-}
-
-.empty-state-icon svg {
-    opacity: 0.5;
-}
-
-/* Week view styles */
-.agenda-week {
-    margin-top: 1rem;
-}
-
-.agenda-day-group {
-    margin-bottom: 1.5rem;
-    border: 1px solid var(--border-color, #e0e0e0);
-    border-radius: 8px;
-    overflow: hidden;
-}
-
-.day-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    background-color: var(--bg-muted, #f9f9f9);
-    border-bottom: 1px solid var(--border-color, #e0e0e0);
-}
-
-.day-name {
-    font-weight: 600;
-    font-size: 1rem;
-}
-
-.day-date {
-    color: var(--text-muted);
-    font-size: 0.9rem;
-}
-
-.agenda-day-group .agenda-table {
-    margin: 0;
-}
-
-.agenda-day-group .agenda-table tbody tr:last-child td {
-    border-bottom: none;
-}
-
-.no-events-day {
-    padding: 0.75rem 1rem;
-    margin: 0;
-    color: var(--text-muted);
-    font-style: italic;
-}
-</style>
 {{end}}

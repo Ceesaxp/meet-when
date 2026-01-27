@@ -4,73 +4,100 @@
 
 {{define "content"}}
 <div class="page-header">
-    <h1>Audit Logs</h1>
-    <p class="subtitle">Activity history for your organization</p>
+    <div>
+        <h1 class="page-title">Audit Logs</h1>
+        <p class="page-subtitle">Activity history for your organization</p>
+    </div>
 </div>
 
 <div class="filter-bar">
-    <span class="filter-label">Filter by action:</span>
-    <a href="/dashboard/audit-logs" class="btn btn-sm {{if eq .Data.ActionFilter ""}}btn-primary{{end}}">All</a>
-    <a href="/dashboard/audit-logs?action=create" class="btn btn-sm {{if eq .Data.ActionFilter "create"}}btn-primary{{end}}">Create</a>
-    <a href="/dashboard/audit-logs?action=update" class="btn btn-sm {{if eq .Data.ActionFilter "update"}}btn-primary{{end}}">Update</a>
-    <a href="/dashboard/audit-logs?action=delete" class="btn btn-sm {{if eq .Data.ActionFilter "delete"}}btn-primary{{end}}">Delete</a>
+    <div class="filter-tabs">
+        <a href="/dashboard/audit-logs" class="filter-tab {{if eq .Data.ActionFilter ""}}active{{end}}">All</a>
+        <a href="/dashboard/audit-logs?action=create" class="filter-tab {{if eq .Data.ActionFilter "create"}}active{{end}}">Create</a>
+        <a href="/dashboard/audit-logs?action=update" class="filter-tab {{if eq .Data.ActionFilter "update"}}active{{end}}">Update</a>
+        <a href="/dashboard/audit-logs?action=delete" class="filter-tab {{if eq .Data.ActionFilter "delete"}}active{{end}}">Delete</a>
+    </div>
 </div>
 
 {{if .Data.Logs}}
-<table class="table">
-    <thead>
-        <tr>
-            <th>Timestamp</th>
-            <th>Action</th>
-            <th>Entity Type</th>
-            <th>Details</th>
-            <th>IP Address</th>
-        </tr>
-    </thead>
-    <tbody>
-        {{range .Data.Logs}}
-        <tr>
-            <td>
-                {{formatDateTime .CreatedAt}}<br>
-            </td>
-            <td>
-                <span class="badge badge-{{.Action}}">{{.Action}}</span>
-            </td>
-            <td>{{.EntityType}}</td>
-            <td class="audit-details">
-                {{if .Details}}
-                <details>
-                    <summary>View details</summary>
-                    <pre class="details-json">{{range $key, $value := .Details}}{{$key}}: {{$value}}
-{{end}}</pre>
-                </details>
-                {{else}}
-                <span class="text-muted">-</span>
-                {{end}}
-            </td>
-            <td><code>{{.IPAddress}}</code></td>
-        </tr>
-        {{end}}
-    </tbody>
-</table>
+<div class="table-container">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Action</th>
+                <th>Entity Type</th>
+                <th>Details</th>
+                <th>IP Address</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Data.Logs}}
+            <tr>
+                <td>
+                    <div class="datetime-cell">
+                        <span class="date">{{formatDate .CreatedAt}}</span>
+                        <span class="time">{{formatTime .CreatedAt}}</span>
+                    </div>
+                </td>
+                <td><span class="badge badge-{{.Action}}">{{.Action}}</span></td>
+                <td>{{.EntityType}}</td>
+                <td class="audit-details">
+                    {{if .Details}}
+                    <details class="details-toggle">
+                        <summary class="btn-sm btn-outline">View details</summary>
+                        <div class="details-content">
+                            {{range $key, $value := .Details}}
+                            <div class="detail-row">
+                                <span class="detail-key">{{$key}}:</span>
+                                <span class="detail-value">{{$value}}</span>
+                            </div>
+                            {{end}}
+                        </div>
+                    </details>
+                    {{else}}
+                    <span class="text-muted">-</span>
+                    {{end}}
+                </td>
+                <td><code class="ip-address">{{.IPAddress}}</code></td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
 
-<!-- Pagination -->
 {{if gt .Data.TotalPages 1}}
 <div class="pagination">
     {{if gt .Data.Page 1}}
-    <a href="/dashboard/audit-logs?page={{sub .Data.Page 1}}{{if .Data.ActionFilter}}&action={{.Data.ActionFilter}}{{end}}" class="btn btn-sm">&laquo; Previous</a>
+    <a href="/dashboard/audit-logs?page={{sub .Data.Page 1}}{{if .Data.ActionFilter}}&action={{.Data.ActionFilter}}{{end}}" class="btn btn-outline btn-sm">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        Previous
+    </a>
     {{end}}
 
-    <span class="page-info">Page {{.Data.Page}} of {{.Data.TotalPages}} ({{.Data.TotalCount}} total entries)</span>
+    <span class="page-info">Page {{.Data.Page}} of {{.Data.TotalPages}}</span>
 
     {{if lt .Data.Page .Data.TotalPages}}
-    <a href="/dashboard/audit-logs?page={{add .Data.Page 1}}{{if .Data.ActionFilter}}&action={{.Data.ActionFilter}}{{end}}" class="btn btn-sm">Next &raquo;</a>
+    <a href="/dashboard/audit-logs?page={{add .Data.Page 1}}{{if .Data.ActionFilter}}&action={{.Data.ActionFilter}}{{end}}" class="btn btn-outline btn-sm">
+        Next
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <polyline points="9 18 15 12 9 6"/>
+        </svg>
+    </a>
     {{end}}
 </div>
 {{end}}
 
 {{else}}
-<div class="empty-state">
+<div class="empty-state-card">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+    </svg>
     <h3>No audit logs found</h3>
     <p>{{if .Data.ActionFilter}}No {{.Data.ActionFilter}} events found.{{else}}No activity has been logged yet.{{end}}</p>
 </div>

@@ -4,28 +4,39 @@
 
 {{define "content"}}
 <div class="page-header">
-    <h1>Bookings</h1>
+    <div>
+        <h1 class="page-title">Bookings</h1>
+        <p class="page-subtitle">Manage your meeting requests</p>
+    </div>
     {{if gt .Data.ArchivableCount 0}}
-    <button type="button" class="btn btn-outline"
-        onclick="confirmBulkArchive({{.Data.ArchivableCount}})">
-        Archive all cancelled/rejected ({{.Data.ArchivableCount}})
+    <button type="button" class="btn btn-secondary" onclick="confirmBulkArchive({{.Data.ArchivableCount}})">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <polyline points="21 8 21 21 3 21 3 8"/>
+            <rect x="1" y="3" width="22" height="5"/>
+            <line x1="10" y1="12" x2="14" y2="12"/>
+        </svg>
+        Archive all ({{.Data.ArchivableCount}})
     </button>
     {{end}}
 </div>
 
-<div class="filter-bar">
-    <div class="filter-buttons">
-        <a href="/dashboard/bookings{{if .Data.ShowArchived}}?archived=true{{end}}" class="btn btn-sm {{if eq .Data.Filter ""}}btn-primary{{end}}">All ({{.Data.AllCount}})</a>
-        <a href="/dashboard/bookings?filter=pending{{if .Data.ShowArchived}}&archived=true{{end}}" class="btn btn-sm {{if eq .Data.Filter "pending"}}btn-primary{{end}}">Pending ({{.Data.PendingCount}})</a>
-        <a href="/dashboard/bookings?filter=confirmed{{if .Data.ShowArchived}}&archived=true{{end}}" class="btn btn-sm {{if eq .Data.Filter "confirmed"}}btn-primary{{end}}">Confirmed ({{.Data.ConfirmedCount}})</a>
-        <a href="/dashboard/bookings?filter=cancelled{{if .Data.ShowArchived}}&archived=true{{end}}" class="btn btn-sm {{if eq .Data.Filter "cancelled"}}btn-primary{{end}}">Cancelled ({{.Data.CancelledCount}})</a>
-    </div>
-    <div class="filter-options">
-        <label class="checkbox-label">
-            <input type="checkbox" id="show-archived" {{if .Data.ShowArchived}}checked{{end}} onchange="toggleArchived(this)">
-            Show archived
-        </label>
-    </div>
+<div class="filters">
+    <a href="/dashboard/bookings{{if .Data.ShowArchived}}?archived=true{{end}}" class="filter-btn {{if eq .Data.Filter ""}}active{{end}}">
+        All<span class="filter-count">{{.Data.AllCount}}</span>
+    </a>
+    <a href="/dashboard/bookings?filter=pending{{if .Data.ShowArchived}}&archived=true{{end}}" class="filter-btn {{if eq .Data.Filter "pending"}}active{{end}}">
+        Pending<span class="filter-count">{{.Data.PendingCount}}</span>
+    </a>
+    <a href="/dashboard/bookings?filter=confirmed{{if .Data.ShowArchived}}&archived=true{{end}}" class="filter-btn {{if eq .Data.Filter "confirmed"}}active{{end}}">
+        Confirmed<span class="filter-count">{{.Data.ConfirmedCount}}</span>
+    </a>
+    <a href="/dashboard/bookings?filter=cancelled{{if .Data.ShowArchived}}&archived=true{{end}}" class="filter-btn {{if eq .Data.Filter "cancelled"}}active{{end}}">
+        Cancelled<span class="filter-count">{{.Data.CancelledCount}}</span>
+    </a>
+    <label class="checkbox-label" style="margin-left: auto;">
+        <input type="checkbox" id="show-archived" {{if .Data.ShowArchived}}checked{{end}} onchange="toggleArchived(this)">
+        Show archived
+    </label>
 </div>
 
 <script>
@@ -41,7 +52,6 @@ function toggleArchived(checkbox) {
 
 function confirmBulkArchive(count) {
     if (confirm('Archive ' + count + ' cancelled/rejected booking' + (count > 1 ? 's' : '') + '?')) {
-        // Create and submit a form
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = '/dashboard/bookings/archive-all';
@@ -52,73 +62,87 @@ function confirmBulkArchive(count) {
 </script>
 
 {{if .Data.Bookings}}
-<table class="table bookings-table">
-    <thead>
-        <tr>
-            <th>Date & Time</th>
-            <th>Guest</th>
-            <th>Meeting Type</th>
-            <th>Duration</th>
-            <th>Status</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        {{range .Data.Bookings}}
-        <tr class="booking-row{{if .IsArchived}} archived{{end}}" id="booking-row-{{.ID}}" data-booking-id="{{.ID}}" onclick="openBookingModal('{{.ID}}')">
-            <td>
-                {{formatDate .StartTime}}<br>
-                <small>{{formatTime .StartTime}} - {{formatTime .EndTime}}</small>
-            </td>
-            <td>
-                {{.InviteeName}}<br>
-                <small>{{.InviteeEmail}}</small>
-                {{if .InviteePhone}}<br><small>{{.InviteePhone}}</small>{{end}}
-            </td>
-            <td>
-                {{with index $.Data.Templates .TemplateID}}
-                {{.Name}}
-                {{end}}
-            </td>
-            <td>{{.Duration}} min</td>
-            <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
-            <td class="actions-cell" onclick="event.stopPropagation()">
-                {{if eq .Status "pending"}}
-                <form action="/dashboard/bookings/{{.ID}}/approve" method="POST" style="display:inline">
-                    <button type="submit" class="btn btn-sm btn-success">Approve</button>
-                </form>
-                <form action="/dashboard/bookings/{{.ID}}/reject" method="POST" style="display:inline">
-                    <input type="hidden" name="reason" value="">
-                    <button type="submit" class="btn btn-sm btn-danger">Reject</button>
-                </form>
-                {{else if eq .Status "confirmed"}}
-                {{if .ConferenceLink}}
-                <a href="{{.ConferenceLink}}" target="_blank" class="btn btn-sm">Join</a>
-                {{end}}
-                <form action="/dashboard/bookings/{{.ID}}/cancel" method="POST" style="display:inline">
-                    <input type="hidden" name="reason" value="">
-                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Cancel this booking?')">Cancel</button>
-                </form>
-                {{else if or (eq .Status "cancelled") (eq .Status "rejected")}}
-                {{if .IsArchived}}
-                <button type="button" class="btn btn-sm btn-outline"
-                    hx-post="/dashboard/bookings/{{.ID}}/unarchive"
-                    hx-target="#booking-row-{{.ID}}"
-                    hx-swap="outerHTML"
-                    hx-confirm="Unarchive this booking?">Unarchive</button>
-                {{else}}
-                <button type="button" class="btn btn-sm btn-outline"
-                    hx-post="/dashboard/bookings/{{.ID}}/archive"
-                    hx-target="#booking-row-{{.ID}}"
-                    hx-swap="outerHTML"
-                    hx-confirm="Archive this booking?">Archive</button>
-                {{end}}
-                {{end}}
-            </td>
-        </tr>
-        {{end}}
-    </tbody>
-</table>
+<div class="table-container">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date & Time</th>
+                <th>Guest</th>
+                <th>Meeting Type</th>
+                <th>Duration</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Data.Bookings}}
+            <tr class="booking-row{{if .IsArchived}} archived{{end}}" id="booking-row-{{.ID}}" onclick="openBookingModal('{{.ID}}')">
+                <td>
+                    <div class="datetime-cell">
+                        <span class="date">{{formatDate .StartTime}}</span>
+                        <span class="time">{{formatTime .StartTime}} - {{formatTime .EndTime}}</span>
+                    </div>
+                </td>
+                <td>
+                    <div class="guest-info">
+                        <span class="guest-name">{{.InviteeName}}</span>
+                        <span class="guest-email">{{.InviteeEmail}}</span>
+                        {{if .InviteePhone}}<span class="guest-phone">{{.InviteePhone}}</span>{{end}}
+                    </div>
+                </td>
+                <td>
+                    {{with index $.Data.Templates .TemplateID}}
+                    {{.Name}}
+                    {{end}}
+                </td>
+                <td>{{.Duration}} min</td>
+                <td><span class="badge badge-{{.Status}}">{{.Status}}</span></td>
+                <td class="actions-cell" onclick="event.stopPropagation()">
+                    <div class="table-actions">
+                        {{if eq .Status "pending"}}
+                        <form action="/dashboard/bookings/{{.ID}}/approve" method="POST" style="display:inline">
+                            <button type="submit" class="btn-sm btn-approve">Approve</button>
+                        </form>
+                        <form action="/dashboard/bookings/{{.ID}}/reject" method="POST" style="display:inline">
+                            <input type="hidden" name="reason" value="">
+                            <button type="submit" class="btn-sm btn-cancel">Reject</button>
+                        </form>
+                        {{else if eq .Status "confirmed"}}
+                        {{if .ConferenceLink}}
+                        <a href="{{.ConferenceLink}}" target="_blank" class="btn-sm btn-join">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <polygon points="23 7 16 12 23 17 23 7"/>
+                                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                            </svg>
+                            Join
+                        </a>
+                        {{end}}
+                        <form action="/dashboard/bookings/{{.ID}}/cancel" method="POST" style="display:inline">
+                            <input type="hidden" name="reason" value="">
+                            <button type="submit" class="btn-sm btn-cancel" onclick="return confirm('Cancel this booking?')">Cancel</button>
+                        </form>
+                        {{else if or (eq .Status "cancelled") (eq .Status "rejected")}}
+                        {{if .IsArchived}}
+                        <button type="button" class="btn-sm btn-secondary"
+                            hx-post="/dashboard/bookings/{{.ID}}/unarchive"
+                            hx-target="#booking-row-{{.ID}}"
+                            hx-swap="outerHTML"
+                            hx-confirm="Unarchive this booking?">Unarchive</button>
+                        {{else}}
+                        <button type="button" class="btn-sm btn-secondary"
+                            hx-post="/dashboard/bookings/{{.ID}}/archive"
+                            hx-target="#booking-row-{{.ID}}"
+                            hx-swap="outerHTML"
+                            hx-confirm="Archive this booking?">Archive</button>
+                        {{end}}
+                        {{end}}
+                    </div>
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
 
 <!-- Modal container -->
 <div id="booking-modal"></div>
@@ -142,7 +166,6 @@ function closeBookingModal(event) {
     document.body.classList.remove('modal-open');
 }
 
-// Close modal on Escape key
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
         closeBookingModal();
@@ -150,9 +173,17 @@ document.addEventListener('keydown', function(event) {
 });
 </script>
 {{else}}
-<div class="empty-state">
-    <h3>No bookings found</h3>
-    <p>{{if .Data.Filter}}No {{.Data.Filter}} bookings.{{else}}You haven't received any bookings yet.{{end}}</p>
+<div class="table-container">
+    <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        <h3>No bookings found</h3>
+        <p>{{if .Data.Filter}}No {{.Data.Filter}} bookings.{{else}}You haven't received any bookings yet.{{end}}</p>
+    </div>
 </div>
 {{end}}
 {{end}}
