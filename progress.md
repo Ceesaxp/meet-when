@@ -868,3 +868,392 @@ The following features from the requirements document are already fully implemen
   - Using `defer svc.CalendarSync.Stop()` ensures proper shutdown sequence when server receives SIGINT/SIGTERM
 
 ---
+
+## 2026-01-26 - US-008 - Display last sync time and status on calendar list
+- What was implemented:
+  - Added `timeAgo` template function in `internal/handlers/helpers.go` to display relative time
+  - Function handles various time ranges: "just now" (< 60s), "X minutes ago", "X hours ago", "X days ago", and falls back to date for > 7 days
+  - Updated `dashboard_calendars.html` to use `timeAgo` function for sync time display
+  - Changed "Not synced yet" to "Never synced" for calendars with unknown sync status
+  - Added click-to-reveal functionality for error messages on failed sync status
+  - Error message is hidden by default (`style="display: none;"`) and toggled via JavaScript `toggleCalendarError()` function
+  - Added CSS styles for clickable error status: `.sync-error-clickable` with underline and cursor pointer
+  - Green checkmark (sync-ok), red warning (sync-error), and gray refresh (sync-unknown) indicators already existed
+- Files changed:
+  - `internal/handlers/helpers.go` - Added `timeAgo()` function (~40 lines)
+  - `internal/handlers/handlers.go` - Registered `timeAgo` in template funcs
+  - `templates/pages/dashboard_calendars.html` - Updated sync status display and added JS toggle function
+  - `static/css/style.css` - Added styles for clickable error status
+- **Learnings for future iterations:**
+  - The `toTime()` helper function in helpers.go handles both `time.Time` and `models.SQLiteTime` types - use it when creating time-related template functions
+  - Template functions are registered in `templateFuncs()` in handlers.go
+  - The sync status display already had most of the UI (indicators, colors) from US-019 - this feature added the relative time and click-to-reveal
+  - For toggle functionality in templates, use inline JavaScript functions since there's no separate JS bundle system
+
+---
+
+## 2026-01-26 - US-009 - Add manual calendar refresh button with feedback
+- What was implemented:
+  - Created `calendar_card_partial.html` partial template for individual calendar card rendering
+  - Updated calendar list in `dashboard_calendars.html` to add unique IDs to each calendar card (`calendar-card-{{.ID}}`)
+  - Changed refresh button from form POST to HTMX button with loading indicator
+  - Button uses `hx-post`, `hx-target`, `hx-swap="outerHTML"`, and `hx-indicator` attributes for seamless HTMX updates
+  - Updated `RefreshCalendarSync` handler to detect HTMX requests via `HX-Request` header
+  - Handler returns the updated calendar card partial for HTMX requests, maintains redirect for regular requests
+  - Added CSS styles for refresh button spinner animation and HTMX indicator states
+  - Spinner uses CSS `@keyframes spin` animation with border-radius styling
+- Files changed:
+  - `templates/partials/calendar_card_partial.html` - New partial template (~55 lines)
+  - `templates/pages/dashboard_calendars.html` - Updated calendar card with HTMX attributes and unique IDs
+  - `internal/handlers/dashboard.go` - Updated RefreshCalendarSync to handle HTMX requests (~15 lines added)
+  - `static/css/style.css` - Added ~50 lines for refresh button and spinner styles
+- **Learnings for future iterations:**
+  - HTMX partials in this codebase are loaded separately with template functions via `loadTemplates()` - they have access to all helper functions like `timeAgo`
+  - The pattern for HTMX responses: check `r.Header.Get("HX-Request") == "true"`, then return partial instead of redirect
+  - Use `hx-swap="outerHTML"` when replacing the entire element (vs `innerHTML` for replacing contents)
+  - The `hx-indicator` attribute shows a loading element during the request - combine with CSS `.htmx-request` class
+  - Calendar sync errors are stored in the `SyncError` field and displayed via the partial even on failure
+
+---
+
+## 2026-01-26 - US-010 - Create agenda data fetching service
+- What was implemented:
+  - Added `AgendaEvent` struct with fields: Title, Start, End, CalendarName, IsAllDay
+  - Added `GetAgendaEvents(hostID, startDate, endDate)` method to CalendarService
+  - Google Calendar implementation uses `events.list` API to get full event details (title, times, all-day flag)
+  - CalDAV/iCloud implementation uses calendar-query REPORT with VEVENT filter, parses SUMMARY for title
+  - Events sorted by start time using simple bubble sort helper function
+  - Error handling: failed calendars are logged and skipped, other calendars continue to be fetched
+  - All-day event detection: Google uses `date` vs `dateTime` fields, CalDAV uses `VALUE=DATE` parameter
+- Files changed:
+  - `internal/services/calendar.go` - Added ~285 lines implementing GetAgendaEvents and helper functions
+- **Learnings for future iterations:**
+  - Google Calendar `events.list` API returns full event details including summary (title), unlike `freebusy` API which only returns busy times
+  - For CalDAV, the same calendar-query REPORT used for busy times can extract SUMMARY field for event title
+  - All-day events in Google Calendar API use `date` field instead of `dateTime` field in start/end objects
+  - In ICS format, all-day events have `VALUE=DATE` parameter (not `VALUE=DATE-TIME`) on DTSTART
+  - The existing `unfoldICSLines` and `parseICSDateTime` functions are reusable for agenda event parsing
+
+---
+
+## 2026-01-26 - US-011 - Create agenda page with Today view
+- What was implemented:
+  - Added `Agenda` handler method to `DashboardHandler` in `dashboard.go`
+  - Handler loads host timezone via `time.LoadLocation()`, calculates today's boundaries (00:00 to 23:59:59 in host timezone)
+  - Calls `CalendarService.GetAgendaEvents()` (from US-010) to fetch events from all connected calendars
+  - Created `dashboard_agenda.html` template with:
+    - Page header showing current date
+    - Tab bar with Today (active) and This Week buttons (This Week for future US-012)
+    - Table displaying events in chronological order: time, title, duration, calendar
+    - All-day events shown with special "All Day" badge instead of time range
+    - Empty state with calendar icon when no events today
+  - Added `duration()` template helper function in `helpers.go` to calculate and format time duration (e.g., "30 min", "1 hour", "1 hr 30 min")
+  - Registered `duration` function in `templateFuncs()` in `handlers.go`
+  - Added `GET /dashboard/agenda` route in `main.go`
+  - Added Agenda link to dashboard sidebar in `dashboard.html` layout, positioned near Bookings
+- Files changed:
+  - `internal/handlers/dashboard.go` - Added Agenda handler (~43 lines)
+  - `internal/handlers/helpers.go` - Added duration() function (~32 lines)
+  - `internal/handlers/handlers.go` - Registered duration in templateFuncs
+  - `cmd/server/main.go` - Added GET /dashboard/agenda route
+  - `templates/pages/dashboard_agenda.html` - New file (~130 lines)
+  - `templates/layouts/dashboard.html` - Added Agenda link to sidebar
+- **Learnings for future iterations:**
+  - Use `time.LoadLocation()` to load IANA timezone strings for proper timezone handling
+  - The `time.Date()` function creates a time in a specific location - use for day boundaries
+  - Handler accesses CalendarService via `h.handlers.services.Calendar`
+  - Template helper functions are registered once in `templateFuncs()` in handlers.go and available to all templates
+  - The toTime() helper in helpers.go handles both `time.Time` and `models.SQLiteTime` types
+  - CSS variables like `var(--text-muted)` are used for consistent styling
+
+---
+
+## 2026-01-26 - US-012 - Add This Week tab to agenda view
+- What was implemented:
+  - Added view parameter handling (`?view=week`) in Agenda handler to switch between today and week views
+  - Created `AgendaDayGroup` struct to hold events grouped by day with their date
+  - Implemented `groupEventsByDay()` function that groups events into Monday-Sunday buckets
+  - Week boundary calculation: finds Monday of current week by calculating days from Monday (Sunday = end of week)
+  - Updated `dashboard_agenda.html` template with conditional rendering:
+    - Week view shows events grouped by day with day headers (weekday name + formatted date)
+    - Today view retains original table-based layout with header row
+  - Active tab highlighting: `btn-primary` class applied based on current view
+  - Added CSS styles for week view: `.agenda-week`, `.agenda-day-group`, `.day-header`, `.day-name`, `.day-date`, `.no-events-day`
+- Files changed:
+  - `internal/handlers/dashboard.go` - Added AgendaDayGroup struct, view parameter handling, week date calculation, groupEventsByDay function (~80 lines)
+  - `templates/pages/dashboard_agenda.html` - Conditional rendering for week/today views, day headers for week view (~70 lines)
+- **Learnings for future iterations:**
+  - Go's `time.Weekday` enum: Sunday=0, Monday=1, ..., Saturday=6 - need conversion for Monday-first weeks
+  - For week starting on Monday: `daysFromMonday = weekday - 1` with special case `Sunday = 6`
+  - Go templates support `{{if eq .Data.View "week"}}` for conditional rendering
+  - Events can be grouped by assigning to slice index based on day of week
+  - The `.Date.Weekday` accessor in templates returns the weekday name (e.g., "Monday")
+
+---
+
+## 2026-01-26 - US-013 - Add Agenda link to dashboard sidebar
+- What was implemented:
+  - Already completed as part of US-011 implementation
+  - Agenda link exists in `dashboard.html` layout at line 20, positioned after Bookings link
+- Files changed:
+  - None (already done in US-011)
+- **Learnings for future iterations:**
+  - PRD items can be completed as part of other related features - always check if work was bundled
+  - The US-011 progress notes mentioned "Added Agenda link to dashboard sidebar" which indicated this was done
+
+---
+
+## 2026-01-26 - US-014 - Add archived flag to bookings table
+- What was implemented:
+  - Added `is_archived` boolean column to bookings table via database migrations (PostgreSQL and SQLite)
+  - Updated Booking model with `IsArchived` field in models.go
+  - Updated BookingRepository methods to include `is_archived` in all queries:
+    - Create: now inserts is_archived value
+    - GetByID: includes is_archived with COALESCE for NULL handling
+    - GetByToken: includes is_archived with COALESCE
+    - GetByHostID: accepts new `includeArchived` parameter, filters out archived bookings when false
+    - GetByHostIDAndTimeRange: includes is_archived with COALESCE
+    - GetBookingsNeedingReminder: includes is_archived with COALESCE
+    - Update: now updates is_archived field
+  - Updated BookingService.GetBookings to accept `includeArchived` parameter
+  - Updated dashboard handlers (Home, Bookings) to pass includeArchived parameter
+  - Bookings page now supports `?archived=true` query parameter to show archived bookings
+- Files changed:
+  - `migrations/005_add_is_archived.up.sql` - PostgreSQL migration adding is_archived column and index
+  - `migrations/sqlite/005_add_is_archived.up.sql` - SQLite migration adding is_archived column and index
+  - `internal/models/models.go` - Added IsArchived field to Booking struct
+  - `internal/repository/repository.go` - Updated all booking queries to include is_archived
+  - `internal/services/booking.go` - Updated GetBookings to accept includeArchived parameter
+  - `internal/handlers/dashboard.go` - Updated Home and Bookings handlers to use includeArchived
+- **Learnings for future iterations:**
+  - SQLite uses INTEGER (0/1) for booleans while PostgreSQL uses BOOLEAN - need separate migration files
+  - Use COALESCE(is_archived, false) in queries to handle NULL values from existing rows before migration
+  - Adding a new boolean parameter to existing functions requires updating all callers (service and handler layers)
+  - The archive filter condition `(is_archived = false OR is_archived IS NULL)` handles both new rows and pre-migration rows
+  - Index on is_archived improves query performance when filtering non-archived bookings
+
+---
+
+## 2026-01-26 - US-015 - Add archive button to cancelled/rejected bookings
+- What was implemented:
+  - Added `ArchiveBooking` method to `BookingService` that validates booking status before archiving
+  - Only cancelled or rejected bookings can be archived (business rule enforcement)
+  - Added `ArchiveBooking` handler to `DashboardHandler` with HTMX support
+  - HTMX request returns empty content which removes the row via `hx-swap="outerHTML"`
+  - Regular (non-HTMX) request redirects back to bookings page
+  - Registered `POST /dashboard/bookings/{id}/archive` route
+  - Added Archive button to `dashboard_bookings.html` with conditional display (only for cancelled/rejected)
+  - Button uses HTMX attributes: `hx-post`, `hx-target`, `hx-swap="outerHTML"`, `hx-confirm`
+  - Added CSS styling for archived booking rows (`.booking-row.archived`) with muted opacity
+  - Added audit logging for archive actions
+- Files changed:
+  - `internal/services/booking.go` - Added ArchiveBooking method (~25 lines)
+  - `internal/handlers/dashboard.go` - Added ArchiveBooking handler (~30 lines)
+  - `cmd/server/main.go` - Registered archive route
+  - `templates/pages/dashboard_bookings.html` - Added Archive button with HTMX, added row ID for targeting
+  - `static/css/style.css` - Added archived row styling
+- **Learnings for future iterations:**
+  - HTMX `hx-swap="outerHTML"` with empty response effectively removes the targeted element
+  - Use `id="booking-row-{{.ID}}"` to give each row a unique target for HTMX
+  - The `hx-confirm` attribute provides a browser confirmation dialog without custom JavaScript
+  - Handler pattern: check `r.Header.Get("HX-Request") == "true"` to detect HTMX requests
+  - Business logic validation (only archive cancelled/rejected) belongs in service layer, not handler
+  - Template conditional `{{if or (eq .Status "cancelled") (eq .Status "rejected")}}` for multiple status checks
+
+---
+
+## 2026-01-26 - US-016 - Hide archived bookings by default and add Show archived toggle
+- What was implemented:
+  - Default bookings list excludes archived items (was already partially implemented, now explicit)
+  - Filter counts (All, Pending, Confirmed, Cancelled) now exclude archived bookings
+  - Added "Show archived" toggle checkbox in bookings header using CSS flexbox layout
+  - When enabled, archived bookings appear in the list with muted styling (existing CSS)
+  - Toggle state persists in URL parameter (?archived=true)
+  - JavaScript toggleArchived() function updates URL and reloads page
+  - Handler calculates separate counts for each status type excluding archived
+  - ArchivableCount tracked for future bulk archive feature (US-017)
+- Files changed:
+  - `internal/handlers/dashboard.go` - Added count calculations for filter buttons, added ShowArchived and count data to template
+  - `templates/pages/dashboard_bookings.html` - Restructured filter-bar with filter-buttons and filter-options divs, added checkbox toggle, JavaScript handler
+  - `static/css/style.css` - Added ~30 lines for filter-bar flexbox layout, filter-options, and checkbox-label styles
+- **Learnings for future iterations:**
+  - Counts should always exclude archived bookings for accurate display, even when showing archived items
+  - URL parameter approach for toggle state is simpler than cookies and works with browser back/forward
+  - The archived flag was already implemented in US-014/US-015, this feature just added the UI toggle
+  - Flexbox with `justify-content: space-between` cleanly separates filter buttons and options
+  - The existing `.booking-row.archived` CSS class from US-015 handles the muted styling
+
+---
+
+## 2026-01-26 - US-017 - Add bulk archive and unarchive actions
+- What was implemented:
+  - Added `UnarchiveBooking` method to BookingService for restoring archived bookings
+  - Added `BulkArchiveBookings` method to BookingService that iterates through all cancelled/rejected non-archived bookings and archives them
+  - Added `UnarchiveBooking` handler with HTMX support (uses HX-Redirect to reload page)
+  - Added `BulkArchiveBookings` handler with confirmation count logging
+  - Registered routes: POST `/dashboard/bookings/{id}/unarchive` and POST `/dashboard/bookings/archive-all`
+  - Updated `dashboard_bookings.html` with:
+    - "Archive all cancelled/rejected (N)" button in page header (only shown when ArchivableCount > 0)
+    - `confirmBulkArchive(count)` JavaScript function with confirmation dialog showing count
+    - Unarchive button shown on archived bookings (replacing Archive button)
+  - Audit logging for `booking.unarchived` and `booking.bulk_archived` actions
+- Files changed:
+  - `internal/services/booking.go` - Added UnarchiveBooking and BulkArchiveBookings methods (~55 lines)
+  - `internal/handlers/dashboard.go` - Added UnarchiveBooking and BulkArchiveBookings handlers (~65 lines)
+  - `cmd/server/main.go` - Added two new routes
+  - `templates/pages/dashboard_bookings.html` - Added bulk archive button, JS function, and unarchive button logic
+- **Learnings for future iterations:**
+  - The `page-header` CSS already has `display: flex; justify-content: space-between;` which perfectly positions the bulk archive button
+  - HTMX `hx-swap="outerHTML"` with empty response removes elements; for unarchive we need to reload the page to show the updated row
+  - Using `HX-Redirect` header allows HTMX to handle page reload seamlessly
+  - The ArchivableCount is already calculated in the Bookings handler (from US-016), so the bulk archive button conditional was straightforward
+  - JavaScript form.submit() is the simplest approach for bulk actions that need POST method
+
+---
+
+**ralph run 202601261900**
+
+---
+
+## 2026-01-26 - US-001 - Add GetAllByEmail repository method
+- What was implemented:
+  - Added `GetAllByEmail(ctx, email)` method to HostRepository
+  - Method queries hosts table with email filter across all tenants (no tenant_id filter)
+  - Returns `[]*models.Host` slice with all hosts matching the email
+  - Returns empty slice (not nil/error) when no hosts found
+  - Uses existing `idx_hosts_email` index for efficient lookup
+  - Follows existing repository patterns: `q()` helper for driver compatibility, proper error handling, defer rows.Close()
+- Files changed:
+  - `internal/repository/repository.go` - Added GetAllByEmail method (~40 lines)
+- **Learnings for future iterations:**
+  - The `idx_hosts_email` index exists on the email column alone (not a composite index with tenant_id)
+  - Repository pattern for multi-row queries: use `QueryContext`, iterate with `rows.Next()`, check `rows.Err()` after loop
+  - The `GetByEmail` method is tenant-scoped (requires tenant_id), while `GetAllByEmail` is cross-tenant for simplified login
+  - Always return empty slice `[]*models.Host{}` instead of nil when no rows found - this is the acceptance criteria and prevents nil pointer issues
+
+---
+
+## 2026-01-26 - US-002 - Add simplified login types and service method
+- What was implemented:
+  - Added `SimplifiedLoginInput` struct with Email and Password fields
+  - Added `OrgOption` struct with TenantID, TenantSlug, TenantName, and HostID fields
+  - Added `SimplifiedLoginResult` struct with RequiresOrgSelection, AvailableOrgs, SessionToken, Host, and Tenant fields
+  - Added `SimplifiedLogin(ctx, input)` method to AuthService that:
+    - Finds all hosts by email using `GetAllByEmail` (cross-tenant query from US-001)
+    - Verifies password against each host using bcrypt
+    - Single org match: creates session directly and returns SessionToken, Host, and Tenant
+    - Multiple org matches: returns RequiresOrgSelection=true with populated AvailableOrgs
+    - No matches or wrong password: returns generic ErrInvalidCredentials (no email enumeration)
+    - Timing attack prevention: performs dummy bcrypt comparison when no hosts found
+- Files changed:
+  - `internal/services/auth.go` - Added ~111 lines including types and SimplifiedLogin method
+- **Learnings for future iterations:**
+  - The existing `HostWithTenant` type is defined in session.go, not auth.go
+  - The audit log format follows `s.auditLog.Log(ctx, tenant.ID, &host.ID, "host.login", "host", host.ID, nil, "")` pattern
+  - Timing attack prevention requires bcrypt comparison even for non-existent emails to maintain consistent response time
+  - The existing Login method uses tenant-scoped `GetByEmail`, while SimplifiedLogin uses cross-tenant `GetAllByEmail`
+  - Multi-org case doesn't create a session - that will be handled by US-003's CompleteOrgSelection method
+
+---
+
+## 2026-01-26 - US-003 - Add org selection completion method
+- What was implemented:
+  - Added `SelectionTokenExpiry` constant (5 minutes) for selection token validity
+  - Added `ErrInvalidSelectionToken` and `ErrHostNotFound` error variables
+  - Added `SelectionToken` field to `OrgOption` struct so each org option carries its own token
+  - Added `SelectionToken` field to `SimplifiedLoginResult` struct (for potential future use)
+  - Added `generateSelectionToken(hostID)` method using HMAC-SHA256 with the app's encryption key
+    - Token format: base64(hostID:expiry:signature) - no database storage required
+  - Added `validateSelectionToken(token)` method that verifies signature and expiry
+  - Added `CompleteOrgSelectionInput` struct with HostID and SelectionToken fields
+  - Added `CompleteOrgSelection(ctx, input)` method to AuthService that:
+    - Validates the selection token
+    - Verifies token's host ID matches the requested host ID (prevents cross-host attacks)
+    - Fetches host and tenant from database
+    - Creates a session and returns session token
+    - Logs the login via audit log with "via org selection" note
+  - Updated `SimplifiedLogin` to generate selection tokens for each org option
+- Files changed:
+  - `internal/services/auth.go` - Added ~145 lines for token generation, validation, and CompleteOrgSelection method
+- **Learnings for future iterations:**
+  - The HMAC approach with base64 encoding allows stateless token validation without database storage
+  - Using the existing `cfg.App.EncryptionKey` for HMAC signing leverages the already-configured secret
+  - Token format `hostID:expiry:signature` allows simple string splitting for validation
+  - The double verification (token signature + hostID match) prevents both tampering and cross-host enumeration
+  - Selection tokens are tied to specific hosts, so each org option in the UI carries its own token
+
+---
+
+## 2026-01-26 - US-004 - Update login handler to use SimplifiedLogin
+- What was implemented:
+  - Modified `Login()` handler in `auth.go` to use `SimplifiedLogin` service method (from US-002)
+  - Removed organization field processing from login handler - now only reads email and password
+  - Single-org case: creates session cookie and redirects to dashboard (same as before)
+  - Multi-org case: renders `login_select_org.html` template with available orgs from `SimplifiedLoginResult.AvailableOrgs`
+  - Error case: shows generic "Invalid email or password" message (no email enumeration)
+  - Changed input struct from `LoginInput` (with TenantSlug) to `SimplifiedLoginInput` (email + password only)
+- Files changed:
+  - `internal/handlers/auth.go` - Modified Login() handler (~28 lines changed)
+- **Learnings for future iterations:**
+  - The `SimplifiedLoginResult` struct from US-002 provides all needed data: `RequiresOrgSelection`, `AvailableOrgs`, `SessionToken`
+  - The handler checks `result.RequiresOrgSelection` to determine which flow to take
+  - The `login_select_org.html` template (US-006) will receive `AvailableOrgs` containing `OrgOption` structs with `TenantName`, `HostID`, `SelectionToken`
+  - The template data is passed as `map[string]interface{}` not `map[string]string` because `AvailableOrgs` is a slice of structs
+  - The old `LoginInput` with TenantSlug is still available for backward compatibility but not used by the simplified login flow
+
+---
+
+## 2026-01-26 - US-005 - Remove Organization field from login template
+- What was implemented:
+  - Removed the Organization form field (input + label) from `templates/pages/login.html`
+  - Login form now only shows Email and Password fields
+  - Existing styling and validation preserved (no changes needed to CSS or error display)
+  - The handler was already updated in US-004 to use SimplifiedLogin which doesn't require organization
+- Files changed:
+  - `templates/pages/login.html` - Removed Organization form-group (6 lines deleted)
+- **Learnings for future iterations:**
+  - The login template is a standalone page that doesn't use the dashboard layout
+  - The `{{if .Data}}{{.Data.tenant}}{{end}}` pattern was used to preserve form values on error - no longer needed for tenant field
+  - US-004 already updated the handler to not process the organization field, so this change just removes the unused UI element
+  - The typecheck still passes because Go templates are only validated at runtime, not compile time
+
+---
+
+## 2026-01-26 - US-006 - Create org selection page template
+- What was implemented:
+  - Created `templates/pages/login_select_org.html` template for multi-org user login flow
+  - Template displays list of organizations with tenant name prominently shown
+  - Each org option is a form/button that POSTs to `/auth/select-org`
+  - Hidden fields for `host_id` and `selection_token` included in each form
+  - Styled consistently with existing login page using `.auth-page` and `.auth-container` classes
+  - Added inline CSS for org list styling (`.org-list`, `.org-option`, `.org-option-name`, `.org-option-slug`)
+  - Back link to login page for users who want to try a different email
+- Files changed:
+  - `templates/pages/login_select_org.html` - New file (~80 lines)
+- **Learnings for future iterations:**
+  - The `loadTemplates()` function in handlers.go uses `filepath.Glob("templates/pages/*.html")` to auto-discover page templates
+  - The `OrgOption` struct passed to template contains: `TenantID`, `TenantSlug`, `TenantName`, `HostID`, `SelectionToken`
+  - The handler at auth.go:45-52 passes `AvailableOrgs` to the template via `map[string]interface{}`
+  - Inline styles in `<style>` tag work well for page-specific CSS that doesn't need to be shared
+
+---
+
+## 2026-01-26 - US-007 - Add SelectOrg handler and route
+- What was implemented:
+  - Added `SelectOrg()` handler to `AuthHandler` in `internal/handlers/auth.go`
+  - Handler reads `host_id` and `selection_token` from POST form
+  - Calls `CompleteOrgSelection` service method (from US-003) to validate token and create session
+  - On success: sets session cookie (24hr expiry, HttpOnly, SameSite=Lax) and redirects to `/dashboard`
+  - On error: redirects to `/auth/login?error=session_expired`
+  - Added route `POST /auth/select-org` in `cmd/server/main.go`
+- Files changed:
+  - `internal/handlers/auth.go` - Added SelectOrg handler (~40 lines)
+  - `cmd/server/main.go` - Added SelectOrg route
+- **Learnings for future iterations:**
+  - The `login_select_org.html` template (US-006) POSTs to `/auth/select-org` with `host_id` and `selection_token` hidden fields
+  - The `CompleteOrgSelection` service method validates the HMAC-signed token and returns session token
+  - Handler follows same cookie pattern as Login handler: `time.Hour / time.Second` for MaxAge conversion
+  - Error handling redirects to login page with query param rather than showing error page directly
+  - This completes the simplified login flow: email+password → multi-org selection → dashboard
+
+---

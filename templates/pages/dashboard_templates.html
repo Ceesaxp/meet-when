@@ -33,96 +33,53 @@ function copyTemplateLink(btn, url) {
     });
 }
 </script>
-<div class="template-grid">
+<div class="templates-grid">
     {{range .Data.Templates}}
     <div class="template-card {{if not .IsActive}}inactive{{end}}">
         <div class="template-header">
-            <div class="template-title-row">
-                <h3>{{.Name}}</h3>
-                {{if not .IsActive}}
-                <span class="badge badge-inactive">Inactive</span>
-                {{end}}
-            </div>
-            <div class="template-meta-icons">
-                <span class="template-meta-item">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                        <circle cx="12" cy="12" r="10"/>
-                        <polyline points="12 6 12 12 16 14"/>
-                    </svg>
-                    {{index .Durations 0}} min
-                </span>
-                <span class="template-meta-item">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                        <polygon points="23 7 16 12 23 17 23 7"/>
-                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-                    </svg>
-                    {{.LocationType}}
-                </span>
-            </div>
+            <h3 class="template-title">{{.Name}}</h3>
+            {{if not .IsActive}}
+            <span class="badge badge-inactive">Inactive</span>
+            {{end}}
         </div>
         {{if .Description}}
         <p class="template-description">{{.Description}}</p>
         {{end}}
+        <div class="template-meta">
+            <div class="meta-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                {{index .Durations 0}} min
+            </div>
+            <div class="meta-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="23 7 16 12 23 17 23 7"/>
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                </svg>
+                {{if eq (printf "%s" .LocationType) "google_meet"}}Google Meet{{else if eq (printf "%s" .LocationType) "zoom"}}Zoom{{else if eq (printf "%s" .LocationType) "phone"}}Phone Call{{else}}{{.LocationType}}{{end}}
+            </div>
+        </div>
         {{$counts := index $.Data.BookingCounts .ID}}
         <div class="template-stats">
-            {{if $counts}}
-            <span class="template-stat">
-                <strong>{{$counts.Total}}</strong> booking{{if ne $counts.Total 1}}s{{end}}
+            <span class="stats-text">
+                <strong>{{if $counts}}{{$counts.Total}}{{else}}0{{end}}</strong> booking{{if or (not $counts) (ne $counts.Total 1)}}s{{end}}
+                {{if and $counts (or $counts.Pending $counts.Confirmed)}}
+                &middot; {{if $counts.Pending}}{{$counts.Pending}} pending{{end}}{{if and $counts.Pending $counts.Confirmed}}, {{end}}{{if $counts.Confirmed}}{{$counts.Confirmed}} confirmed{{end}}
+                {{end}}
             </span>
-            {{if or $counts.Pending $counts.Confirmed}}
-            <span class="template-stat-detail">
-                ({{if $counts.Pending}}{{$counts.Pending}} pending{{end}}{{if and $counts.Pending $counts.Confirmed}}, {{end}}{{if $counts.Confirmed}}{{$counts.Confirmed}} confirmed{{end}})
-            </span>
-            {{end}}
-            {{else}}
-            <span class="template-stat">
-                <strong>0</strong> bookings
-            </span>
-            {{end}}
         </div>
         <div class="template-actions">
-            <button type="button" class="btn-sm btn-secondary" onclick="copyTemplateLink(this, '{{$.BaseURL}}/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                </svg>
-                Copy Link
-            </button>
-            <a href="/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}" target="_blank" class="btn-sm btn-secondary">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                    <polyline points="15 3 21 3 21 9"/>
-                    <line x1="10" y1="14" x2="21" y2="3"/>
-                </svg>
-                Preview
-            </a>
-            <a href="/dashboard/templates/{{.ID}}" class="btn-sm btn-secondary">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                </svg>
-                Edit
-            </a>
+            <button type="button" class="btn-sm" onclick="copyTemplateLink(this, '{{$.BaseURL}}/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}')">Copy Link</button>
+            <a href="/m/{{$.Tenant.Slug}}/{{$.Host.Slug}}/{{.Slug}}" target="_blank" class="btn-sm">Preview</a>
+            <a href="/dashboard/templates/{{.ID}}" class="btn-sm">Edit</a>
             <form action="/dashboard/templates/{{.ID}}/duplicate" method="POST" style="display:inline">
-                <button type="submit" class="btn-sm btn-secondary">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                    </svg>
-                    Duplicate
-                </button>
+                <button type="submit" class="btn-sm">Duplicate</button>
             </form>
             <form action="/dashboard/templates/{{.ID}}" method="POST" style="display:inline">
                 <input type="hidden" name="_method" value="DELETE">
-                <button type="submit" class="btn-sm btn-danger" onclick="return confirm('Delete this meeting type?')">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                        <polyline points="3 6 5 6 21 6"/>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                        <line x1="10" y1="11" x2="10" y2="17"/>
-                        <line x1="14" y1="11" x2="14" y2="17"/>
-                    </svg>
-                    Delete
-                </button>
+                <button type="submit" class="btn-sm btn-danger" onclick="return confirm('Delete this meeting type?')">Delete</button>
             </form>
         </div>
     </div>

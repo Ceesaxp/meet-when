@@ -4,29 +4,44 @@
 
 {{define "content"}}
 <div class="page-header">
-    <div>
-        <h1 class="page-title">Settings</h1>
-        <p class="page-subtitle">Manage your profile and preferences</p>
-    </div>
+    <h1 class="page-title">Settings</h1>
 </div>
 
 <section class="settings-section">
-    <div class="section-header-simple">
+    <div class="section-header">
         <h2 class="section-title">Profile</h2>
+        <p class="section-subtitle">Your personal information</p>
     </div>
-    <form method="POST" action="/dashboard/settings" class="settings-form">
+
+    <form method="POST" action="/dashboard/settings">
         <input type="hidden" name="_method" value="PUT">
 
-        <div class="form-group">
-            <label class="form-label" for="name">Name</label>
-            <input type="text" id="name" name="name" class="form-input" required value="{{.Host.Name}}">
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" for="name">Name</label>
+                <input type="text" id="name" name="name" class="form-input" required value="{{.Host.Name}}">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="slug">Booking URL</label>
+                <input type="text" id="slug" name="slug" class="form-input" required pattern="[a-z0-9-]+" value="{{.Host.Slug}}">
+                <p class="form-hint">Your booking page: {{$.BaseURL}}/m/{{.Tenant.Slug}}/{{.Host.Slug}}</p>
+            </div>
         </div>
 
-        <div class="form-group">
-            <label class="form-label" for="slug">URL Slug</label>
-            <input type="text" id="slug" name="slug" class="form-input" required pattern="[a-z0-9-]+" value="{{.Host.Slug}}">
-            <p class="form-hint">Your booking URL: <span class="url-preview">{{$.BaseURL}}/m/{{.Tenant.Slug}}/<strong>{{.Host.Slug}}</strong></span></p>
+        <div class="section-actions">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
         </div>
+    </form>
+</section>
+
+<section class="settings-section">
+    <div class="section-header">
+        <h2 class="section-title">Availability</h2>
+        <p class="section-subtitle">Set your default working hours</p>
+    </div>
+
+    <form method="POST" action="/dashboard/settings/working-hours">
+        <input type="hidden" name="_method" value="PUT">
 
         <div class="form-group">
             <label class="form-label" for="timezone-search">Timezone</label>
@@ -38,42 +53,29 @@
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary">Save Profile</button>
-    </form>
-</section>
-
-<section class="settings-section">
-    <div class="section-header-simple">
-        <h2 class="section-title">Working Hours</h2>
-    </div>
-    <p class="section-description">Set your default availability. These can be overridden per meeting type.</p>
-
-    <form method="POST" action="/dashboard/settings/working-hours" class="settings-form">
-        <input type="hidden" name="_method" value="PUT">
-
-        <div class="working-hours-grid">
+        <div class="availability-grid">
             {{range $i, $day := .Data.DayNames}}
             {{$hours := index $.Data.WorkingHours $i}}
-            <div class="working-hours-row">
-                <div class="working-hours-day">
-                    <label class="checkbox-label">
-                        <input type="checkbox" name="day_{{$i}}_enabled"
-                               {{if $hours}}{{if (index $hours 0).IsEnabled}}checked{{end}}{{end}}>
-                        <span class="day-name">{{$day}}</span>
-                    </label>
+            <div class="availability-row">
+                <div class="day-toggle">
+                    <input type="checkbox" class="day-checkbox" name="day_{{$i}}_enabled"
+                           {{if $hours}}{{if (index $hours 0).IsEnabled}}checked{{end}}{{end}}>
+                    <span class="day-name">{{$day}}</span>
                 </div>
-                <div class="working-hours-times">
-                    <input type="time" name="day_{{$i}}_start" class="form-input time-input"
+                <div class="time-range">
+                    <input type="time" class="time-input" name="day_{{$i}}_start"
                            value="{{if $hours}}{{(index $hours 0).StartTime}}{{else}}09:00{{end}}">
                     <span class="time-separator">to</span>
-                    <input type="time" name="day_{{$i}}_end" class="form-input time-input"
+                    <input type="time" class="time-input" name="day_{{$i}}_end"
                            value="{{if $hours}}{{(index $hours 0).EndTime}}{{else}}17:00{{end}}">
                 </div>
             </div>
             {{end}}
         </div>
 
-        <button type="submit" class="btn btn-primary">Save Working Hours</button>
+        <div class="section-actions">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
     </form>
 </section>
 

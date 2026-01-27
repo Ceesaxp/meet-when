@@ -16,46 +16,43 @@
     </div>
 </div>
 
-<div class="filter-bar">
-    <div class="filter-tabs">
-        <a href="/dashboard/agenda" class="filter-tab {{if eq .Data.View "today"}}active{{end}}">Today</a>
-        <a href="/dashboard/agenda?view=week" class="filter-tab {{if eq .Data.View "week"}}active{{end}}">This Week</a>
-    </div>
+<div class="view-tabs">
+    <a href="/dashboard/agenda" class="view-tab {{if eq .Data.View "today"}}active{{end}}">Today</a>
+    <a href="/dashboard/agenda?view=week" class="view-tab {{if eq .Data.View "week"}}active{{end}}">This Week</a>
 </div>
 
 {{if eq .Data.View "week"}}
 <!-- Week view - events grouped by day -->
 <div class="agenda-week">
     {{range .Data.DayGroups}}
-    <div class="agenda-day-card">
-        <div class="agenda-day-header">
+    <div class="day-group">
+        <div class="day-header">
             <span class="day-name">{{.Date.Weekday}}</span>
             <span class="day-date">{{formatDate .Date}}</span>
         </div>
         {{if .Events}}
-        <div class="agenda-events">
+        <div class="events-list">
             {{range .Events}}
-            <div class="agenda-event {{if .IsAllDay}}all-day{{end}}">
-                <div class="event-time-col">
+            <div class="event-item {{if .IsAllDay}}all-day{{end}}">
+                <div class="event-time">
                     {{if .IsAllDay}}
                     <span class="all-day-badge">All Day</span>
                     {{else}}
-                    <span class="event-time">{{formatTime .Start}}</span>
-                    <span class="event-time-end">{{formatTime .End}}</span>
+                    <div class="event-time-range">{{formatTime .Start}} - {{formatTime .End}}</div>
+                    <div class="event-duration">{{duration .Start .End}}</div>
                     {{end}}
                 </div>
-                <div class="event-details">
-                    <span class="event-title">{{if .Title}}{{.Title}}{{else}}(No title){{end}}</span>
-                    {{if not .IsAllDay}}
-                    <span class="event-duration">{{duration .Start .End}}</span>
-                    {{end}}
+                <div class="event-content">
+                    <div class="event-title">{{if .Title}}{{.Title}}{{else}}(No title){{end}}</div>
+                    <div class="event-details">
+                        <span class="event-calendar">{{.CalendarName}}</span>
+                    </div>
                 </div>
-                <span class="event-calendar">{{.CalendarName}}</span>
             </div>
             {{end}}
         </div>
         {{else}}
-        <div class="agenda-no-events">No events</div>
+        <div class="no-events">No events scheduled</div>
         {{end}}
     </div>
     {{end}}
@@ -104,8 +101,8 @@
     </table>
 </div>
 {{else}}
-<div class="empty-state-card">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<div class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48" height="48">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
         <line x1="16" y1="2" x2="16" y2="6"/>
         <line x1="8" y1="2" x2="8" y2="6"/>
