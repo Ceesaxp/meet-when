@@ -57,3 +57,5 @@ client_secr*
 .claude/skills
 plans/
 tasks/
+.playwright-mcp/
+tests/
