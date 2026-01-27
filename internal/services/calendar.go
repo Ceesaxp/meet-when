@@ -1168,11 +1168,12 @@ func (s *CalendarService) getGoogleAgendaEvents(ctx context.Context, cal *models
 
 	// Use events.list API to get full event details
 	// CalendarID must be URL-encoded as it often contains @ (email addresses)
+	// Times must use UTC with Z suffix to avoid + in query params (+ becomes space)
 	eventsURL := fmt.Sprintf(
 		"https://www.googleapis.com/calendar/v3/calendars/%s/events?timeMin=%s&timeMax=%s&singleEvents=true&orderBy=startTime",
 		url.PathEscape(cal.CalendarID),
-		start.Format(time.RFC3339),
-		end.Format(time.RFC3339),
+		start.UTC().Format(time.RFC3339),
+		end.UTC().Format(time.RFC3339),
 	)
 
 	req, _ := http.NewRequest("GET", eventsURL, nil)
