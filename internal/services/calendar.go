@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -581,9 +582,9 @@ func (s *CalendarService) createGoogleEvent(ctx context.Context, cal *models.Cal
 	}
 
 	body, _ := json.Marshal(event)
-	url := fmt.Sprintf("https://www.googleapis.com/calendar/v3/calendars/%s/events?conferenceDataVersion=1&sendUpdates=all", cal.CalendarID)
+	eventsURL := fmt.Sprintf("https://www.googleapis.com/calendar/v3/calendars/%s/events?conferenceDataVersion=1&sendUpdates=all", url.PathEscape(cal.CalendarID))
 
-	req, _ := http.NewRequest("POST", url, strings.NewReader(string(body)))
+	req, _ := http.NewRequest("POST", eventsURL, strings.NewReader(string(body)))
 	req.Header.Set("Authorization", "Bearer "+cal.AccessToken)
 	req.Header.Set("Content-Type", "application/json")
 
@@ -627,8 +628,8 @@ func (s *CalendarService) deleteGoogleEvent(ctx context.Context, cal *models.Cal
 		return err
 	}
 
-	url := fmt.Sprintf("https://www.googleapis.com/calendar/v3/calendars/%s/events/%s?sendUpdates=all", cal.CalendarID, eventID)
-	req, _ := http.NewRequest("DELETE", url, nil)
+	deleteURL := fmt.Sprintf("https://www.googleapis.com/calendar/v3/calendars/%s/events/%s?sendUpdates=all", url.PathEscape(cal.CalendarID), eventID)
+	req, _ := http.NewRequest("DELETE", deleteURL, nil)
 	req.Header.Set("Authorization", "Bearer "+cal.AccessToken)
 
 	resp, err := http.DefaultClient.Do(req)
@@ -1166,14 +1167,15 @@ func (s *CalendarService) getGoogleAgendaEvents(ctx context.Context, cal *models
 	}
 
 	// Use events.list API to get full event details
-	url := fmt.Sprintf(
+	// CalendarID must be URL-encoded as it often contains @ (email addresses)
+	eventsURL := fmt.Sprintf(
 		"https://www.googleapis.com/calendar/v3/calendars/%s/events?timeMin=%s&timeMax=%s&singleEvents=true&orderBy=startTime",
-		cal.CalendarID,
+		url.PathEscape(cal.CalendarID),
 		start.Format(time.RFC3339),
 		end.Format(time.RFC3339),
 	)
 
-	req, _ := http.NewRequest("GET", url, nil)
+	req, _ := http.NewRequest("GET", eventsURL, nil)
 	req.Header.Set("Authorization", "Bearer "+cal.AccessToken)
 
 	resp, err := http.DefaultClient.Do(req)
@@ -1187,6 +1189,8 @@ func (s *CalendarService) getGoogleAgendaEvents(ctx context.Context, cal *models
 	}()
 
 	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("Google Calendar API error (status %d) for calendar %s: %s", resp.StatusCode, cal.CalendarID, string(body))
 		return nil, ErrCalendarAuth
 	}
 
