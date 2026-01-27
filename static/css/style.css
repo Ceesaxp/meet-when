@@ -584,6 +584,11 @@ a:hover {
     color: var(--gray-500);
 }
 
+.badge-private {
+    background: var(--gray-100);
+    color: var(--gray-600);
+}
+
 .badge-warning {
     background: var(--warning-bg);
     color: var(--warning);

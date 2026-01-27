@@ -313,6 +313,7 @@ func (h *DashboardHandler) CreateTemplate(w http.ResponseWriter, r *http.Request
 		InviteeQuestions:  inviteeQuestions,
 		ConfirmationEmail: r.FormValue("confirmation_email"),
 		ReminderEmail:     r.FormValue("reminder_email"),
+		IsPrivate:         r.FormValue("is_private") == "on",
 	}
 
 	_, err := h.handlers.services.Template.CreateTemplate(r.Context(), input)
@@ -431,6 +432,7 @@ func (h *DashboardHandler) UpdateTemplate(w http.ResponseWriter, r *http.Request
 		ConfirmationEmail: r.FormValue("confirmation_email"),
 		ReminderEmail:     r.FormValue("reminder_email"),
 		IsActive:          r.FormValue("is_active") == "on",
+		IsPrivate:         r.FormValue("is_private") == "on",
 	}
 
 	_, err := h.handlers.services.Template.UpdateTemplate(r.Context(), input)

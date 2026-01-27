@@ -49,6 +49,7 @@ type CreateTemplateInput struct {
 	InviteeQuestions  models.JSONArray
 	ConfirmationEmail string
 	ReminderEmail     string
+	IsPrivate         bool
 }
 
 // CreateTemplate creates a new meeting template
@@ -94,6 +95,7 @@ func (s *TemplateService) CreateTemplate(ctx context.Context, input CreateTempla
 		ConfirmationEmail: input.ConfirmationEmail,
 		ReminderEmail:     input.ReminderEmail,
 		IsActive:          true,
+		IsPrivate:         input.IsPrivate,
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
@@ -130,6 +132,7 @@ type UpdateTemplateInput struct {
 	ConfirmationEmail string
 	ReminderEmail     string
 	IsActive          bool
+	IsPrivate         bool
 }
 
 // UpdateTemplate updates an existing template
@@ -170,6 +173,7 @@ func (s *TemplateService) UpdateTemplate(ctx context.Context, input UpdateTempla
 	template.ConfirmationEmail = input.ConfirmationEmail
 	template.ReminderEmail = input.ReminderEmail
 	template.IsActive = input.IsActive
+	template.IsPrivate = input.IsPrivate
 
 	if err := s.repos.Template.Update(ctx, template); err != nil {
 		return nil, err
@@ -273,6 +277,7 @@ func (s *TemplateService) DuplicateTemplate(ctx context.Context, hostID, tenantI
 		ConfirmationEmail: original.ConfirmationEmail,
 		ReminderEmail:     original.ReminderEmail,
 		IsActive:          false, // New copies are inactive by default
+		IsPrivate:         original.IsPrivate,
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}

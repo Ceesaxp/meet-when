@@ -186,6 +186,7 @@ type MeetingTemplate struct {
 	ConfirmationEmail string               `json:"confirmation_email" db:"confirmation_email"`
 	ReminderEmail     string               `json:"reminder_email" db:"reminder_email"`
 	IsActive          bool                 `json:"is_active" db:"is_active"`
+	IsPrivate         bool                 `json:"is_private" db:"is_private"` // Hidden from public listing, still bookable via direct link
 	CreatedAt         SQLiteTime           `json:"created_at" db:"created_at"`
 	UpdatedAt         SQLiteTime           `json:"updated_at" db:"updated_at"`
 }

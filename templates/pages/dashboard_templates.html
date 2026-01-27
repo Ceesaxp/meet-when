@@ -41,6 +41,9 @@ function copyTemplateLink(btn, url) {
             {{if not .CalendarID}}
             <span class="badge badge-warning" title="No calendar assigned - bookings cannot be created">No Calendar</span>
             {{end}}
+            {{if .IsPrivate}}
+            <span class="badge badge-private" title="Hidden from public listing, accessible via direct link">Private</span>
+            {{end}}
             {{if not .IsActive}}
             <span class="badge badge-inactive">Inactive</span>
             {{end}}

@@ -41,10 +41,10 @@ func (h *PublicHandler) HostPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Filter to active templates only
+	// Filter to active, public templates only (private templates are hidden from listing)
 	var activeTemplates []*models.MeetingTemplate
 	for _, t := range templates {
-		if t.IsActive {
+		if t.IsActive && !t.IsPrivate {
 			activeTemplates = append(activeTemplates, t)
 		}
 	}

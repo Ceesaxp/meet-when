@@ -483,8 +483,8 @@ func (r *TemplateRepository) Create(ctx context.Context, tmpl *models.MeetingTem
 			location_type, custom_location, calendar_id, requires_approval,
 			min_notice_minutes, max_schedule_days, pre_buffer_minutes, post_buffer_minutes,
 			availability_rules, invitee_questions, confirmation_email, reminder_email,
-			is_active, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+			is_active, is_private, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
 	`)
 	_, err := r.db.ExecContext(ctx, query,
 		tmpl.ID, tmpl.HostID, tmpl.Slug, tmpl.Name, tmpl.Description,
@@ -492,7 +492,7 @@ func (r *TemplateRepository) Create(ctx context.Context, tmpl *models.MeetingTem
 		tmpl.RequiresApproval, tmpl.MinNoticeMinutes, tmpl.MaxScheduleDays,
 		tmpl.PreBufferMinutes, tmpl.PostBufferMinutes, tmpl.AvailabilityRules,
 		tmpl.InviteeQuestions, tmpl.ConfirmationEmail, tmpl.ReminderEmail,
-		tmpl.IsActive, tmpl.CreatedAt, tmpl.UpdatedAt)
+		tmpl.IsActive, tmpl.IsPrivate, tmpl.CreatedAt, tmpl.UpdatedAt)
 	return err
 }
 
@@ -503,7 +503,7 @@ func (r *TemplateRepository) GetByID(ctx context.Context, id string) (*models.Me
 		       custom_location, COALESCE(calendar_id, ''), requires_approval, min_notice_minutes,
 		       max_schedule_days, pre_buffer_minutes, post_buffer_minutes,
 		       availability_rules, invitee_questions, confirmation_email, reminder_email,
-		       is_active, created_at, updated_at
+		       is_active, COALESCE(is_private, false), created_at, updated_at
 		FROM meeting_templates WHERE id = $1
 	`)
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
@@ -512,7 +512,7 @@ func (r *TemplateRepository) GetByID(ctx context.Context, id string) (*models.Me
 		&tmpl.RequiresApproval, &tmpl.MinNoticeMinutes, &tmpl.MaxScheduleDays,
 		&tmpl.PreBufferMinutes, &tmpl.PostBufferMinutes, &tmpl.AvailabilityRules,
 		&tmpl.InviteeQuestions, &tmpl.ConfirmationEmail, &tmpl.ReminderEmail,
-		&tmpl.IsActive, &tmpl.CreatedAt, &tmpl.UpdatedAt)
+		&tmpl.IsActive, &tmpl.IsPrivate, &tmpl.CreatedAt, &tmpl.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -526,7 +526,7 @@ func (r *TemplateRepository) GetByHostAndSlug(ctx context.Context, hostID, slug 
 		       custom_location, COALESCE(calendar_id, ''), requires_approval, min_notice_minutes,
 		       max_schedule_days, pre_buffer_minutes, post_buffer_minutes,
 		       availability_rules, invitee_questions, confirmation_email, reminder_email,
-		       is_active, created_at, updated_at
+		       is_active, COALESCE(is_private, false), created_at, updated_at
 		FROM meeting_templates WHERE host_id = $1 AND slug = $2
 	`)
 	err := r.db.QueryRowContext(ctx, query, hostID, slug).Scan(
@@ -535,7 +535,7 @@ func (r *TemplateRepository) GetByHostAndSlug(ctx context.Context, hostID, slug 
 		&tmpl.RequiresApproval, &tmpl.MinNoticeMinutes, &tmpl.MaxScheduleDays,
 		&tmpl.PreBufferMinutes, &tmpl.PostBufferMinutes, &tmpl.AvailabilityRules,
 		&tmpl.InviteeQuestions, &tmpl.ConfirmationEmail, &tmpl.ReminderEmail,
-		&tmpl.IsActive, &tmpl.CreatedAt, &tmpl.UpdatedAt)
+		&tmpl.IsActive, &tmpl.IsPrivate, &tmpl.CreatedAt, &tmpl.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -548,7 +548,7 @@ func (r *TemplateRepository) GetByHostID(ctx context.Context, hostID string) ([]
 		       custom_location, COALESCE(calendar_id, ''), requires_approval, min_notice_minutes,
 		       max_schedule_days, pre_buffer_minutes, post_buffer_minutes,
 		       availability_rules, invitee_questions, confirmation_email, reminder_email,
-		       is_active, created_at, updated_at
+		       is_active, COALESCE(is_private, false), created_at, updated_at
 		FROM meeting_templates WHERE host_id = $1
 		ORDER BY created_at DESC
 	`)
@@ -571,7 +571,7 @@ func (r *TemplateRepository) GetByHostID(ctx context.Context, hostID string) ([]
 			&tmpl.RequiresApproval, &tmpl.MinNoticeMinutes, &tmpl.MaxScheduleDays,
 			&tmpl.PreBufferMinutes, &tmpl.PostBufferMinutes, &tmpl.AvailabilityRules,
 			&tmpl.InviteeQuestions, &tmpl.ConfirmationEmail, &tmpl.ReminderEmail,
-			&tmpl.IsActive, &tmpl.CreatedAt, &tmpl.UpdatedAt)
+			&tmpl.IsActive, &tmpl.IsPrivate, &tmpl.CreatedAt, &tmpl.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -587,15 +587,15 @@ func (r *TemplateRepository) Update(ctx context.Context, tmpl *models.MeetingTem
 		    custom_location = $6, calendar_id = $7, requires_approval = $8,
 		    min_notice_minutes = $9, max_schedule_days = $10, pre_buffer_minutes = $11,
 		    post_buffer_minutes = $12, availability_rules = $13, invitee_questions = $14,
-		    confirmation_email = $15, reminder_email = $16, is_active = $17
-		WHERE id = $18
+		    confirmation_email = $15, reminder_email = $16, is_active = $17, is_private = $18
+		WHERE id = $19
 	`)
 	_, err := r.db.ExecContext(ctx, query,
 		tmpl.Slug, tmpl.Name, tmpl.Description, tmpl.Durations, tmpl.LocationType,
 		tmpl.CustomLocation, tmpl.CalendarID, tmpl.RequiresApproval,
 		tmpl.MinNoticeMinutes, tmpl.MaxScheduleDays, tmpl.PreBufferMinutes,
 		tmpl.PostBufferMinutes, tmpl.AvailabilityRules, tmpl.InviteeQuestions,
-		tmpl.ConfirmationEmail, tmpl.ReminderEmail, tmpl.IsActive, tmpl.ID)
+		tmpl.ConfirmationEmail, tmpl.ReminderEmail, tmpl.IsActive, tmpl.IsPrivate, tmpl.ID)
 	return err
 }
 

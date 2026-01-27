@@ -244,6 +244,16 @@
             </label>
         </div>
         {{end}}
+        <div class="toggle-row">
+            <div class="toggle-info">
+                <h4>Private</h4>
+                <p>Hide from public listing, but still accessible via direct link</p>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" name="is_private" {{if .Data.Template}}{{if .Data.Template.IsPrivate}}checked{{end}}{{end}}>
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
     </section>
 
     <section class="section">
