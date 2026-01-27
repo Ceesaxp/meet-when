@@ -214,6 +214,40 @@ a:hover {
     border-color: #fecaca;
 }
 
+/* Secondary small button - neutral style for Archive/Unarchive */
+.btn-sm.btn-secondary {
+    background: var(--white);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-200);
+}
+
+.btn-sm.btn-secondary:hover {
+    background: var(--gray-100);
+    border-color: var(--gray-300);
+}
+
+/* Join button - prominent CTA for video conference links */
+.btn-join {
+    background: var(--accent);
+    color: var(--white);
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-join:hover {
+    background: var(--accent-hover);
+}
+
+.btn-sm.btn-join {
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    min-height: 36px;
+}
+
 .btn-lg {
     padding: 16px 32px;
     font-size: 1.05rem;

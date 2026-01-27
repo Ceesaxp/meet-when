@@ -20,27 +20,23 @@
     {{end}}
 </div>
 
-<div class="filter-bar">
-    <div class="filter-tabs">
-        <a href="/dashboard/bookings{{if .Data.ShowArchived}}?archived=true{{end}}" class="filter-tab {{if eq .Data.Filter ""}}active{{end}}">
-            All <span class="filter-count">{{.Data.AllCount}}</span>
-        </a>
-        <a href="/dashboard/bookings?filter=pending{{if .Data.ShowArchived}}&archived=true{{end}}" class="filter-tab {{if eq .Data.Filter "pending"}}active{{end}}">
-            Pending <span class="filter-count">{{.Data.PendingCount}}</span>
-        </a>
-        <a href="/dashboard/bookings?filter=confirmed{{if .Data.ShowArchived}}&archived=true{{end}}" class="filter-tab {{if eq .Data.Filter "confirmed"}}active{{end}}">
-            Confirmed <span class="filter-count">{{.Data.ConfirmedCount}}</span>
-        </a>
-        <a href="/dashboard/bookings?filter=cancelled{{if .Data.ShowArchived}}&archived=true{{end}}" class="filter-tab {{if eq .Data.Filter "cancelled"}}active{{end}}">
-            Cancelled <span class="filter-count">{{.Data.CancelledCount}}</span>
-        </a>
-    </div>
-    <div class="filter-options">
-        <label class="checkbox-label">
-            <input type="checkbox" id="show-archived" {{if .Data.ShowArchived}}checked{{end}} onchange="toggleArchived(this)">
-            <span class="checkbox-text">Show archived</span>
-        </label>
-    </div>
+<div class="filters">
+    <a href="/dashboard/bookings{{if .Data.ShowArchived}}?archived=true{{end}}" class="filter-btn {{if eq .Data.Filter ""}}active{{end}}">
+        All<span class="filter-count">{{.Data.AllCount}}</span>
+    </a>
+    <a href="/dashboard/bookings?filter=pending{{if .Data.ShowArchived}}&archived=true{{end}}" class="filter-btn {{if eq .Data.Filter "pending"}}active{{end}}">
+        Pending<span class="filter-count">{{.Data.PendingCount}}</span>
+    </a>
+    <a href="/dashboard/bookings?filter=confirmed{{if .Data.ShowArchived}}&archived=true{{end}}" class="filter-btn {{if eq .Data.Filter "confirmed"}}active{{end}}">
+        Confirmed<span class="filter-count">{{.Data.ConfirmedCount}}</span>
+    </a>
+    <a href="/dashboard/bookings?filter=cancelled{{if .Data.ShowArchived}}&archived=true{{end}}" class="filter-btn {{if eq .Data.Filter "cancelled"}}active{{end}}">
+        Cancelled<span class="filter-count">{{.Data.CancelledCount}}</span>
+    </a>
+    <label class="checkbox-label" style="margin-left: auto;">
+        <input type="checkbox" id="show-archived" {{if .Data.ShowArchived}}checked{{end}} onchange="toggleArchived(this)">
+        Show archived
+    </label>
 </div>
 
 <script>
@@ -113,7 +109,13 @@ function confirmBulkArchive(count) {
                         </form>
                         {{else if eq .Status "confirmed"}}
                         {{if .ConferenceLink}}
-                        <a href="{{.ConferenceLink}}" target="_blank" class="btn-sm btn-secondary">Join</a>
+                        <a href="{{.ConferenceLink}}" target="_blank" class="btn-sm btn-join">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <polygon points="23 7 16 12 23 17 23 7"/>
+                                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                            </svg>
+                            Join
+                        </a>
                         {{end}}
                         <form action="/dashboard/bookings/{{.ID}}/cancel" method="POST" style="display:inline">
                             <input type="hidden" name="reason" value="">
