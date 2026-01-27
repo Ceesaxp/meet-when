@@ -500,7 +500,7 @@ func (r *TemplateRepository) GetByID(ctx context.Context, id string) (*models.Me
 	tmpl := &models.MeetingTemplate{}
 	query := q(r.driver, `
 		SELECT id, host_id, slug, name, description, durations, location_type,
-		       custom_location, calendar_id, requires_approval, min_notice_minutes,
+		       custom_location, COALESCE(calendar_id, ''), requires_approval, min_notice_minutes,
 		       max_schedule_days, pre_buffer_minutes, post_buffer_minutes,
 		       availability_rules, invitee_questions, confirmation_email, reminder_email,
 		       is_active, created_at, updated_at
@@ -523,7 +523,7 @@ func (r *TemplateRepository) GetByHostAndSlug(ctx context.Context, hostID, slug 
 	tmpl := &models.MeetingTemplate{}
 	query := q(r.driver, `
 		SELECT id, host_id, slug, name, description, durations, location_type,
-		       custom_location, calendar_id, requires_approval, min_notice_minutes,
+		       custom_location, COALESCE(calendar_id, ''), requires_approval, min_notice_minutes,
 		       max_schedule_days, pre_buffer_minutes, post_buffer_minutes,
 		       availability_rules, invitee_questions, confirmation_email, reminder_email,
 		       is_active, created_at, updated_at
@@ -545,7 +545,7 @@ func (r *TemplateRepository) GetByHostAndSlug(ctx context.Context, hostID, slug 
 func (r *TemplateRepository) GetByHostID(ctx context.Context, hostID string) ([]*models.MeetingTemplate, error) {
 	query := q(r.driver, `
 		SELECT id, host_id, slug, name, description, durations, location_type,
-		       custom_location, calendar_id, requires_approval, min_notice_minutes,
+		       custom_location, COALESCE(calendar_id, ''), requires_approval, min_notice_minutes,
 		       max_schedule_days, pre_buffer_minutes, post_buffer_minutes,
 		       availability_rules, invitee_questions, confirmation_email, reminder_email,
 		       is_active, created_at, updated_at

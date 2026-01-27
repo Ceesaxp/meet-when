@@ -38,6 +38,9 @@ function copyTemplateLink(btn, url) {
     <div class="template-card {{if not .IsActive}}inactive{{end}}">
         <div class="template-header">
             <h3 class="template-title">{{.Name}}</h3>
+            {{if not .CalendarID}}
+            <span class="badge badge-warning" title="No calendar assigned - bookings cannot be created">No Calendar</span>
+            {{end}}
             {{if not .IsActive}}
             <span class="badge badge-inactive">Inactive</span>
             {{end}}
