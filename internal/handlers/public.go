@@ -107,7 +107,8 @@ func (h *PublicHandler) GetSlots(w http.ResponseWriter, r *http.Request) {
 	templateSlug := r.PathValue("template")
 
 	// Parse query parameters
-	dateStr := r.URL.Query().Get("date")
+	monthStr := r.URL.Query().Get("month")      // YYYY-MM format for month navigation
+	selectedStr := r.URL.Query().Get("selected") // YYYY-MM-DD for selected date
 	timezone := r.URL.Query().Get("timezone")
 	durationStr := r.URL.Query().Get("duration")
 
@@ -134,17 +135,27 @@ func (h *PublicHandler) GetSlots(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse date
-	var startDate time.Time
-	if dateStr != "" {
-		startDate, _ = time.Parse("2006-01-02", dateStr)
+	// Parse month - determines which month to display
+	now := time.Now()
+	var displayMonth time.Time
+	if monthStr != "" {
+		if parsed, err := time.Parse("2006-01", monthStr); err == nil {
+			displayMonth = parsed
+		}
 	}
-	if startDate.IsZero() {
-		startDate = time.Now()
+	if displayMonth.IsZero() {
+		displayMonth = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	}
 
-	// Calculate date range (show one week at a time)
-	endDate := startDate.AddDate(0, 0, 7)
+	// Parse selected date for showing time slots
+	var selectedDate time.Time
+	if selectedStr != "" {
+		selectedDate, _ = time.Parse("2006-01-02", selectedStr)
+	}
+
+	// Calculate date range for fetching slots (full month plus padding for calendar view)
+	monthStart := time.Date(displayMonth.Year(), displayMonth.Month(), 1, 0, 0, 0, 0, time.UTC)
+	monthEnd := monthStart.AddDate(0, 1, 0) // First day of next month
 
 	// Parse duration - validate against allowed template durations
 	duration := 30
@@ -163,12 +174,12 @@ func (h *PublicHandler) GetSlots(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Get available slots
+	// Get available slots for the entire month
 	slots, err := h.handlers.services.Availability.GetAvailableSlots(r.Context(), services.GetAvailableSlotsInput{
 		HostID:     host.ID,
 		TemplateID: template.ID,
-		StartDate:  startDate,
-		EndDate:    endDate,
+		StartDate:  monthStart,
+		EndDate:    monthEnd,
 		Duration:   duration,
 		Timezone:   timezone,
 	})
@@ -179,17 +190,99 @@ func (h *PublicHandler) GetSlots(w http.ResponseWriter, r *http.Request) {
 
 	// Group slots by date
 	slotsByDate := make(map[string][]models.TimeSlot)
+	availableDates := make(map[string]bool)
 	for _, slot := range slots {
 		dateKey := slot.Start.Format("2006-01-02")
 		slotsByDate[dateKey] = append(slotsByDate[dateKey], slot)
+		availableDates[dateKey] = true
 	}
 
+	// Build calendar grid data
+	type CalendarDay struct {
+		Date       time.Time
+		DayNum     int
+		IsInMonth  bool
+		IsToday    bool
+		IsPast     bool
+		IsSelected bool
+		HasSlots   bool
+	}
+
+	// Get the first day of the month and figure out what weekday it starts on
+	firstOfMonth := time.Date(displayMonth.Year(), displayMonth.Month(), 1, 0, 0, 0, 0, time.UTC)
+	startWeekday := int(firstOfMonth.Weekday()) // 0=Sunday
+
+	// Calculate days in month
+	lastOfMonth := firstOfMonth.AddDate(0, 1, -1)
+	daysInMonth := lastOfMonth.Day()
+
+	// Build calendar weeks
+	var weeks [][]CalendarDay
+	var currentWeek []CalendarDay
+
+	// Add empty days before first of month
+	for i := 0; i < startWeekday; i++ {
+		currentWeek = append(currentWeek, CalendarDay{IsInMonth: false})
+	}
+
+	// Add days of month
+	today := time.Now().Truncate(24 * time.Hour)
+	for day := 1; day <= daysInMonth; day++ {
+		date := time.Date(displayMonth.Year(), displayMonth.Month(), day, 0, 0, 0, 0, time.UTC)
+		dateKey := date.Format("2006-01-02")
+
+		calDay := CalendarDay{
+			Date:       date,
+			DayNum:     day,
+			IsInMonth:  true,
+			IsToday:    date.Year() == today.Year() && date.Month() == today.Month() && date.Day() == today.Day(),
+			IsPast:     date.Before(today),
+			IsSelected: !selectedDate.IsZero() && date.Year() == selectedDate.Year() && date.Month() == selectedDate.Month() && date.Day() == selectedDate.Day(),
+			HasSlots:   availableDates[dateKey],
+		}
+
+		currentWeek = append(currentWeek, calDay)
+
+		// Start new week if this is Saturday
+		if len(currentWeek) == 7 {
+			weeks = append(weeks, currentWeek)
+			currentWeek = nil
+		}
+	}
+
+	// Add empty days after last of month
+	for len(currentWeek) > 0 && len(currentWeek) < 7 {
+		currentWeek = append(currentWeek, CalendarDay{IsInMonth: false})
+	}
+	if len(currentWeek) > 0 {
+		weeks = append(weeks, currentWeek)
+	}
+
+	// Get slots for selected date
+	var selectedSlots []models.TimeSlot
+	if !selectedDate.IsZero() {
+		selectedSlots = slotsByDate[selectedDate.Format("2006-01-02")]
+	}
+
+	// Calculate previous and next month
+	prevMonth := displayMonth.AddDate(0, -1, 0)
+	nextMonth := displayMonth.AddDate(0, 1, 0)
+
+	// Can navigate to previous month if it's current month or later
+	canGoPrev := !prevMonth.Before(time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC))
+
 	h.handlers.renderPartial(w, "slots_partial.html", map[string]interface{}{
-		"Slots":     slotsByDate,
-		"StartDate": startDate,
-		"EndDate":   endDate,
-		"Duration":  duration,
-		"Timezone":  timezone,
+		"CalendarWeeks":   weeks,
+		"MonthDisplay":    displayMonth.Format("January 2006"),
+		"MonthValue":      displayMonth.Format("2006-01"),
+		"PrevMonth":       prevMonth.Format("2006-01"),
+		"NextMonth":       nextMonth.Format("2006-01"),
+		"CanGoPrev":       canGoPrev,
+		"SelectedDate":    selectedDate,
+		"SelectedDisplay": selectedDate.Format("Monday, January 2"),
+		"SelectedSlots":   selectedSlots,
+		"Duration":        duration,
+		"Timezone":        timezone,
 	})
 }
 
@@ -449,7 +542,8 @@ func (h *PublicHandler) GetRescheduleSlots(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Parse query parameters
-	dateStr := r.URL.Query().Get("date")
+	monthStr := r.URL.Query().Get("month")       // YYYY-MM format for month navigation
+	selectedStr := r.URL.Query().Get("selected") // YYYY-MM-DD for selected date
 	timezone := r.URL.Query().Get("timezone")
 	durationStr := r.URL.Query().Get("duration")
 
@@ -460,17 +554,27 @@ func (h *PublicHandler) GetRescheduleSlots(w http.ResponseWriter, r *http.Reques
 		timezone = "UTC"
 	}
 
-	// Parse date
-	var startDate time.Time
-	if dateStr != "" {
-		startDate, _ = time.Parse("2006-01-02", dateStr)
+	// Parse month - determines which month to display
+	now := time.Now()
+	var displayMonth time.Time
+	if monthStr != "" {
+		if parsed, err := time.Parse("2006-01", monthStr); err == nil {
+			displayMonth = parsed
+		}
 	}
-	if startDate.IsZero() {
-		startDate = time.Now()
+	if displayMonth.IsZero() {
+		displayMonth = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	}
 
-	// Calculate date range (show one week at a time)
-	endDate := startDate.AddDate(0, 0, 7)
+	// Parse selected date for showing time slots
+	var selectedDate time.Time
+	if selectedStr != "" {
+		selectedDate, _ = time.Parse("2006-01-02", selectedStr)
+	}
+
+	// Calculate date range for fetching slots (full month)
+	monthStart := time.Date(displayMonth.Year(), displayMonth.Month(), 1, 0, 0, 0, 0, time.UTC)
+	monthEnd := monthStart.AddDate(0, 1, 0)
 
 	// Parse duration - validate against allowed template durations
 	duration := details.Booking.Duration // Default to current booking duration
@@ -486,12 +590,12 @@ func (h *PublicHandler) GetRescheduleSlots(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	// Get available slots
+	// Get available slots for the entire month
 	slots, err := h.handlers.services.Availability.GetAvailableSlots(r.Context(), services.GetAvailableSlotsInput{
 		HostID:     details.Host.ID,
 		TemplateID: details.Template.ID,
-		StartDate:  startDate,
-		EndDate:    endDate,
+		StartDate:  monthStart,
+		EndDate:    monthEnd,
 		Duration:   duration,
 		Timezone:   timezone,
 	})
@@ -502,18 +606,97 @@ func (h *PublicHandler) GetRescheduleSlots(w http.ResponseWriter, r *http.Reques
 
 	// Group slots by date
 	slotsByDate := make(map[string][]models.TimeSlot)
+	availableDates := make(map[string]bool)
 	for _, slot := range slots {
 		dateKey := slot.Start.Format("2006-01-02")
 		slotsByDate[dateKey] = append(slotsByDate[dateKey], slot)
+		availableDates[dateKey] = true
 	}
 
+	// Build calendar grid data
+	type CalendarDay struct {
+		Date       time.Time
+		DayNum     int
+		IsInMonth  bool
+		IsToday    bool
+		IsPast     bool
+		IsSelected bool
+		HasSlots   bool
+	}
+
+	// Get the first day of the month and figure out what weekday it starts on
+	firstOfMonth := time.Date(displayMonth.Year(), displayMonth.Month(), 1, 0, 0, 0, 0, time.UTC)
+	startWeekday := int(firstOfMonth.Weekday())
+
+	// Calculate days in month
+	lastOfMonth := firstOfMonth.AddDate(0, 1, -1)
+	daysInMonth := lastOfMonth.Day()
+
+	// Build calendar weeks
+	var weeks [][]CalendarDay
+	var currentWeek []CalendarDay
+
+	// Add empty days before first of month
+	for i := 0; i < startWeekday; i++ {
+		currentWeek = append(currentWeek, CalendarDay{IsInMonth: false})
+	}
+
+	// Add days of month
+	today := time.Now().Truncate(24 * time.Hour)
+	for day := 1; day <= daysInMonth; day++ {
+		date := time.Date(displayMonth.Year(), displayMonth.Month(), day, 0, 0, 0, 0, time.UTC)
+		dateKey := date.Format("2006-01-02")
+
+		calDay := CalendarDay{
+			Date:       date,
+			DayNum:     day,
+			IsInMonth:  true,
+			IsToday:    date.Year() == today.Year() && date.Month() == today.Month() && date.Day() == today.Day(),
+			IsPast:     date.Before(today),
+			IsSelected: !selectedDate.IsZero() && date.Year() == selectedDate.Year() && date.Month() == selectedDate.Month() && date.Day() == selectedDate.Day(),
+			HasSlots:   availableDates[dateKey],
+		}
+
+		currentWeek = append(currentWeek, calDay)
+
+		if len(currentWeek) == 7 {
+			weeks = append(weeks, currentWeek)
+			currentWeek = nil
+		}
+	}
+
+	// Add empty days after last of month
+	for len(currentWeek) > 0 && len(currentWeek) < 7 {
+		currentWeek = append(currentWeek, CalendarDay{IsInMonth: false})
+	}
+	if len(currentWeek) > 0 {
+		weeks = append(weeks, currentWeek)
+	}
+
+	// Get slots for selected date
+	var selectedSlots []models.TimeSlot
+	if !selectedDate.IsZero() {
+		selectedSlots = slotsByDate[selectedDate.Format("2006-01-02")]
+	}
+
+	// Calculate previous and next month
+	prevMonth := displayMonth.AddDate(0, -1, 0)
+	nextMonth := displayMonth.AddDate(0, 1, 0)
+	canGoPrev := !prevMonth.Before(time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC))
+
 	h.handlers.renderPartial(w, "reschedule_slots_partial.html", map[string]interface{}{
-		"Slots":     slotsByDate,
-		"StartDate": startDate,
-		"EndDate":   endDate,
-		"Duration":  duration,
-		"Timezone":  timezone,
-		"Token":     token,
+		"CalendarWeeks":   weeks,
+		"MonthDisplay":    displayMonth.Format("January 2006"),
+		"MonthValue":      displayMonth.Format("2006-01"),
+		"PrevMonth":       prevMonth.Format("2006-01"),
+		"NextMonth":       nextMonth.Format("2006-01"),
+		"CanGoPrev":       canGoPrev,
+		"SelectedDate":    selectedDate,
+		"SelectedDisplay": selectedDate.Format("Monday, January 2"),
+		"SelectedSlots":   selectedSlots,
+		"Duration":        duration,
+		"Timezone":        timezone,
+		"Token":           token,
 	})
 }
 

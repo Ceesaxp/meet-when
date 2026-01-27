@@ -1705,6 +1705,11 @@ body.landing .section-header {
     min-height: 100vh;
 }
 
+/* Booking Status Page - uses gray background */
+.public-page.booking-status-page {
+    background: var(--gray-100);
+}
+
 .public-container {
     max-width: 800px;
     margin: 0 auto;
@@ -2232,6 +2237,38 @@ body.landing .section-header {
     text-align: center;
     padding: 2rem;
     color: var(--gray-500);
+}
+
+.loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--gray-200);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 16px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Calendar Wrapper for Booking Pages */
+.calendar-wrapper {
+    min-height: 400px;
+}
+
+.booking-main .section-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--gray-500);
+    margin-bottom: 24px;
+}
+
+.time-slots-section {
+    margin-top: 40px;
 }
 
 /* CTA Section */
