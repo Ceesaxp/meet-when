@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"log"
 
 	"github.com/google/uuid"
 	"github.com/meet-when/meet-when/internal/models"
@@ -20,7 +21,7 @@ func NewAuditLogService(repos *repository.Repositories) *AuditLogService {
 
 // Log creates an audit log entry
 func (s *AuditLogService) Log(ctx context.Context, tenantID string, hostID *string, action, entityType, entityID string, details models.JSONMap, ipAddress string) {
-	log := &models.AuditLog{
+	entry := &models.AuditLog{
 		ID:         uuid.New().String(),
 		TenantID:   tenantID,
 		HostID:     hostID,
@@ -32,9 +33,11 @@ func (s *AuditLogService) Log(ctx context.Context, tenantID string, hostID *stri
 		CreatedAt:  models.Now(),
 	}
 
-	// Fire and forget - don't block on audit log failures
+	// Fire and forget - don't block on audit log failures, but log errors
 	go func() {
-		_ = s.repos.AuditLog.Create(context.Background(), log)
+		if err := s.repos.AuditLog.Create(context.Background(), entry); err != nil {
+			log.Printf("Failed to create audit log: %v (action=%s, entity=%s/%s)", err, action, entityType, entityID)
+		}
 	}()
 }
 

@@ -1021,9 +1021,20 @@ func (r *AuditLogRepository) Create(ctx context.Context, log *models.AuditLog) e
 		INSERT INTO audit_logs (id, tenant_id, host_id, action, entity_type, entity_id, details, ip_address, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`)
+
+	// For PostgreSQL, empty strings must be converted to NULL for INET and UUID columns
+	var entityID interface{} = log.EntityID
+	if log.EntityID == "" {
+		entityID = nil
+	}
+	var ipAddress interface{} = log.IPAddress
+	if log.IPAddress == "" {
+		ipAddress = nil
+	}
+
 	_, err := r.db.ExecContext(ctx, query,
 		log.ID, log.TenantID, log.HostID, log.Action, log.EntityType,
-		log.EntityID, log.Details, log.IPAddress, log.CreatedAt)
+		entityID, log.Details, ipAddress, log.CreatedAt)
 	return err
 }
 
@@ -1046,14 +1057,18 @@ func (r *AuditLogRepository) GetByTenantID(ctx context.Context, tenantID string,
 
 	var logs []*models.AuditLog
 	for rows.Next() {
-		log := &models.AuditLog{}
+		auditLog := &models.AuditLog{}
+		// Use sql.NullString for nullable columns that PostgreSQL may return as NULL
+		var entityID, ipAddress sql.NullString
 		err := rows.Scan(
-			&log.ID, &log.TenantID, &log.HostID, &log.Action, &log.EntityType,
-			&log.EntityID, &log.Details, &log.IPAddress, &log.CreatedAt)
+			&auditLog.ID, &auditLog.TenantID, &auditLog.HostID, &auditLog.Action, &auditLog.EntityType,
+			&entityID, &auditLog.Details, &ipAddress, &auditLog.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
-		logs = append(logs, log)
+		auditLog.EntityID = entityID.String
+		auditLog.IPAddress = ipAddress.String
+		logs = append(logs, auditLog)
 	}
 	return logs, nil
 }

@@ -21,7 +21,9 @@ func (st *SQLiteTime) Scan(value interface{}) error {
 
 	switch v := value.(type) {
 	case time.Time:
-		st.Time = v
+		// Always normalize to UTC for consistent comparisons across drivers
+		// PostgreSQL returns time.Time directly, SQLite returns strings
+		st.Time = v.UTC()
 		return nil
 	case string:
 		// Try various formats
@@ -36,7 +38,8 @@ func (st *SQLiteTime) Scan(value interface{}) error {
 		}
 		for _, layout := range layouts {
 			if t, err := time.Parse(layout, v); err == nil {
-				st.Time = t
+				// Normalize to UTC for consistent comparisons
+				st.Time = t.UTC()
 				return nil
 			}
 		}

@@ -388,7 +388,8 @@ func (s *CalendarService) exchangeGoogleAuthCode(code, redirectURI string) (*goo
 }
 
 func (s *CalendarService) refreshGoogleToken(cal *models.CalendarConnection) error {
-	if cal.TokenExpiry == nil || time.Now().Before(cal.TokenExpiry.Add(-5*time.Minute)) {
+	// Use UTC for consistent timezone comparison (TokenExpiry is always stored in UTC)
+	if cal.TokenExpiry == nil || time.Now().UTC().Before(cal.TokenExpiry.Add(-5*time.Minute)) {
 		return nil // Token still valid
 	}
 
@@ -423,6 +424,11 @@ func (s *CalendarService) refreshGoogleToken(cal *models.CalendarConnection) err
 	cal.AccessToken = tokens.AccessToken
 	expiry := models.NewSQLiteTime(time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second))
 	cal.TokenExpiry = &expiry
+
+	// Google may return a new refresh token - save it if provided
+	if tokens.RefreshToken != "" {
+		cal.RefreshToken = tokens.RefreshToken
+	}
 
 	return s.repos.Calendar.Update(context.Background(), cal)
 }
