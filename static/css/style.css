@@ -2614,6 +2614,32 @@ body.landing .section-header {
     background: var(--gray-100);
 }
 
+/* Booking Status Page - Full-width buttons */
+.booking-status-container .primary-actions .btn {
+    width: 100%;
+    border-radius: 12px;
+    min-height: 56px;
+    padding: 16px 24px;
+}
+
+.booking-status-container .secondary-actions {
+    justify-content: stretch;
+}
+
+.booking-status-container .secondary-actions .btn-secondary {
+    max-width: none;
+    border-radius: 12px;
+}
+
+.booking-status-container .btn-secondary.btn-danger {
+    color: #dc2626;
+}
+
+.booking-status-container .btn-secondary.btn-danger:hover {
+    border-color: #fecaca;
+    background: #fef2f2;
+}
+
 /* Book Again Link */
 .book-again-link {
     display: inline-flex;
