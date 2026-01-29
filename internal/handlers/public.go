@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	"slices"
+
 	"github.com/meet-when/meet-when/internal/models"
 	"github.com/meet-when/meet-when/internal/services"
 )
@@ -88,6 +90,9 @@ func (h *PublicHandler) TemplatePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Load pooled hosts for display
+	pooledHosts, _ := h.handlers.services.Template.GetPooledHosts(r.Context(), template.ID)
+
 	h.handlers.render(w, "public_template.html", PageData{
 		Title:       template.Name + " | " + host.Name,
 		Description: template.Description,
@@ -95,7 +100,8 @@ func (h *PublicHandler) TemplatePage(w http.ResponseWriter, r *http.Request) {
 		Tenant:      tenant,
 		BaseURL:     h.handlers.cfg.Server.BaseURL,
 		Data: map[string]interface{}{
-			"Template": template,
+			"Template":    template,
+			"PooledHosts": pooledHosts,
 		},
 	})
 }
@@ -107,7 +113,7 @@ func (h *PublicHandler) GetSlots(w http.ResponseWriter, r *http.Request) {
 	templateSlug := r.PathValue("template")
 
 	// Parse query parameters
-	monthStr := r.URL.Query().Get("month")      // YYYY-MM format for month navigation
+	monthStr := r.URL.Query().Get("month")       // YYYY-MM format for month navigation
 	selectedStr := r.URL.Query().Get("selected") // YYYY-MM-DD for selected date
 	timezone := r.URL.Query().Get("timezone")
 	durationStr := r.URL.Query().Get("duration")
@@ -165,11 +171,8 @@ func (h *PublicHandler) GetSlots(w http.ResponseWriter, r *http.Request) {
 	if durationStr != "" {
 		if parsedDuration, err := strconv.Atoi(durationStr); err == nil {
 			// Validate that the requested duration is allowed for this template
-			for _, d := range template.Durations {
-				if d == parsedDuration {
-					duration = parsedDuration
-					break
-				}
+			if slices.Contains(template.Durations, parsedDuration) {
+				duration = parsedDuration
 			}
 		}
 	}

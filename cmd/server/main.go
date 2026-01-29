@@ -113,6 +113,11 @@ func main() {
 	dashboard.HandleFunc("DELETE /dashboard/templates/{id}", h.Dashboard.DeleteTemplate)
 	dashboard.HandleFunc("POST /dashboard/templates/{id}/duplicate", h.Dashboard.DuplicateTemplate)
 
+	// Pooled hosts management
+	dashboard.HandleFunc("POST /dashboard/templates/{id}/hosts", h.Dashboard.AddPooledHost)
+	dashboard.HandleFunc("DELETE /dashboard/templates/{id}/hosts/{hostId}", h.Dashboard.RemovePooledHost)
+	dashboard.HandleFunc("PUT /dashboard/templates/{id}/hosts/{hostId}", h.Dashboard.UpdatePooledHost)
+
 	// Bookings management
 	dashboard.HandleFunc("GET /dashboard/bookings", h.Dashboard.Bookings)
 	dashboard.HandleFunc("GET /dashboard/bookings/{id}/details", h.Dashboard.BookingDetails)

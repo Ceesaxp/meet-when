@@ -355,6 +355,13 @@ func (h *DashboardHandler) EditTemplatePage(w http.ResponseWriter, r *http.Reque
 
 	calendars, _ := h.handlers.services.Calendar.GetCalendars(r.Context(), host.Host.ID)
 
+	// Load pooled hosts for this template
+	pooledHosts, _ := h.handlers.services.Template.GetPooledHosts(r.Context(), templateID)
+
+	// Load all hosts in the tenant for the dropdown, excluding already-pooled hosts
+	allTenantHosts, _ := h.handlers.repos.Host.GetByTenantID(r.Context(), host.Tenant.ID)
+	tenantHosts := filterAvailableHosts(allTenantHosts, pooledHosts)
+
 	h.handlers.render(w, "dashboard_template_form.html", PageData{
 		Title:        "Edit Template",
 		Host:         host.Host,
@@ -362,9 +369,11 @@ func (h *DashboardHandler) EditTemplatePage(w http.ResponseWriter, r *http.Reque
 		ActiveNav:    "templates",
 		PendingCount: h.getPendingCount(r, host.Host.ID),
 		Data: map[string]interface{}{
-			"Template":  template,
-			"Calendars": calendars,
-			"IsNew":     false,
+			"Template":    template,
+			"Calendars":   calendars,
+			"IsNew":       false,
+			"PooledHosts": pooledHosts,
+			"TenantHosts": tenantHosts,
 		},
 	})
 }
@@ -475,6 +484,172 @@ func (h *DashboardHandler) DuplicateTemplate(w http.ResponseWriter, r *http.Requ
 
 	// Redirect to edit page for the new template
 	h.handlers.redirect(w, r, "/dashboard/templates/"+duplicate.ID)
+}
+
+// AddPooledHost adds a host to a template's pool
+func (h *DashboardHandler) AddPooledHost(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	templateID := r.PathValue("id")
+
+	// Verify the current host owns this template
+	template, err := h.handlers.services.Template.GetTemplate(r.Context(), host.Host.ID, templateID)
+	if err != nil || template == nil {
+		if r.Header.Get("HX-Request") == "true" {
+			http.Error(w, "Template not found", http.StatusNotFound)
+			return
+		}
+		h.handlers.redirect(w, r, "/dashboard/templates")
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		if r.Header.Get("HX-Request") == "true" {
+			http.Error(w, "Invalid form", http.StatusBadRequest)
+			return
+		}
+		h.handlers.redirect(w, r, "/dashboard/templates/"+templateID+"?error=invalid_form")
+		return
+	}
+
+	hostIDToAdd := r.FormValue("host_id")
+	isOptional := r.FormValue("is_optional") == "on"
+
+	_, err = h.handlers.services.Template.AddPooledHost(r.Context(), host.Tenant.ID, templateID, hostIDToAdd, isOptional)
+	if err != nil {
+		if r.Header.Get("HX-Request") == "true" {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		h.handlers.redirect(w, r, "/dashboard/templates/"+templateID+"?error=add_host_failed")
+		return
+	}
+
+	// For HTMX requests, return the updated pooled hosts partial
+	if r.Header.Get("HX-Request") == "true" {
+		pooledHosts, _ := h.handlers.services.Template.GetPooledHosts(r.Context(), templateID)
+		allTenantHosts, _ := h.handlers.repos.Host.GetByTenantID(r.Context(), host.Tenant.ID)
+		tenantHosts := filterAvailableHosts(allTenantHosts, pooledHosts)
+		h.handlers.renderPartial(w, "pooled_hosts_partial.html", map[string]interface{}{
+			"Template":    template,
+			"PooledHosts": pooledHosts,
+			"TenantHosts": tenantHosts,
+		})
+		return
+	}
+
+	h.handlers.redirect(w, r, "/dashboard/templates/"+templateID)
+}
+
+// RemovePooledHost removes a host from a template's pool
+func (h *DashboardHandler) RemovePooledHost(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	templateID := r.PathValue("id")
+	hostIDToRemove := r.PathValue("hostId")
+
+	// Verify the current host owns this template
+	template, err := h.handlers.services.Template.GetTemplate(r.Context(), host.Host.ID, templateID)
+	if err != nil || template == nil {
+		if r.Header.Get("HX-Request") == "true" {
+			http.Error(w, "Template not found", http.StatusNotFound)
+			return
+		}
+		h.handlers.redirect(w, r, "/dashboard/templates")
+		return
+	}
+
+	err = h.handlers.services.Template.RemovePooledHost(r.Context(), host.Tenant.ID, templateID, hostIDToRemove)
+	if err != nil {
+		if r.Header.Get("HX-Request") == "true" {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		h.handlers.redirect(w, r, "/dashboard/templates/"+templateID+"?error=remove_host_failed")
+		return
+	}
+
+	// For HTMX requests, return the updated pooled hosts partial
+	if r.Header.Get("HX-Request") == "true" {
+		pooledHosts, _ := h.handlers.services.Template.GetPooledHosts(r.Context(), templateID)
+		allTenantHosts, _ := h.handlers.repos.Host.GetByTenantID(r.Context(), host.Tenant.ID)
+		tenantHosts := filterAvailableHosts(allTenantHosts, pooledHosts)
+		h.handlers.renderPartial(w, "pooled_hosts_partial.html", map[string]interface{}{
+			"Template":    template,
+			"PooledHosts": pooledHosts,
+			"TenantHosts": tenantHosts,
+		})
+		return
+	}
+
+	h.handlers.redirect(w, r, "/dashboard/templates/"+templateID)
+}
+
+// UpdatePooledHost updates a pooled host's optional status
+func (h *DashboardHandler) UpdatePooledHost(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	templateID := r.PathValue("id")
+	hostIDToUpdate := r.PathValue("hostId")
+
+	// Verify the current host owns this template
+	template, err := h.handlers.services.Template.GetTemplate(r.Context(), host.Host.ID, templateID)
+	if err != nil || template == nil {
+		if r.Header.Get("HX-Request") == "true" {
+			http.Error(w, "Template not found", http.StatusNotFound)
+			return
+		}
+		h.handlers.redirect(w, r, "/dashboard/templates")
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		if r.Header.Get("HX-Request") == "true" {
+			http.Error(w, "Invalid form", http.StatusBadRequest)
+			return
+		}
+		h.handlers.redirect(w, r, "/dashboard/templates/"+templateID+"?error=invalid_form")
+		return
+	}
+
+	isOptional := r.FormValue("is_optional") == "on"
+
+	err = h.handlers.services.Template.UpdatePooledHost(r.Context(), host.Tenant.ID, templateID, hostIDToUpdate, isOptional)
+	if err != nil {
+		if r.Header.Get("HX-Request") == "true" {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		h.handlers.redirect(w, r, "/dashboard/templates/"+templateID+"?error=update_host_failed")
+		return
+	}
+
+	// For HTMX requests, return the updated pooled hosts partial
+	if r.Header.Get("HX-Request") == "true" {
+		pooledHosts, _ := h.handlers.services.Template.GetPooledHosts(r.Context(), templateID)
+		allTenantHosts, _ := h.handlers.repos.Host.GetByTenantID(r.Context(), host.Tenant.ID)
+		tenantHosts := filterAvailableHosts(allTenantHosts, pooledHosts)
+		h.handlers.renderPartial(w, "pooled_hosts_partial.html", map[string]interface{}{
+			"Template":    template,
+			"PooledHosts": pooledHosts,
+			"TenantHosts": tenantHosts,
+		})
+		return
+	}
+
+	h.handlers.redirect(w, r, "/dashboard/templates/"+templateID)
 }
 
 // Bookings renders the bookings list
@@ -1042,4 +1217,24 @@ func groupEventsByDay(events []services.AgendaEvent, weekStart time.Time, loc *t
 	}
 
 	return groups
+}
+
+// filterAvailableHosts returns hosts that are not already in the pooled hosts list
+func filterAvailableHosts(allHosts []*models.Host, pooledHosts []*models.TemplateHost) []*models.Host {
+	if len(pooledHosts) == 0 {
+		return allHosts
+	}
+
+	pooledMap := make(map[string]bool, len(pooledHosts))
+	for _, ph := range pooledHosts {
+		pooledMap[ph.HostID] = true
+	}
+
+	var available []*models.Host
+	for _, h := range allHosts {
+		if !pooledMap[h.ID] {
+			available = append(available, h)
+		}
+	}
+	return available
 }

@@ -269,13 +269,8 @@ func (s *BookingService) CancelBooking(ctx context.Context, bookingID, cancelled
 		return err
 	}
 
-	// Delete calendar event if exists
-	if booking.CalendarEventID != "" {
-		template, _ := s.repos.Template.GetByID(ctx, booking.TemplateID)
-		if template != nil {
-			_ = s.calendar.DeleteEvent(ctx, booking.HostID, template.CalendarID, booking.CalendarEventID)
-		}
-	}
+	// Delete calendar events for all pooled hosts
+	s.deleteAllCalendarEvents(ctx, booking)
 
 	// Get related entities and send cancellation email
 	template, _ := s.repos.Template.GetByID(ctx, booking.TemplateID)
@@ -298,6 +293,38 @@ func (s *BookingService) CancelBooking(ctx context.Context, bookingID, cancelled
 	}, "")
 
 	return nil
+}
+
+// deleteAllCalendarEvents deletes calendar events for all hosts (pooled and legacy single-host)
+func (s *BookingService) deleteAllCalendarEvents(ctx context.Context, booking *models.Booking) {
+	// First, try to delete events from booking_calendar_events table (pooled hosts)
+	calEvents, err := s.repos.BookingCalendarEvent.GetByBookingID(ctx, booking.ID)
+	if err != nil {
+		log.Printf("[BOOKING] Error loading calendar events for booking %s: %v", booking.ID, err)
+	}
+
+	if len(calEvents) > 0 {
+		// Delete events for all pooled hosts
+		for _, ce := range calEvents {
+			if err := s.calendar.DeleteEvent(ctx, ce.HostID, ce.CalendarID, ce.EventID); err != nil {
+				log.Printf("[BOOKING] Error deleting calendar event %s for host %s: %v", ce.EventID, ce.HostID, err)
+			} else {
+				log.Printf("[BOOKING] Deleted calendar event %s for host %s", ce.EventID, ce.HostID)
+			}
+		}
+		// Clean up the booking_calendar_events records
+		if err := s.repos.BookingCalendarEvent.DeleteByBookingID(ctx, booking.ID); err != nil {
+			log.Printf("[BOOKING] Error deleting booking_calendar_events records: %v", err)
+		}
+	} else if booking.CalendarEventID != "" {
+		// Fall back to legacy single-host event deletion
+		template, _ := s.repos.Template.GetByID(ctx, booking.TemplateID)
+		if template != nil {
+			if err := s.calendar.DeleteEvent(ctx, booking.HostID, template.CalendarID, booking.CalendarEventID); err != nil {
+				log.Printf("[BOOKING] Error deleting legacy calendar event: %v", err)
+			}
+		}
+	}
 }
 
 // CancelBookingByToken cancels a booking using the public token (for invitee cancellation)
@@ -395,10 +422,8 @@ func (s *BookingService) RescheduleBooking(ctx context.Context, input Reschedule
 		return nil, time.Time{}, ErrInvalidBookingTime
 	}
 
-	// Delete old calendar event if it exists
-	if oldBooking.CalendarEventID != "" {
-		_ = s.calendar.DeleteEvent(ctx, oldBooking.HostID, template.CalendarID, oldBooking.CalendarEventID)
-	}
+	// Delete all old calendar events (pooled and legacy)
+	s.deleteAllCalendarEvents(ctx, oldBooking)
 
 	// Update booking with new times
 	oldBooking.StartTime = models.NewSQLiteTime(input.NewStartTime.UTC())
@@ -436,12 +461,23 @@ func (s *BookingService) RescheduleBooking(ctx context.Context, input Reschedule
 			}
 		}
 
-		// Create new calendar event
-		eventID, err := s.calendar.CreateEvent(ctx, details)
+		// Load pooled hosts and create calendar events for all of them
+		pooledHosts, err := s.repos.TemplateHost.GetByTemplateIDWithHost(ctx, template.ID)
 		if err != nil {
-			log.Printf("[RESCHEDULE] Error creating calendar event: %v", err)
-		} else if eventID != "" {
-			details.Booking.CalendarEventID = eventID
+			log.Printf("[RESCHEDULE] Error loading pooled hosts: %v", err)
+			pooledHosts = nil
+		}
+
+		if len(pooledHosts) > 0 {
+			s.createPooledHostCalendarEvents(ctx, details, pooledHosts)
+		} else {
+			// Single-host flow (backward compatibility)
+			eventID, err := s.calendar.CreateEvent(ctx, details)
+			if err != nil {
+				log.Printf("[RESCHEDULE] Error creating calendar event: %v", err)
+			} else if eventID != "" {
+				details.Booking.CalendarEventID = eventID
+			}
 		}
 
 		// Update booking with new conference link and event ID
@@ -547,7 +583,7 @@ func (s *BookingService) processConfirmedBooking(ctx context.Context, details *B
 	log.Printf("[BOOKING] processConfirmedBooking: booking=%s template=%s calendar=%s",
 		details.Booking.ID, details.Template.ID, details.Template.CalendarID)
 
-	// Create conference link if needed
+	// Create conference link if needed (use owner's credentials)
 	if details.Template.LocationType == models.ConferencingProviderGoogleMeet ||
 		details.Template.LocationType == models.ConferencingProviderZoom {
 		log.Printf("[BOOKING] Creating conference link for location type: %s", details.Template.LocationType)
@@ -560,16 +596,29 @@ func (s *BookingService) processConfirmedBooking(ctx context.Context, details *B
 		}
 	}
 
-	// Create calendar event
-	log.Printf("[BOOKING] Creating calendar event...")
-	eventID, err := s.calendar.CreateEvent(ctx, details)
+	// Load pooled hosts for this template
+	pooledHosts, err := s.repos.TemplateHost.GetByTemplateIDWithHost(ctx, details.Template.ID)
 	if err != nil {
-		log.Printf("[BOOKING] Error creating calendar event: %v", err)
-	} else if eventID != "" {
-		log.Printf("[BOOKING] Calendar event created: %s", eventID)
-		details.Booking.CalendarEventID = eventID
+		log.Printf("[BOOKING] Error loading pooled hosts: %v", err)
+		// Continue with single-host flow
+		pooledHosts = nil
+	}
+
+	// Create calendar events for all pooled hosts (or just owner if no pooled hosts)
+	if len(pooledHosts) > 0 {
+		s.createPooledHostCalendarEvents(ctx, details, pooledHosts)
 	} else {
-		log.Printf("[BOOKING] No calendar event created (no calendar configured or empty response)")
+		// Single-host flow (backward compatibility)
+		log.Printf("[BOOKING] Creating calendar event for single host...")
+		eventID, err := s.calendar.CreateEvent(ctx, details)
+		if err != nil {
+			log.Printf("[BOOKING] Error creating calendar event: %v", err)
+		} else if eventID != "" {
+			log.Printf("[BOOKING] Calendar event created: %s", eventID)
+			details.Booking.CalendarEventID = eventID
+		} else {
+			log.Printf("[BOOKING] No calendar event created (no calendar configured or empty response)")
+		}
 	}
 
 	// Update booking with conference link and event ID
@@ -582,4 +631,72 @@ func (s *BookingService) processConfirmedBooking(ctx context.Context, details *B
 	s.email.SendBookingConfirmed(ctx, details)
 
 	return nil
+}
+
+// createPooledHostCalendarEvents creates calendar events for all hosts in a pooled template
+func (s *BookingService) createPooledHostCalendarEvents(ctx context.Context, details *BookingWithDetails, pooledHosts []*models.TemplateHost) {
+	for _, th := range pooledHosts {
+		// Get the host's default calendar
+		host := th.Host
+		if host == nil {
+			var err error
+			host, err = s.repos.Host.GetByID(ctx, th.HostID)
+			if err != nil || host == nil {
+				log.Printf("[BOOKING] Error loading host %s: %v", th.HostID, err)
+				continue
+			}
+		}
+
+		// Find the host's default calendar
+		var calendarID string
+		if host.DefaultCalendarID != nil {
+			calendarID = *host.DefaultCalendarID
+		}
+		if calendarID == "" {
+			// Try to find any connected calendar
+			calendars, err := s.repos.Calendar.GetByHostID(ctx, th.HostID)
+			if err != nil || len(calendars) == 0 {
+				log.Printf("[BOOKING] No calendar found for host %s, skipping event creation", th.HostID)
+				continue
+			}
+			calendarID = calendars[0].ID
+		}
+
+		// Create a modified details with this host's info for event creation
+		hostDetails := &BookingWithDetails{
+			Booking:  details.Booking,
+			Template: details.Template,
+			Host:     host,
+			Tenant:   details.Tenant,
+		}
+
+		// Create calendar event for this host
+		eventID, err := s.calendar.CreateEventForHost(ctx, hostDetails, calendarID)
+		if err != nil {
+			log.Printf("[BOOKING] Error creating calendar event for host %s: %v", th.HostID, err)
+			continue
+		}
+
+		if eventID != "" {
+			log.Printf("[BOOKING] Calendar event created for host %s: %s", th.HostID, eventID)
+
+			// Store in booking_calendar_events table
+			calEvent := &models.BookingCalendarEvent{
+				ID:         uuid.New().String(),
+				BookingID:  details.Booking.ID,
+				HostID:     th.HostID,
+				CalendarID: calendarID,
+				EventID:    eventID,
+				CreatedAt:  models.Now(),
+			}
+			if err := s.repos.BookingCalendarEvent.Create(ctx, calEvent); err != nil {
+				log.Printf("[BOOKING] Error storing calendar event record: %v", err)
+			}
+
+			// Store first event ID in booking for backward compatibility
+			if details.Booking.CalendarEventID == "" && th.Role == models.TemplateHostRoleOwner {
+				details.Booking.CalendarEventID = eventID
+			}
+		}
+	}
 }
