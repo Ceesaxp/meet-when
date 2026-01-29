@@ -35,6 +35,9 @@
                 {{end}}
 
                 <form method="POST" action="/auth/register" class="auth-form">
+                    {{if .Data.ref}}
+                    <input type="hidden" name="ref" value="{{.Data.ref}}">
+                    {{end}}
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label" for="tenant_name">Organization Name</label>

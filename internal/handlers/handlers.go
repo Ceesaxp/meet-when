@@ -8,12 +8,14 @@ import (
 	"time"
 
 	"github.com/meet-when/meet-when/internal/config"
+	"github.com/meet-when/meet-when/internal/repository"
 	"github.com/meet-when/meet-when/internal/services"
 )
 
 // Handlers holds all handler instances
 type Handlers struct {
 	cfg       *config.Config
+	repos     *repository.Repositories
 	services  *services.Services
 	templates map[string]*template.Template
 
@@ -25,12 +27,13 @@ type Handlers struct {
 }
 
 // New creates all handlers
-func New(cfg *config.Config, svc *services.Services) *Handlers {
+func New(cfg *config.Config, svc *services.Services, repos *repository.Repositories) *Handlers {
 	// Load templates - each page gets its own template instance with layouts
 	templates := loadTemplates()
 
 	h := &Handlers{
 		cfg:       cfg,
+		repos:     repos,
 		services:  svc,
 		templates: templates,
 	}

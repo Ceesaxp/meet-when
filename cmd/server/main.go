@@ -56,7 +56,7 @@ func main() {
 	defer svc.CalendarSync.Stop()
 
 	// Initialize handlers
-	h := handlers.New(cfg, svc)
+	h := handlers.New(cfg, svc, repos)
 
 	// Set up router
 	mux := http.NewServeMux()
@@ -86,6 +86,7 @@ func main() {
 	mux.HandleFunc("GET /auth/register", h.Auth.RegisterPage)
 	mux.HandleFunc("POST /auth/register", h.Auth.Register)
 	mux.HandleFunc("POST /auth/logout", h.Auth.Logout)
+	mux.HandleFunc("GET /signup/track", h.Auth.TrackSignupCTA)
 
 	// OAuth callbacks
 	mux.HandleFunc("GET /auth/google/callback", h.Auth.GoogleCallback)

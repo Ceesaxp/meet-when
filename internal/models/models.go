@@ -249,6 +249,33 @@ type AuditLog struct {
 	CreatedAt  SQLiteTime `json:"created_at" db:"created_at"`
 }
 
+// SignupConversion represents a conversion tracking record for registration CTAs
+type SignupConversion struct {
+	ID              string      `json:"id" db:"id"`
+	SourceBookingID *string     `json:"source_booking_id" db:"source_booking_id"` // Nullable FK to booking
+	InviteeEmail    string      `json:"invitee_email" db:"invitee_email"`
+	ClickedAt       SQLiteTime  `json:"clicked_at" db:"clicked_at"`
+	RegisteredAt    *SQLiteTime `json:"registered_at" db:"registered_at"` // Nullable - set when registration completes
+	TenantID        string      `json:"tenant_id" db:"tenant_id"`
+	CreatedAt       SQLiteTime  `json:"created_at" db:"created_at"`
+	UpdatedAt       SQLiteTime  `json:"updated_at" db:"updated_at"`
+}
+
+// IsRegistered returns true if the conversion completed with a registration
+func (sc *SignupConversion) IsRegistered() bool {
+	return sc.RegisteredAt != nil
+}
+
+// ConversionTime returns the duration between clicking the CTA and completing registration
+// Returns nil if not yet registered
+func (sc *SignupConversion) ConversionTime() *time.Duration {
+	if sc.RegisteredAt == nil {
+		return nil
+	}
+	duration := sc.RegisteredAt.Sub(sc.ClickedAt.Time)
+	return &duration
+}
+
 // TimeSlot represents an available time slot
 type TimeSlot struct {
 	Start time.Time `json:"start"`
