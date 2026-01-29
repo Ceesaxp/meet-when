@@ -2675,6 +2675,32 @@ body.landing .section-header {
     background: #fef2f2;
 }
 
+/* Signup Conversion CTA */
+.signup-prompt {
+    margin-top: 32px;
+    padding: 24px;
+    background: var(--accent-light);
+    border-radius: var(--radius-lg);
+    text-align: center;
+}
+
+.signup-prompt h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--black);
+    margin-bottom: 8px;
+}
+
+.signup-prompt p {
+    color: var(--gray-700);
+    margin-bottom: 20px;
+    font-size: 0.95rem;
+}
+
+.signup-prompt .btn {
+    margin-top: 4px;
+}
+
 /* Book Again Link */
 .book-again-link {
     display: inline-flex;

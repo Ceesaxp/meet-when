@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/meet-when/meet-when/internal/models"
 	"github.com/meet-when/meet-when/internal/services"
 )
 
@@ -67,8 +69,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 // RegisterPage renders the registration page
 func (h *AuthHandler) RegisterPage(w http.ResponseWriter, r *http.Request) {
+	// Preserve ref parameter from query string (e.g., from signup tracking)
+	ref := r.URL.Query().Get("ref")
+
 	h.handlers.render(w, "register.html", PageData{
 		Title: "Create Account",
+		Data: map[string]interface{}{
+			"ref": ref,
+		},
 	})
 }
 
@@ -102,15 +110,19 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 			message = "Password must be at least 8 characters"
 		}
 
+		// Preserve ref parameter on error
+		ref := r.FormValue("ref")
+
 		h.handlers.render(w, "register.html", PageData{
 			Title: "Create Account",
 			Flash: &FlashMessage{Type: "error", Message: message},
-			Data: map[string]string{
+			Data: map[string]interface{}{
 				"tenant_name": input.TenantName,
 				"tenant_slug": input.TenantSlug,
 				"name":        input.Name,
 				"email":       input.Email,
 				"timezone":    input.Timezone,
+				"ref":         ref,
 			},
 		})
 		return
@@ -125,6 +137,14 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
+
+	// Track signup conversion if ref parameter indicates booking source
+	ref := r.FormValue("ref")
+	if ref != "" && len(ref) > 8 && ref[:8] == "booking:" {
+		// Mark the most recent unregistered conversion for this email as registered
+		// Ignore errors - don't block registration flow
+		_ = h.handlers.repos.SignupConversion.MarkRegistered(r.Context(), input.Email)
+	}
 
 	// Redirect new users to onboarding
 	h.handlers.redirect(w, r, "/onboarding/step/1")
@@ -256,4 +276,45 @@ func (h *AuthHandler) SelectOrg(w http.ResponseWriter, r *http.Request) {
 	})
 
 	h.handlers.redirect(w, r, "/dashboard")
+}
+
+// TrackSignupCTA tracks when an invitee clicks the signup CTA from booking confirmation
+func (h *AuthHandler) TrackSignupCTA(w http.ResponseWriter, r *http.Request) {
+	// Get ref parameter
+	ref := r.URL.Query().Get("ref")
+
+	// Parse ref format: "booking:{token}"
+	if ref != "" && len(ref) > 8 && ref[:8] == "booking:" {
+		token := ref[8:]
+
+		// Look up booking by token
+		booking, err := h.handlers.services.Booking.GetBookingByToken(r.Context(), token)
+		if err == nil && booking != nil {
+			// Get tenant ID from the booking's host
+			host, err := h.handlers.repos.Host.GetByID(r.Context(), booking.Booking.HostID)
+			if err == nil && host != nil {
+				// Create signup conversion record
+				conversion := &models.SignupConversion{
+					ID:              uuid.New().String(),
+					SourceBookingID: &booking.Booking.ID,
+					InviteeEmail:    booking.Booking.InviteeEmail,
+					ClickedAt:       models.Now(),
+					RegisteredAt:    nil,
+					TenantID:        host.TenantID,
+					CreatedAt:       models.Now(),
+					UpdatedAt:       models.Now(),
+				}
+
+				// Log the conversion (ignore errors - don't block redirect)
+				_ = h.handlers.repos.SignupConversion.Create(r.Context(), conversion)
+			}
+		}
+	}
+
+	// Always redirect to register page with ref parameter preserved
+	if ref != "" {
+		h.handlers.redirect(w, r, "/auth/register?ref="+ref)
+	} else {
+		h.handlers.redirect(w, r, "/auth/register")
+	}
 }

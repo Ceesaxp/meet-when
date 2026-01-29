@@ -220,6 +220,14 @@
                 </button>
             </form>
         </div>
+
+        <div class="signup-prompt">
+            <h3>Need your own scheduling page?</h3>
+            <p>Create a free MeetWhen account and let others book time with you.</p>
+            <a href="/signup/track?ref=booking:{{.Data.Booking.Token}}" class="btn btn-accent">
+                Get Started Free
+            </a>
+        </div>
         {{end}}
 
         <a href="/m/{{.Tenant.Slug}}/{{.Host.Slug}}" class="back-link">

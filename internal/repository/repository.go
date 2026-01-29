@@ -13,29 +13,31 @@ import (
 
 // Repositories holds all repository instances
 type Repositories struct {
-	Tenant       *TenantRepository
-	Host         *HostRepository
-	Calendar     *CalendarRepository
-	Conferencing *ConferencingRepository
-	Template     *TemplateRepository
-	Booking      *BookingRepository
-	Session      *SessionRepository
-	WorkingHours *WorkingHoursRepository
-	AuditLog     *AuditLogRepository
+	Tenant           *TenantRepository
+	Host             *HostRepository
+	Calendar         *CalendarRepository
+	Conferencing     *ConferencingRepository
+	Template         *TemplateRepository
+	Booking          *BookingRepository
+	Session          *SessionRepository
+	WorkingHours     *WorkingHoursRepository
+	AuditLog         *AuditLogRepository
+	SignupConversion *SignupConversionRepository
 }
 
 // NewRepositories creates all repositories
 func NewRepositories(db *sql.DB, driver string) *Repositories {
 	return &Repositories{
-		Tenant:       &TenantRepository{db: db, driver: driver},
-		Host:         &HostRepository{db: db, driver: driver},
-		Calendar:     &CalendarRepository{db: db, driver: driver},
-		Conferencing: &ConferencingRepository{db: db, driver: driver},
-		Template:     &TemplateRepository{db: db, driver: driver},
-		Booking:      &BookingRepository{db: db, driver: driver},
-		Session:      &SessionRepository{db: db, driver: driver},
-		WorkingHours: &WorkingHoursRepository{db: db, driver: driver},
-		AuditLog:     &AuditLogRepository{db: db, driver: driver},
+		Tenant:           &TenantRepository{db: db, driver: driver},
+		Host:             &HostRepository{db: db, driver: driver},
+		Calendar:         &CalendarRepository{db: db, driver: driver},
+		Conferencing:     &ConferencingRepository{db: db, driver: driver},
+		Template:         &TemplateRepository{db: db, driver: driver},
+		Booking:          &BookingRepository{db: db, driver: driver},
+		Session:          &SessionRepository{db: db, driver: driver},
+		WorkingHours:     &WorkingHoursRepository{db: db, driver: driver},
+		AuditLog:         &AuditLogRepository{db: db, driver: driver},
+		SignupConversion: &SignupConversionRepository{db: db, driver: driver},
 	}
 }
 
@@ -1109,4 +1111,83 @@ func (r *AuditLogRepository) CountByTenantID(ctx context.Context, tenantID strin
 	var count int
 	err := r.db.QueryRowContext(ctx, query, tenantID).Scan(&count)
 	return count, err
+}
+
+// SignupConversionRepository handles signup conversion tracking database operations
+type SignupConversionRepository struct {
+	db     *sql.DB
+	driver string
+}
+
+// Create logs a CTA click by creating a new signup conversion record
+func (r *SignupConversionRepository) Create(ctx context.Context, conversion *models.SignupConversion) error {
+	query := q(r.driver, `
+		INSERT INTO signup_conversions (id, source_booking_id, invitee_email, clicked_at,
+			registered_at, tenant_id, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`)
+	_, err := r.db.ExecContext(ctx, query,
+		conversion.ID, conversion.SourceBookingID, conversion.InviteeEmail,
+		conversion.ClickedAt, conversion.RegisteredAt, conversion.TenantID,
+		conversion.CreatedAt, conversion.UpdatedAt)
+	return err
+}
+
+// MarkRegistered updates the registered_at timestamp for the most recent conversion with the given email
+func (r *SignupConversionRepository) MarkRegistered(ctx context.Context, email string) error {
+	var query string
+	if r.driver == "sqlite" {
+		query = `
+			UPDATE signup_conversions
+			SET registered_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+			WHERE invitee_email = ?
+			  AND registered_at IS NULL
+			  AND id = (
+				SELECT id FROM signup_conversions
+				WHERE invitee_email = ?
+				  AND registered_at IS NULL
+				ORDER BY clicked_at DESC
+				LIMIT 1
+			  )
+		`
+		_, err := r.db.ExecContext(ctx, query, email, email)
+		return err
+	} else {
+		query = `
+			UPDATE signup_conversions
+			SET registered_at = NOW()
+			WHERE invitee_email = $1
+			  AND registered_at IS NULL
+			  AND id = (
+				SELECT id FROM signup_conversions
+				WHERE invitee_email = $1
+				  AND registered_at IS NULL
+				ORDER BY clicked_at DESC
+				LIMIT 1
+			  )
+		`
+		_, err := r.db.ExecContext(ctx, query, email)
+		return err
+	}
+}
+
+// GetByEmail finds the most recent signup conversion for the given email address
+func (r *SignupConversionRepository) GetByEmail(ctx context.Context, email string) (*models.SignupConversion, error) {
+	conversion := &models.SignupConversion{}
+	query := q(r.driver, `
+		SELECT id, source_booking_id, invitee_email, clicked_at, registered_at,
+		       tenant_id, created_at, updated_at
+		FROM signup_conversions
+		WHERE invitee_email = $1
+		ORDER BY clicked_at DESC
+		LIMIT 1
+	`)
+	err := r.db.QueryRowContext(ctx, query, email).Scan(
+		&conversion.ID, &conversion.SourceBookingID, &conversion.InviteeEmail,
+		&conversion.ClickedAt, &conversion.RegisteredAt, &conversion.TenantID,
+		&conversion.CreatedAt, &conversion.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return conversion, err
 }
