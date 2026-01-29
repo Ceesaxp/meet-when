@@ -358,8 +358,9 @@ func (h *DashboardHandler) EditTemplatePage(w http.ResponseWriter, r *http.Reque
 	// Load pooled hosts for this template
 	pooledHosts, _ := h.handlers.services.Template.GetPooledHosts(r.Context(), templateID)
 
-	// Load all hosts in the tenant for the dropdown
-	tenantHosts, _ := h.handlers.repos.Host.GetByTenantID(r.Context(), host.Tenant.ID)
+	// Load all hosts in the tenant for the dropdown, excluding already-pooled hosts
+	allTenantHosts, _ := h.handlers.repos.Host.GetByTenantID(r.Context(), host.Tenant.ID)
+	tenantHosts := filterAvailableHosts(allTenantHosts, pooledHosts)
 
 	h.handlers.render(w, "dashboard_template_form.html", PageData{
 		Title:        "Edit Template",
@@ -531,7 +532,8 @@ func (h *DashboardHandler) AddPooledHost(w http.ResponseWriter, r *http.Request)
 	// For HTMX requests, return the updated pooled hosts partial
 	if r.Header.Get("HX-Request") == "true" {
 		pooledHosts, _ := h.handlers.services.Template.GetPooledHosts(r.Context(), templateID)
-		tenantHosts, _ := h.handlers.repos.Host.GetByTenantID(r.Context(), host.Tenant.ID)
+		allTenantHosts, _ := h.handlers.repos.Host.GetByTenantID(r.Context(), host.Tenant.ID)
+		tenantHosts := filterAvailableHosts(allTenantHosts, pooledHosts)
 		h.handlers.renderPartial(w, "pooled_hosts_partial.html", map[string]interface{}{
 			"Template":    template,
 			"PooledHosts": pooledHosts,
@@ -578,7 +580,8 @@ func (h *DashboardHandler) RemovePooledHost(w http.ResponseWriter, r *http.Reque
 	// For HTMX requests, return the updated pooled hosts partial
 	if r.Header.Get("HX-Request") == "true" {
 		pooledHosts, _ := h.handlers.services.Template.GetPooledHosts(r.Context(), templateID)
-		tenantHosts, _ := h.handlers.repos.Host.GetByTenantID(r.Context(), host.Tenant.ID)
+		allTenantHosts, _ := h.handlers.repos.Host.GetByTenantID(r.Context(), host.Tenant.ID)
+		tenantHosts := filterAvailableHosts(allTenantHosts, pooledHosts)
 		h.handlers.renderPartial(w, "pooled_hosts_partial.html", map[string]interface{}{
 			"Template":    template,
 			"PooledHosts": pooledHosts,
@@ -636,7 +639,8 @@ func (h *DashboardHandler) UpdatePooledHost(w http.ResponseWriter, r *http.Reque
 	// For HTMX requests, return the updated pooled hosts partial
 	if r.Header.Get("HX-Request") == "true" {
 		pooledHosts, _ := h.handlers.services.Template.GetPooledHosts(r.Context(), templateID)
-		tenantHosts, _ := h.handlers.repos.Host.GetByTenantID(r.Context(), host.Tenant.ID)
+		allTenantHosts, _ := h.handlers.repos.Host.GetByTenantID(r.Context(), host.Tenant.ID)
+		tenantHosts := filterAvailableHosts(allTenantHosts, pooledHosts)
 		h.handlers.renderPartial(w, "pooled_hosts_partial.html", map[string]interface{}{
 			"Template":    template,
 			"PooledHosts": pooledHosts,
@@ -1213,4 +1217,24 @@ func groupEventsByDay(events []services.AgendaEvent, weekStart time.Time, loc *t
 	}
 
 	return groups
+}
+
+// filterAvailableHosts returns hosts that are not already in the pooled hosts list
+func filterAvailableHosts(allHosts []*models.Host, pooledHosts []*models.TemplateHost) []*models.Host {
+	if len(pooledHosts) == 0 {
+		return allHosts
+	}
+
+	pooledMap := make(map[string]bool, len(pooledHosts))
+	for _, ph := range pooledHosts {
+		pooledMap[ph.HostID] = true
+	}
+
+	var available []*models.Host
+	for _, h := range allHosts {
+		if !pooledMap[h.ID] {
+			available = append(available, h)
+		}
+	}
+	return available
 }

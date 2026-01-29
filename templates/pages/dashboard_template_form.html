@@ -217,7 +217,7 @@
         </div>
     </section>
 
-    {{if not .Data.IsNew}}
+    {{if not .Data.IsNew}}{{if or .Data.TenantHosts (gt (len .Data.PooledHosts) 1)}}
     <section class="section">
         <div class="section-header">
             <h2 class="section-title">Team Members</h2>
@@ -226,7 +226,7 @@
 
         {{template "pooled_hosts_partial.html" (toMap .Data)}}
     </section>
-    {{end}}
+    {{end}}{{end}}
 
     <section class="section">
         <div class="section-header">
