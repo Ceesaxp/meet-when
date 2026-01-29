@@ -1020,11 +1020,22 @@ type WorkingHoursRepository struct {
 }
 
 func (r *WorkingHoursRepository) GetByHostID(ctx context.Context, hostID string) ([]*models.WorkingHours, error) {
-	query := q(r.driver, `
-		SELECT id, host_id, day_of_week, start_time, end_time, is_enabled, created_at, updated_at
-		FROM working_hours WHERE host_id = $1
-		ORDER BY day_of_week, start_time
-	`)
+	// For PostgreSQL, cast TIME columns to text to get HH:MM:SS format as string
+	// SQLite stores times as TEXT already
+	var query string
+	if r.driver == "postgres" {
+		query = `
+			SELECT id, host_id, day_of_week, start_time::text, end_time::text, is_enabled, created_at, updated_at
+			FROM working_hours WHERE host_id = $1
+			ORDER BY day_of_week, start_time
+		`
+	} else {
+		query = q(r.driver, `
+			SELECT id, host_id, day_of_week, start_time, end_time, is_enabled, created_at, updated_at
+			FROM working_hours WHERE host_id = $1
+			ORDER BY day_of_week, start_time
+		`)
+	}
 	rows, err := r.db.QueryContext(ctx, query, hostID)
 	if err != nil {
 		return nil, err
