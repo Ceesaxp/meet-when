@@ -1,0 +1,24 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="256" height="256" fill="white"/>
+<path d="M192 32C205.255 32 216 42.7452 216 56V147C216 147.683 215.969 148.358 215.913 149.026C215.969 150.344 216 151.668 216 153C216 202.706 176.377 243 127.5 243C78.6228 243 39 202.706 39 153C39 151.668 39.0297 150.344 39.0859 149.026C39.0301 148.358 39 147.683 39 147V56C39 42.7452 49.7452 32 63 32H192Z" fill="#E85D40"/>
+<rect x="71" y="14" width="22" height="43" rx="11" fill="white"/>
+<rect x="75" y="14" width="14" height="40" rx="7" fill="#E85D40"/>
+<rect x="162" y="14" width="22" height="43" rx="11" fill="white"/>
+<rect x="166" y="14" width="14" height="40" rx="7" fill="#E85D40"/>
+<circle cx="128" cy="154" r="74" fill="white"/>
+<rect x="59" y="151" width="14" height="6" fill="black"/>
+<rect x="184" y="151" width="14" height="6" fill="black"/>
+<rect x="66.8112" y="186.152" width="14" height="4" transform="rotate(-30 66.8112 186.152)" fill="#777777"/>
+<rect x="175.064" y="123.652" width="14" height="4" transform="rotate(-30 175.064 123.652)" fill="#777777"/>
+<rect x="91.1519" y="212.689" width="14" height="4" transform="rotate(-60 91.1519 212.689)" fill="#777777"/>
+<rect x="153.652" y="104.436" width="14" height="4" transform="rotate(-60 153.652 104.436)" fill="#777777"/>
+<rect x="125.5" y="223.5" width="14" height="6" transform="rotate(-90 125.5 223.5)" fill="black"/>
+<rect x="125.5" y="98.5" width="14" height="6" transform="rotate(-90 125.5 98.5)" fill="black"/>
+<rect x="187.189" y="191.348" width="14" height="4" transform="rotate(-150 187.189 191.348)" fill="#777777"/>
+<rect x="78.9356" y="128.848" width="14" height="4" transform="rotate(-150 78.9356 128.848)" fill="#777777"/>
+<rect x="160.652" y="215.689" width="14" height="4" transform="rotate(-120 160.652 215.689)" fill="#777777"/>
+<rect x="98.1519" y="107.436" width="14" height="4" transform="rotate(-120 98.1519 107.436)" fill="#777777"/>
+<path d="M174.531 99.4083L124.664 163.562L119.38 159.081L174.531 99.4083Z" fill="black"/>
+<path d="M83.3789 122.699L136.491 153.739L130.282 162.504L83.3789 122.699Z" fill="black"/>
+<circle cx="3" cy="3" r="3" transform="matrix(-1 0 0 1 131 152)" fill="white"/>
+</svg>
