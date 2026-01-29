@@ -267,6 +267,15 @@ type DayAvailability struct {
 	Intervals []TimeInterval
 }
 
+// normalizeTimeHHMM normalizes a time string to HH:MM format
+// Handles both "HH:MM" and "HH:MM:SS" formats
+func normalizeTimeHHMM(s string) string {
+	if len(s) >= 5 {
+		return s[:5]
+	}
+	return s
+}
+
 // parseAvailabilityRules parses JSONMap availability rules into a structured format
 // Supports both old format (single start/end) and new format (intervals array) for backward compatibility
 func parseAvailabilityRules(rules models.JSONMap) *TemplateAvailabilityRules {
@@ -302,10 +311,10 @@ func parseAvailabilityRules(rules models.JSONMap) *TemplateAvailabilityRules {
 						if intervalMap, ok := intervalData.(map[string]interface{}); ok {
 							interval := TimeInterval{}
 							if start, ok := intervalMap["start"].(string); ok {
-								interval.Start = start
+								interval.Start = normalizeTimeHHMM(start)
 							}
 							if end, ok := intervalMap["end"].(string); ok {
-								interval.End = end
+								interval.End = normalizeTimeHHMM(end)
 							}
 							if interval.Start != "" && interval.End != "" {
 								dayAvail.Intervals = append(dayAvail.Intervals, interval)
@@ -316,10 +325,10 @@ func parseAvailabilityRules(rules models.JSONMap) *TemplateAvailabilityRules {
 					// Fall back to old format: single start/end
 					var start, end string
 					if s, ok := dayMap["start"].(string); ok {
-						start = s
+						start = normalizeTimeHHMM(s)
 					}
 					if e, ok := dayMap["end"].(string); ok {
-						end = e
+						end = normalizeTimeHHMM(e)
 					}
 					if start != "" && end != "" {
 						dayAvail.Intervals = []TimeInterval{{Start: start, End: end}}

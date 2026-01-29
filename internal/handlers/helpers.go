@@ -41,6 +41,15 @@ func formatDateTime(t interface{}) string {
 	return toTime(t).Format("Monday, January 2, 2006 at 3:04 PM")
 }
 
+// formatTimeHHMM normalizes a time string to HH:MM format
+// Handles both "HH:MM" (SQLite) and "HH:MM:SS" (PostgreSQL) formats
+func formatTimeHHMM(s string) string {
+	if len(s) >= 5 {
+		return s[:5]
+	}
+	return s
+}
+
 // timeAgo formats a time as a relative string like "5 minutes ago" or "2 hours ago"
 func timeAgo(t interface{}) string {
 	tm := toTime(t)

@@ -162,6 +162,7 @@ func templateFuncs() template.FuncMap {
 		"formatDate":     formatDate,
 		"formatTime":     formatTime,
 		"formatDateTime": formatDateTime,
+		"formatTimeHHMM": formatTimeHHMM,
 		"timeAgo":        timeAgo,
 		"duration":       duration,
 		"add":            func(a, b int) int { return a + b },

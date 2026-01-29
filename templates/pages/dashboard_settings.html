@@ -64,10 +64,10 @@
                 </div>
                 <div class="time-range">
                     <input type="time" class="time-input" name="day_{{$i}}_start"
-                           value="{{if $hours}}{{(index $hours 0).StartTime}}{{else}}09:00{{end}}">
+                           value="{{if $hours}}{{formatTimeHHMM (index $hours 0).StartTime}}{{else}}09:00{{end}}">
                     <span class="time-separator">to</span>
                     <input type="time" class="time-input" name="day_{{$i}}_end"
-                           value="{{if $hours}}{{(index $hours 0).EndTime}}{{else}}17:00{{end}}">
+                           value="{{if $hours}}{{formatTimeHHMM (index $hours 0).EndTime}}{{else}}17:00{{end}}">
                 </div>
             </div>
             {{end}}

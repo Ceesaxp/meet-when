@@ -67,10 +67,10 @@
                         </div>
                         <div class="working-hours-times">
                             <input type="time" name="day_{{$i}}_start" class="form-input time-input"
-                                   value="{{if $hours}}{{(index $hours 0).StartTime}}{{else}}09:00{{end}}">
+                                   value="{{if $hours}}{{formatTimeHHMM (index $hours 0).StartTime}}{{else}}09:00{{end}}">
                             <span class="time-separator">to</span>
                             <input type="time" name="day_{{$i}}_end" class="form-input time-input"
-                                   value="{{if $hours}}{{(index $hours 0).EndTime}}{{else}}17:00{{end}}">
+                                   value="{{if $hours}}{{formatTimeHHMM (index $hours 0).EndTime}}{{else}}17:00{{end}}">
                         </div>
                     </div>
                     {{end}}
