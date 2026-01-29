@@ -1,0 +1,69 @@
+{{define "pooled_hosts_partial.html"}}
+<div id="pooled-hosts-section" class="pooled-hosts-section">
+    <div class="pooled-hosts-list">
+        {{if .PooledHosts}}
+        {{range .PooledHosts}}
+        <div class="pooled-host-item" data-host-id="{{.HostID}}">
+            <div class="pooled-host-info">
+                <span class="pooled-host-name">{{if .Host}}{{.Host.Name}}{{else}}Unknown Host{{end}}</span>
+                {{if eq .Role "owner"}}
+                <span class="pooled-host-badge badge-owner">Owner</span>
+                {{else}}
+                <span class="pooled-host-badge badge-sibling">Team Member</span>
+                {{end}}
+                {{if .IsOptional}}
+                <span class="pooled-host-badge badge-optional">Optional</span>
+                {{end}}
+            </div>
+            <div class="pooled-host-actions">
+                {{if ne .Role "owner"}}
+                <form method="POST" action="/dashboard/templates/{{$.Template.ID}}/hosts/{{.HostID}}" style="display: inline;">
+                    <input type="hidden" name="_method" value="PUT">
+                    <input type="hidden" name="is_optional" value="{{if .IsOptional}}off{{else}}on{{end}}">
+                    <button type="submit" class="btn btn-xs btn-outline" title="Toggle optional">
+                        {{if .IsOptional}}Make Required{{else}}Make Optional{{end}}
+                    </button>
+                </form>
+                <form method="POST" action="/dashboard/templates/{{$.Template.ID}}/hosts/{{.HostID}}" style="display: inline;"
+                      onsubmit="return confirm('Remove this team member from the meeting?')">
+                    <input type="hidden" name="_method" value="DELETE">
+                    <button type="submit" class="btn-icon btn-remove-host" title="Remove from meeting">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                </form>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+        {{else}}
+        <p class="text-muted">No team members added yet. This meeting type only involves you.</p>
+        {{end}}
+    </div>
+
+    {{if .TenantHosts}}
+    <div class="add-host-form" style="margin-top: 16px;">
+        <form method="POST" action="/dashboard/templates/{{.Template.ID}}/hosts" class="add-host-inline">
+            <select name="host_id" class="form-select" required style="max-width: 250px;">
+                <option value="">Select a team member...</option>
+                {{range .TenantHosts}}
+                <option value="{{.ID}}">{{.Name}} ({{.Email}})</option>
+                {{end}}
+            </select>
+            <label class="checkbox-inline" style="margin-left: 12px;">
+                <input type="checkbox" name="is_optional">
+                Optional
+            </label>
+            <button type="submit" class="btn btn-sm btn-outline" style="margin-left: 12px;">Add</button>
+        </form>
+    </div>
+    {{end}}
+
+    <p class="form-hint" style="margin-top: 12px;">
+        Team members share this meeting type. Required members must all be available for a slot to appear.
+        Optional members receive calendar invites but don't affect availability.
+    </p>
+</div>
+{{end}}

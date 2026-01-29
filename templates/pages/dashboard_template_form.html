@@ -217,6 +217,17 @@
         </div>
     </section>
 
+    {{if not .Data.IsNew}}
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Team Members</h2>
+            <p class="section-subtitle">Add team members to share this meeting type (pooled availability)</p>
+        </div>
+
+        {{template "pooled_hosts_partial.html" (toMap .Data)}}
+    </section>
+    {{end}}
+
     <section class="section">
         <div class="section-header">
             <h2 class="section-title">Booking Settings</h2>

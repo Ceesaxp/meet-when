@@ -36,12 +36,6 @@ type GetAvailableSlotsInput struct {
 
 // GetAvailableSlots returns available time slots for booking
 func (s *AvailabilityService) GetAvailableSlots(ctx context.Context, input GetAvailableSlotsInput) ([]models.TimeSlot, error) {
-	// Load host
-	host, err := s.repos.Host.GetByID(ctx, input.HostID)
-	if err != nil || host == nil {
-		return nil, err
-	}
-
 	// Load template
 	template, err := s.repos.Template.GetByID(ctx, input.TemplateID)
 	if err != nil || template == nil {
@@ -52,12 +46,6 @@ func (s *AvailabilityService) GetAvailableSlots(ctx context.Context, input GetAv
 	inviteeLoc, err := time.LoadLocation(input.Timezone)
 	if err != nil {
 		inviteeLoc = time.UTC
-	}
-
-	// Parse host timezone
-	hostLoc, err := time.LoadLocation(host.Timezone)
-	if err != nil {
-		hostLoc = time.UTC
 	}
 
 	// Calculate date range
@@ -74,6 +62,52 @@ func (s *AvailabilityService) GetAvailableSlots(ctx context.Context, input GetAv
 	maxEnd := now.AddDate(0, 0, template.MaxScheduleDays)
 	if input.EndDate.After(maxEnd) {
 		input.EndDate = maxEnd
+	}
+
+	// Load pooled hosts for this template
+	pooledHosts, err := s.repos.TemplateHost.GetByTemplateIDWithHost(ctx, input.TemplateID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get required hosts (non-optional) for availability calculation
+	var requiredHosts []*models.TemplateHost
+	for _, th := range pooledHosts {
+		if !th.IsOptional {
+			requiredHosts = append(requiredHosts, th)
+		}
+	}
+
+	// If no pooled hosts or only one required host, use single-host logic
+	if len(requiredHosts) <= 1 {
+		slots, err := s.getSingleHostSlots(ctx, input, template, earliestStart)
+		if err != nil {
+			return nil, err
+		}
+		return convertToInviteeTimezone(slots, inviteeLoc), nil
+	}
+
+	// For pooled templates, compute intersection of all required hosts' availability
+	slots, err := s.getPooledHostSlots(ctx, input, template, requiredHosts, earliestStart)
+	if err != nil {
+		return nil, err
+	}
+
+	return convertToInviteeTimezone(slots, inviteeLoc), nil
+}
+
+// getSingleHostSlots returns available slots for a single host
+func (s *AvailabilityService) getSingleHostSlots(ctx context.Context, input GetAvailableSlotsInput, template *models.MeetingTemplate, earliestStart time.Time) ([]models.TimeSlot, error) {
+	// Load host
+	host, err := s.repos.Host.GetByID(ctx, input.HostID)
+	if err != nil || host == nil {
+		return nil, err
+	}
+
+	// Parse host timezone
+	hostLoc, err := time.LoadLocation(host.Timezone)
+	if err != nil {
+		hostLoc = time.UTC
 	}
 
 	// Get working hours
@@ -131,13 +165,87 @@ func (s *AvailabilityService) GetAvailableSlots(ctx context.Context, input GetAv
 		current = current.AddDate(0, 0, 1)
 	}
 
-	// Convert to invitee timezone for display
-	for i := range availableSlots {
-		availableSlots[i].Start = availableSlots[i].Start.In(inviteeLoc)
-		availableSlots[i].End = availableSlots[i].End.In(inviteeLoc)
+	return availableSlots, nil
+}
+
+// getPooledHostSlots computes the intersection of availability for multiple required hosts
+func (s *AvailabilityService) getPooledHostSlots(ctx context.Context, input GetAvailableSlotsInput, template *models.MeetingTemplate, requiredHosts []*models.TemplateHost, earliestStart time.Time) ([]models.TimeSlot, error) {
+	if len(requiredHosts) == 0 {
+		return nil, nil
 	}
 
-	return availableSlots, nil
+	// Get first host's slots as base
+	firstHostInput := GetAvailableSlotsInput{
+		HostID:     requiredHosts[0].HostID,
+		TemplateID: input.TemplateID,
+		StartDate:  input.StartDate,
+		EndDate:    input.EndDate,
+		Duration:   input.Duration,
+		Timezone:   "UTC", // Use UTC internally, convert at the end
+	}
+	slots, err := s.getSingleHostSlots(ctx, firstHostInput, template, earliestStart)
+	if err != nil {
+		return nil, err
+	}
+
+	// Intersect with each additional required host's availability
+	for _, th := range requiredHosts[1:] {
+		hostInput := GetAvailableSlotsInput{
+			HostID:     th.HostID,
+			TemplateID: input.TemplateID,
+			StartDate:  input.StartDate,
+			EndDate:    input.EndDate,
+			Duration:   input.Duration,
+			Timezone:   "UTC",
+		}
+		hostSlots, err := s.getSingleHostSlots(ctx, hostInput, template, earliestStart)
+		if err != nil {
+			return nil, err
+		}
+		slots = intersectSlots(slots, hostSlots)
+
+		// Early exit if no common slots
+		if len(slots) == 0 {
+			return slots, nil
+		}
+	}
+
+	return slots, nil
+}
+
+// intersectSlots returns time slots that exist in both slices
+// Slots must match exactly (same start and end time)
+func intersectSlots(a, b []models.TimeSlot) []models.TimeSlot {
+	if len(a) == 0 || len(b) == 0 {
+		return nil
+	}
+
+	// Create a map of slots from b for O(1) lookup
+	bSet := make(map[string]bool)
+	for _, slot := range b {
+		key := slot.Start.UTC().Format(time.RFC3339) + "|" + slot.End.UTC().Format(time.RFC3339)
+		bSet[key] = true
+	}
+
+	// Find slots that exist in both
+	var result []models.TimeSlot
+	for _, slot := range a {
+		key := slot.Start.UTC().Format(time.RFC3339) + "|" + slot.End.UTC().Format(time.RFC3339)
+		if bSet[key] {
+			result = append(result, slot)
+		}
+	}
+
+	return result
+}
+
+// convertToInviteeTimezone converts all slots to the invitee's timezone
+func convertToInviteeTimezone(slots []models.TimeSlot, loc *time.Location) []models.TimeSlot {
+	for i := range slots {
+		slots[i].Start = slots[i].Start.In(loc)
+		slots[i].End = slots[i].End.In(loc)
+	}
+	return slots
 }
 
 // TemplateAvailabilityRules represents parsed availability rules from a template

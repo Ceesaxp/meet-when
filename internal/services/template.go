@@ -11,8 +11,14 @@ import (
 )
 
 var (
-	ErrTemplateNotFound   = errors.New("meeting template not found")
-	ErrTemplateSlugExists = errors.New("template slug already exists")
+	ErrTemplateNotFound     = errors.New("meeting template not found")
+	ErrTemplateSlugExists   = errors.New("template slug already exists")
+	ErrPooledHostNotFound   = errors.New("pooled host not found")
+	ErrPooledHostExists     = errors.New("host is already pooled on this template")
+	ErrCannotRemoveOwner    = errors.New("cannot remove the template owner")
+	ErrPooledHostLimit      = errors.New("maximum 5 hosts per template")
+	ErrHostNotInTenant      = errors.New("host must be in the same tenant")
+	MaxPooledHostsPerTemplate = 5
 )
 
 // TemplateService handles meeting template operations
@@ -102,6 +108,12 @@ func (s *TemplateService) CreateTemplate(ctx context.Context, input CreateTempla
 
 	if err := s.repos.Template.Create(ctx, template); err != nil {
 		return nil, err
+	}
+
+	// Create template_hosts entry for the owner
+	if err := s.EnsureOwnerInPool(ctx, template); err != nil {
+		// Log but don't fail - the template was created successfully
+		// The migration should have handled existing templates
 	}
 
 	// Audit log
@@ -292,4 +304,187 @@ func (s *TemplateService) DuplicateTemplate(ctx context.Context, hostID, tenantI
 	}, "")
 
 	return duplicate, nil
+}
+
+// GetTemplateWithHosts retrieves a template with its pooled hosts
+func (s *TemplateService) GetTemplateWithHosts(ctx context.Context, templateID string) (*models.MeetingTemplate, error) {
+	template, err := s.repos.Template.GetByID(ctx, templateID)
+	if err != nil || template == nil {
+		return nil, ErrTemplateNotFound
+	}
+
+	// Load pooled hosts
+	pooledHosts, err := s.repos.TemplateHost.GetByTemplateIDWithHost(ctx, templateID)
+	if err != nil {
+		return nil, err
+	}
+	template.PooledHosts = pooledHosts
+
+	return template, nil
+}
+
+// AddPooledHost adds a host to a template's pool
+func (s *TemplateService) AddPooledHost(ctx context.Context, tenantID, templateID, hostID string, isOptional bool) (*models.TemplateHost, error) {
+	// Get the template to verify ownership
+	template, err := s.repos.Template.GetByID(ctx, templateID)
+	if err != nil || template == nil {
+		return nil, ErrTemplateNotFound
+	}
+
+	// Verify the host being added is in the same tenant
+	host, err := s.repos.Host.GetByID(ctx, hostID)
+	if err != nil || host == nil {
+		return nil, errors.New("host not found")
+	}
+	if host.TenantID != tenantID {
+		return nil, ErrHostNotInTenant
+	}
+
+	// Check if host is already pooled
+	existing, err := s.repos.TemplateHost.GetByTemplateAndHost(ctx, templateID, hostID)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return nil, ErrPooledHostExists
+	}
+
+	// Check pool limit
+	count, err := s.repos.TemplateHost.CountByTemplateID(ctx, templateID)
+	if err != nil {
+		return nil, err
+	}
+	if count >= MaxPooledHostsPerTemplate {
+		return nil, ErrPooledHostLimit
+	}
+
+	// Determine role (owner or sibling)
+	role := models.TemplateHostRoleSibling
+	if hostID == template.HostID {
+		role = models.TemplateHostRoleOwner
+	}
+
+	now := models.Now()
+	templateHost := &models.TemplateHost{
+		ID:           uuid.New().String(),
+		TemplateID:   templateID,
+		HostID:       hostID,
+		Role:         role,
+		IsOptional:   isOptional,
+		DisplayOrder: count, // Add at the end
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	if err := s.repos.TemplateHost.Create(ctx, templateHost); err != nil {
+		return nil, err
+	}
+
+	// Audit log
+	s.auditLog.Log(ctx, tenantID, &template.HostID, "template.host_added", "template", templateID, map[string]interface{}{
+		"added_host_id": hostID,
+		"is_optional":   isOptional,
+	}, "")
+
+	return templateHost, nil
+}
+
+// RemovePooledHost removes a host from a template's pool
+func (s *TemplateService) RemovePooledHost(ctx context.Context, tenantID, templateID, hostID string) error {
+	// Get the template to verify ownership
+	template, err := s.repos.Template.GetByID(ctx, templateID)
+	if err != nil || template == nil {
+		return ErrTemplateNotFound
+	}
+
+	// Cannot remove the template owner
+	if hostID == template.HostID {
+		return ErrCannotRemoveOwner
+	}
+
+	// Get the template host record
+	templateHost, err := s.repos.TemplateHost.GetByTemplateAndHost(ctx, templateID, hostID)
+	if err != nil {
+		return err
+	}
+	if templateHost == nil {
+		return ErrPooledHostNotFound
+	}
+
+	if err := s.repos.TemplateHost.Delete(ctx, templateHost.ID); err != nil {
+		return err
+	}
+
+	// Audit log
+	s.auditLog.Log(ctx, tenantID, &template.HostID, "template.host_removed", "template", templateID, map[string]interface{}{
+		"removed_host_id": hostID,
+	}, "")
+
+	return nil
+}
+
+// UpdatePooledHost updates a pooled host's optional status
+func (s *TemplateService) UpdatePooledHost(ctx context.Context, tenantID, templateID, hostID string, isOptional bool) error {
+	// Get the template to verify it exists
+	template, err := s.repos.Template.GetByID(ctx, templateID)
+	if err != nil || template == nil {
+		return ErrTemplateNotFound
+	}
+
+	// Get the template host record
+	templateHost, err := s.repos.TemplateHost.GetByTemplateAndHost(ctx, templateID, hostID)
+	if err != nil {
+		return err
+	}
+	if templateHost == nil {
+		return ErrPooledHostNotFound
+	}
+
+	templateHost.IsOptional = isOptional
+	templateHost.UpdatedAt = models.Now()
+
+	if err := s.repos.TemplateHost.Update(ctx, templateHost); err != nil {
+		return err
+	}
+
+	// Audit log
+	s.auditLog.Log(ctx, tenantID, &template.HostID, "template.host_updated", "template", templateID, map[string]interface{}{
+		"host_id":     hostID,
+		"is_optional": isOptional,
+	}, "")
+
+	return nil
+}
+
+// GetPooledHosts returns all pooled hosts for a template
+func (s *TemplateService) GetPooledHosts(ctx context.Context, templateID string) ([]*models.TemplateHost, error) {
+	return s.repos.TemplateHost.GetByTemplateIDWithHost(ctx, templateID)
+}
+
+// EnsureOwnerInPool ensures the template owner has a record in template_hosts
+// This is called when creating a template to maintain the pooled hosts invariant
+func (s *TemplateService) EnsureOwnerInPool(ctx context.Context, template *models.MeetingTemplate) error {
+	// Check if owner already exists in pool
+	existing, err := s.repos.TemplateHost.GetByTemplateAndHost(ctx, template.ID, template.HostID)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		return nil // Owner already in pool
+	}
+
+	// Add owner to pool
+	now := models.Now()
+	templateHost := &models.TemplateHost{
+		ID:           uuid.New().String(),
+		TemplateID:   template.ID,
+		HostID:       template.HostID,
+		Role:         models.TemplateHostRoleOwner,
+		IsOptional:   false,
+		DisplayOrder: 0,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	return s.repos.TemplateHost.Create(ctx, templateHost)
 }

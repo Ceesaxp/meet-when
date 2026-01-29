@@ -13,31 +13,35 @@ import (
 
 // Repositories holds all repository instances
 type Repositories struct {
-	Tenant           *TenantRepository
-	Host             *HostRepository
-	Calendar         *CalendarRepository
-	Conferencing     *ConferencingRepository
-	Template         *TemplateRepository
-	Booking          *BookingRepository
-	Session          *SessionRepository
-	WorkingHours     *WorkingHoursRepository
-	AuditLog         *AuditLogRepository
-	SignupConversion *SignupConversionRepository
+	Tenant               *TenantRepository
+	Host                 *HostRepository
+	Calendar             *CalendarRepository
+	Conferencing         *ConferencingRepository
+	Template             *TemplateRepository
+	Booking              *BookingRepository
+	Session              *SessionRepository
+	WorkingHours         *WorkingHoursRepository
+	AuditLog             *AuditLogRepository
+	SignupConversion     *SignupConversionRepository
+	TemplateHost         *TemplateHostRepository
+	BookingCalendarEvent *BookingCalendarEventRepository
 }
 
 // NewRepositories creates all repositories
 func NewRepositories(db *sql.DB, driver string) *Repositories {
 	return &Repositories{
-		Tenant:           &TenantRepository{db: db, driver: driver},
-		Host:             &HostRepository{db: db, driver: driver},
-		Calendar:         &CalendarRepository{db: db, driver: driver},
-		Conferencing:     &ConferencingRepository{db: db, driver: driver},
-		Template:         &TemplateRepository{db: db, driver: driver},
-		Booking:          &BookingRepository{db: db, driver: driver},
-		Session:          &SessionRepository{db: db, driver: driver},
-		WorkingHours:     &WorkingHoursRepository{db: db, driver: driver},
-		AuditLog:         &AuditLogRepository{db: db, driver: driver},
-		SignupConversion: &SignupConversionRepository{db: db, driver: driver},
+		Tenant:               &TenantRepository{db: db, driver: driver},
+		Host:                 &HostRepository{db: db, driver: driver},
+		Calendar:             &CalendarRepository{db: db, driver: driver},
+		Conferencing:         &ConferencingRepository{db: db, driver: driver},
+		Template:             &TemplateRepository{db: db, driver: driver},
+		Booking:              &BookingRepository{db: db, driver: driver},
+		Session:              &SessionRepository{db: db, driver: driver},
+		WorkingHours:         &WorkingHoursRepository{db: db, driver: driver},
+		AuditLog:             &AuditLogRepository{db: db, driver: driver},
+		SignupConversion:     &SignupConversionRepository{db: db, driver: driver},
+		TemplateHost:         &TemplateHostRepository{db: db, driver: driver},
+		BookingCalendarEvent: &BookingCalendarEventRepository{db: db, driver: driver},
 	}
 }
 
@@ -232,6 +236,39 @@ func (r *HostRepository) UpdateOnboardingCompleted(ctx context.Context, id strin
 	query := q(r.driver, `UPDATE hosts SET onboarding_completed = $1 WHERE id = $2`)
 	_, err := r.db.ExecContext(ctx, query, completed, id)
 	return err
+}
+
+// GetByTenantID returns all hosts for a tenant (used for pooled host selection)
+func (r *HostRepository) GetByTenantID(ctx context.Context, tenantID string) ([]*models.Host, error) {
+	query := q(r.driver, `
+		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
+		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false), created_at, updated_at
+		FROM hosts WHERE tenant_id = $1
+		ORDER BY name ASC
+	`)
+	rows, err := r.db.QueryContext(ctx, query, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var hosts []*models.Host
+	for rows.Next() {
+		host := &models.Host{}
+		err := rows.Scan(
+			&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
+			&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
+			&host.OnboardingCompleted, &host.CreatedAt, &host.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		hosts = append(hosts, host)
+	}
+
+	if hosts == nil {
+		hosts = []*models.Host{}
+	}
+	return hosts, nil
 }
 
 // CalendarRepository handles calendar connection database operations
@@ -1190,4 +1227,196 @@ func (r *SignupConversionRepository) GetByEmail(ctx context.Context, email strin
 		return nil, nil
 	}
 	return conversion, err
+}
+
+// TemplateHostRepository handles template host (pooled hosts) database operations
+type TemplateHostRepository struct {
+	db     *sql.DB
+	driver string
+}
+
+// Create adds a new host to a template
+func (r *TemplateHostRepository) Create(ctx context.Context, th *models.TemplateHost) error {
+	query := q(r.driver, `
+		INSERT INTO template_hosts (id, template_id, host_id, role, is_optional, display_order, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`)
+	_, err := r.db.ExecContext(ctx, query,
+		th.ID, th.TemplateID, th.HostID, th.Role, th.IsOptional, th.DisplayOrder, th.CreatedAt, th.UpdatedAt)
+	return err
+}
+
+// GetByTemplateID returns all hosts for a template
+func (r *TemplateHostRepository) GetByTemplateID(ctx context.Context, templateID string) ([]*models.TemplateHost, error) {
+	query := q(r.driver, `
+		SELECT id, template_id, host_id, role, is_optional, display_order, created_at, updated_at
+		FROM template_hosts
+		WHERE template_id = $1
+		ORDER BY display_order ASC, created_at ASC
+	`)
+	rows, err := r.db.QueryContext(ctx, query, templateID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var hosts []*models.TemplateHost
+	for rows.Next() {
+		th := &models.TemplateHost{}
+		err := rows.Scan(
+			&th.ID, &th.TemplateID, &th.HostID, &th.Role, &th.IsOptional,
+			&th.DisplayOrder, &th.CreatedAt, &th.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		hosts = append(hosts, th)
+	}
+	return hosts, nil
+}
+
+// GetByTemplateIDWithHost returns all hosts for a template with joined Host data
+func (r *TemplateHostRepository) GetByTemplateIDWithHost(ctx context.Context, templateID string) ([]*models.TemplateHost, error) {
+	query := q(r.driver, `
+		SELECT th.id, th.template_id, th.host_id, th.role, th.is_optional, th.display_order,
+		       th.created_at, th.updated_at,
+		       h.id, h.tenant_id, h.email, h.name, h.slug, h.timezone,
+		       h.default_calendar_id, h.is_admin, COALESCE(h.onboarding_completed, false),
+		       h.created_at, h.updated_at
+		FROM template_hosts th
+		JOIN hosts h ON th.host_id = h.id
+		WHERE th.template_id = $1
+		ORDER BY th.display_order ASC, th.created_at ASC
+	`)
+	rows, err := r.db.QueryContext(ctx, query, templateID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var hosts []*models.TemplateHost
+	for rows.Next() {
+		th := &models.TemplateHost{}
+		h := &models.Host{}
+		err := rows.Scan(
+			&th.ID, &th.TemplateID, &th.HostID, &th.Role, &th.IsOptional,
+			&th.DisplayOrder, &th.CreatedAt, &th.UpdatedAt,
+			&h.ID, &h.TenantID, &h.Email, &h.Name, &h.Slug, &h.Timezone,
+			&h.DefaultCalendarID, &h.IsAdmin, &h.OnboardingCompleted,
+			&h.CreatedAt, &h.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		th.Host = h
+		hosts = append(hosts, th)
+	}
+	return hosts, nil
+}
+
+// GetOwner returns the owner host for a template
+func (r *TemplateHostRepository) GetOwner(ctx context.Context, templateID string) (*models.TemplateHost, error) {
+	th := &models.TemplateHost{}
+	query := q(r.driver, `
+		SELECT id, template_id, host_id, role, is_optional, display_order, created_at, updated_at
+		FROM template_hosts
+		WHERE template_id = $1 AND role = 'owner'
+	`)
+	err := r.db.QueryRowContext(ctx, query, templateID).Scan(
+		&th.ID, &th.TemplateID, &th.HostID, &th.Role, &th.IsOptional,
+		&th.DisplayOrder, &th.CreatedAt, &th.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return th, err
+}
+
+// GetByTemplateAndHost returns a specific template-host relationship
+func (r *TemplateHostRepository) GetByTemplateAndHost(ctx context.Context, templateID, hostID string) (*models.TemplateHost, error) {
+	th := &models.TemplateHost{}
+	query := q(r.driver, `
+		SELECT id, template_id, host_id, role, is_optional, display_order, created_at, updated_at
+		FROM template_hosts
+		WHERE template_id = $1 AND host_id = $2
+	`)
+	err := r.db.QueryRowContext(ctx, query, templateID, hostID).Scan(
+		&th.ID, &th.TemplateID, &th.HostID, &th.Role, &th.IsOptional,
+		&th.DisplayOrder, &th.CreatedAt, &th.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return th, err
+}
+
+// Update updates a template host entry
+func (r *TemplateHostRepository) Update(ctx context.Context, th *models.TemplateHost) error {
+	query := q(r.driver, `
+		UPDATE template_hosts
+		SET is_optional = $1, display_order = $2, updated_at = $3
+		WHERE id = $4
+	`)
+	_, err := r.db.ExecContext(ctx, query, th.IsOptional, th.DisplayOrder, th.UpdatedAt, th.ID)
+	return err
+}
+
+// Delete removes a host from a template
+func (r *TemplateHostRepository) Delete(ctx context.Context, id string) error {
+	query := q(r.driver, `DELETE FROM template_hosts WHERE id = $1`)
+	_, err := r.db.ExecContext(ctx, query, id)
+	return err
+}
+
+// CountByTemplateID returns the count of hosts for a template
+func (r *TemplateHostRepository) CountByTemplateID(ctx context.Context, templateID string) (int, error) {
+	query := q(r.driver, `SELECT COUNT(*) FROM template_hosts WHERE template_id = $1`)
+	var count int
+	err := r.db.QueryRowContext(ctx, query, templateID).Scan(&count)
+	return count, err
+}
+
+// BookingCalendarEventRepository handles booking calendar events database operations
+type BookingCalendarEventRepository struct {
+	db     *sql.DB
+	driver string
+}
+
+// Create adds a new booking calendar event record
+func (r *BookingCalendarEventRepository) Create(ctx context.Context, e *models.BookingCalendarEvent) error {
+	query := q(r.driver, `
+		INSERT INTO booking_calendar_events (id, booking_id, host_id, calendar_id, event_id, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`)
+	_, err := r.db.ExecContext(ctx, query,
+		e.ID, e.BookingID, e.HostID, e.CalendarID, e.EventID, e.CreatedAt)
+	return err
+}
+
+// GetByBookingID returns all calendar events for a booking
+func (r *BookingCalendarEventRepository) GetByBookingID(ctx context.Context, bookingID string) ([]*models.BookingCalendarEvent, error) {
+	query := q(r.driver, `
+		SELECT id, booking_id, host_id, calendar_id, event_id, created_at
+		FROM booking_calendar_events
+		WHERE booking_id = $1
+	`)
+	rows, err := r.db.QueryContext(ctx, query, bookingID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var events []*models.BookingCalendarEvent
+	for rows.Next() {
+		e := &models.BookingCalendarEvent{}
+		err := rows.Scan(&e.ID, &e.BookingID, &e.HostID, &e.CalendarID, &e.EventID, &e.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, e)
+	}
+	return events, nil
+}
+
+// DeleteByBookingID removes all calendar events for a booking
+func (r *BookingCalendarEventRepository) DeleteByBookingID(ctx context.Context, bookingID string) error {
+	query := q(r.driver, `DELETE FROM booking_calendar_events WHERE booking_id = $1`)
+	_, err := r.db.ExecContext(ctx, query, bookingID)
+	return err
 }

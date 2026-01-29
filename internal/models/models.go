@@ -189,6 +189,8 @@ type MeetingTemplate struct {
 	IsPrivate         bool                 `json:"is_private" db:"is_private"` // Hidden from public listing, still bookable via direct link
 	CreatedAt         SQLiteTime           `json:"created_at" db:"created_at"`
 	UpdatedAt         SQLiteTime           `json:"updated_at" db:"updated_at"`
+	// Populated by service layer, not persisted
+	PooledHosts []*TemplateHost `json:"pooled_hosts,omitempty" db:"-"`
 }
 
 // BookingStatus represents the status of a booking
@@ -280,6 +282,38 @@ func (sc *SignupConversion) ConversionTime() *time.Duration {
 type TimeSlot struct {
 	Start time.Time `json:"start"`
 	End   time.Time `json:"end"`
+}
+
+// TemplateHostRole represents the role of a host in a pooled template
+type TemplateHostRole string
+
+const (
+	TemplateHostRoleOwner   TemplateHostRole = "owner"
+	TemplateHostRoleSibling TemplateHostRole = "sibling"
+)
+
+// TemplateHost represents a host assigned to a meeting template (for pooled hosts)
+type TemplateHost struct {
+	ID           string           `json:"id" db:"id"`
+	TemplateID   string           `json:"template_id" db:"template_id"`
+	HostID       string           `json:"host_id" db:"host_id"`
+	Role         TemplateHostRole `json:"role" db:"role"`
+	IsOptional   bool             `json:"is_optional" db:"is_optional"`
+	DisplayOrder int              `json:"display_order" db:"display_order"`
+	CreatedAt    SQLiteTime       `json:"created_at" db:"created_at"`
+	UpdatedAt    SQLiteTime       `json:"updated_at" db:"updated_at"`
+	// Populated by joins, not persisted
+	Host *Host `json:"host,omitempty" db:"-"`
+}
+
+// BookingCalendarEvent tracks calendar events created for each host in a booking
+type BookingCalendarEvent struct {
+	ID         string     `json:"id" db:"id"`
+	BookingID  string     `json:"booking_id" db:"booking_id"`
+	HostID     string     `json:"host_id" db:"host_id"`
+	CalendarID string     `json:"calendar_id" db:"calendar_id"`
+	EventID    string     `json:"event_id" db:"event_id"`
+	CreatedAt  SQLiteTime `json:"created_at" db:"created_at"`
 }
 
 // Custom JSON types for PostgreSQL arrays and JSONB

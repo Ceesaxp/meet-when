@@ -313,6 +313,27 @@ func (s *CalendarService) CreateEvent(ctx context.Context, details *BookingWithD
 	return "", nil
 }
 
+// CreateEventForHost creates a calendar event for a specific host and calendar (used for pooled hosts)
+func (s *CalendarService) CreateEventForHost(ctx context.Context, details *BookingWithDetails, calendarID string) (string, error) {
+	if calendarID == "" {
+		return "", nil
+	}
+
+	cal, err := s.repos.Calendar.GetByID(ctx, calendarID)
+	if err != nil || cal == nil {
+		return "", ErrCalendarNotFound
+	}
+
+	switch cal.Provider {
+	case models.CalendarProviderGoogle:
+		return s.createGoogleEvent(ctx, cal, details)
+	case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
+		return s.createCalDAVEvent(ctx, cal, details)
+	}
+
+	return "", nil
+}
+
 // DeleteEvent deletes a calendar event
 func (s *CalendarService) DeleteEvent(ctx context.Context, hostID, calendarID, eventID string) error {
 	cal, err := s.repos.Calendar.GetByID(ctx, calendarID)
