@@ -78,6 +78,7 @@ type AppConfig struct {
 	SessionDuration   time.Duration
 	DefaultTimezone   string
 	EncryptionKey     string
+	BaseURL           string // APP_BASE_URL - used for OAuth callback URLs
 }
 
 // ConnectionString returns the database connection string
@@ -137,6 +138,7 @@ func Load() (*Config, error) {
 			SessionDuration:   time.Duration(getEnvInt("SESSION_DURATION_HOURS", 24)) * time.Hour,
 			DefaultTimezone:   getEnv("DEFAULT_TIMEZONE", "UTC"),
 			EncryptionKey:     getEnv("ENCRYPTION_KEY", ""),
+			BaseURL:           getEnv("APP_BASE_URL", "http://localhost:8080"),
 		},
 	}
 
