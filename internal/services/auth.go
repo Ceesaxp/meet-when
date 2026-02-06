@@ -7,8 +7,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -30,7 +34,17 @@ var (
 	ErrWeakPassword           = errors.New("password must be at least 8 characters")
 	ErrInvalidSelectionToken  = errors.New("invalid or expired selection token")
 	ErrHostNotFound           = errors.New("host not found")
+	ErrGoogleEmailNotVerified = errors.New("google email is not verified")
+	ErrInvalidOAuthState      = errors.New("invalid OAuth state parameter")
 )
+
+// GoogleUserInfo contains the user profile information returned by Google's userinfo endpoint.
+type GoogleUserInfo struct {
+	Sub           string `json:"sub"`
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"email_verified"`
+	Name          string `json:"name"`
+}
 
 // SelectionTokenExpiry is the duration for which selection tokens are valid
 const SelectionTokenExpiry = 5 * time.Minute
@@ -429,6 +443,126 @@ func (s *AuthService) GetGoogleAuthURL(flow string) (string, string, error) {
 	authURL := "https://accounts.google.com/o/oauth2/v2/auth?" + params.Encode()
 
 	return authURL, nonce, nil
+}
+
+// googleAuthTokenResponse represents the token response from Google's OAuth token endpoint.
+type googleAuthTokenResponse struct {
+	AccessToken string `json:"access_token"`
+	IDToken     string `json:"id_token"`
+	ExpiresIn   int    `json:"expires_in"`
+	TokenType   string `json:"token_type"`
+}
+
+// HandleGoogleCallback exchanges an authorization code for tokens, fetches user info,
+// and validates the CSRF nonce. Returns the user info, the flow string (signup or login),
+// and any error.
+func (s *AuthService) HandleGoogleCallback(code, state, expectedNonce string) (*GoogleUserInfo, string, error) {
+	// Parse state: "auth:{flow}:{nonce}"
+	parts := strings.Split(state, ":")
+	if len(parts) != 3 || parts[0] != "auth" {
+		return nil, "", ErrInvalidOAuthState
+	}
+	flow := parts[1]
+	nonce := parts[2]
+
+	// Validate flow
+	if flow != "signup" && flow != "login" {
+		return nil, "", ErrInvalidOAuthState
+	}
+
+	// Validate CSRF nonce
+	if nonce != expectedNonce {
+		return nil, "", ErrInvalidOAuthState
+	}
+
+	// Exchange authorization code for tokens
+	tokens, err := s.exchangeGoogleAuthCode(code)
+	if err != nil {
+		return nil, "", fmt.Errorf("google token exchange failed: %w", err)
+	}
+
+	// Fetch user info from Google's userinfo endpoint
+	userInfo, err := s.fetchGoogleUserInfo(tokens.AccessToken)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to fetch google user info: %w", err)
+	}
+
+	// Only accept users with verified email
+	if !userInfo.EmailVerified {
+		return nil, "", ErrGoogleEmailNotVerified
+	}
+
+	return userInfo, flow, nil
+}
+
+// exchangeGoogleAuthCode exchanges an authorization code for tokens via Google's token endpoint.
+func (s *AuthService) exchangeGoogleAuthCode(code string) (*googleAuthTokenResponse, error) {
+	redirectURL := s.cfg.App.BaseURL + "/auth/google/auth-callback"
+
+	data := url.Values{
+		"code":          {code},
+		"client_id":     {s.cfg.OAuth.Google.ClientID},
+		"client_secret": {s.cfg.OAuth.Google.ClientSecret},
+		"redirect_uri":  {redirectURL},
+		"grant_type":    {"authorization_code"},
+	}
+
+	resp, err := http.Post(
+		"https://oauth2.googleapis.com/token",
+		"application/x-www-form-urlencoded",
+		strings.NewReader(data.Encode()),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("token exchange failed: %s", string(body))
+	}
+
+	var tokens googleAuthTokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&tokens); err != nil {
+		return nil, err
+	}
+
+	return &tokens, nil
+}
+
+// fetchGoogleUserInfo fetches the user's profile from Google's userinfo endpoint.
+func (s *AuthService) fetchGoogleUserInfo(accessToken string) (*GoogleUserInfo, error) {
+	req, err := http.NewRequest("GET", "https://www.googleapis.com/oauth2/v3/userinfo", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("userinfo request failed: %s", string(body))
+	}
+
+	var userInfo GoogleUserInfo
+	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
+		return nil, err
+	}
+
+	return &userInfo, nil
 }
 
 // CompleteOnboarding marks a host's onboarding as complete
