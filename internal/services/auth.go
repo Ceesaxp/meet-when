@@ -34,8 +34,9 @@ var (
 	ErrWeakPassword           = errors.New("password must be at least 8 characters")
 	ErrInvalidSelectionToken  = errors.New("invalid or expired selection token")
 	ErrHostNotFound           = errors.New("host not found")
-	ErrGoogleEmailNotVerified = errors.New("google email is not verified")
-	ErrInvalidOAuthState      = errors.New("invalid OAuth state parameter")
+	ErrGoogleEmailNotVerified  = errors.New("google email is not verified")
+	ErrInvalidOAuthState       = errors.New("invalid OAuth state parameter")
+	ErrGoogleAccountNotFound   = errors.New("no account found for this Google identity")
 )
 
 // GoogleUserInfo contains the user profile information returned by Google's userinfo endpoint.
@@ -213,6 +214,16 @@ type SimplifiedLoginResult struct {
 	SessionToken         string         // Populated when single org match (direct login)
 	Host                 *models.Host   // Populated when single org match
 	Tenant               *models.Tenant // Populated when single org match
+}
+
+// GoogleLoginResult represents the result of a Google login attempt.
+type GoogleLoginResult struct {
+	RequiresOrgSelection bool           // True if user has multiple orgs and must select one
+	AvailableOrgs        []OrgOption    // Populated when RequiresOrgSelection is true
+	SessionToken         string         // Populated when single match (direct login)
+	Host                 *models.Host   // Populated when single match
+	Tenant               *models.Tenant // Populated when single match
+	Linked               bool           // True if Google identity was auto-linked to an existing email account
 }
 
 // Login authenticates a user
@@ -482,6 +493,155 @@ func (s *AuthService) RegisterWithGoogle(ctx context.Context, googleID, email, n
 	s.auditLog.Log(ctx, tenant.ID, &host.ID, "host.registered", "host", host.ID, nil, "method:google")
 
 	return sessionToken, nil
+}
+
+// LoginWithGoogle handles Google-based login, including auto-linking by email and multi-org support.
+func (s *AuthService) LoginWithGoogle(ctx context.Context, googleID, email string) (*GoogleLoginResult, error) {
+	email = strings.ToLower(email)
+
+	// Step 1: Look up hosts by google_id first
+	hosts, err := s.repos.Host.GetByGoogleID(ctx, googleID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Google ID matched one or more hosts
+	if len(hosts) == 1 {
+		// Single match: create session directly
+		host := hosts[0]
+		tenant, err := s.repos.Tenant.GetByID(ctx, host.TenantID)
+		if err != nil {
+			return nil, err
+		}
+		if tenant == nil {
+			return nil, ErrInvalidCredentials
+		}
+
+		sessionToken, err := s.session.CreateSession(ctx, host.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		s.auditLog.Log(ctx, tenant.ID, &host.ID, "host.login", "host", host.ID, nil, "method:google")
+
+		return &GoogleLoginResult{
+			SessionToken: sessionToken,
+			Host:         host,
+			Tenant:       tenant,
+		}, nil
+	}
+
+	if len(hosts) > 1 {
+		// Multiple matches (multi-org): generate selection tokens
+		var availableOrgs []OrgOption
+		for _, host := range hosts {
+			tenant, err := s.repos.Tenant.GetByID(ctx, host.TenantID)
+			if err != nil {
+				return nil, err
+			}
+			if tenant == nil {
+				continue
+			}
+
+			selectionToken, err := s.generateSelectionToken(host.ID)
+			if err != nil {
+				return nil, err
+			}
+
+			availableOrgs = append(availableOrgs, OrgOption{
+				TenantID:       tenant.ID,
+				TenantSlug:     tenant.Slug,
+				TenantName:     tenant.Name,
+				HostID:         host.ID,
+				SelectionToken: selectionToken,
+			})
+		}
+
+		return &GoogleLoginResult{
+			RequiresOrgSelection: true,
+			AvailableOrgs:        availableOrgs,
+		}, nil
+	}
+
+	// Step 2: No match by google_id — check if host exists with same email
+	emailHosts, err := s.repos.Host.GetAllByEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(emailHosts) == 0 {
+		return nil, ErrGoogleAccountNotFound
+	}
+
+	// Auto-link: link Google identity to the first email match and create session
+	// For multi-org email matches, link the first and let user re-login to access others
+	host := emailHosts[0]
+	if err := s.repos.Host.LinkGoogleIdentity(ctx, host.ID, googleID, email); err != nil {
+		return nil, fmt.Errorf("failed to link google identity: %w", err)
+	}
+
+	// If there are multiple email matches, link all of them
+	for _, h := range emailHosts[1:] {
+		if err := s.repos.Host.LinkGoogleIdentity(ctx, h.ID, googleID, email); err != nil {
+			log.Printf("Warning: failed to link google identity for host %s: %v", h.ID, err)
+		}
+	}
+
+	if len(emailHosts) == 1 {
+		// Single email match: create session directly
+		tenant, err := s.repos.Tenant.GetByID(ctx, host.TenantID)
+		if err != nil {
+			return nil, err
+		}
+		if tenant == nil {
+			return nil, ErrInvalidCredentials
+		}
+
+		sessionToken, err := s.session.CreateSession(ctx, host.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		s.auditLog.Log(ctx, tenant.ID, &host.ID, "host.login", "host", host.ID, nil, "method:google")
+
+		return &GoogleLoginResult{
+			SessionToken: sessionToken,
+			Host:         host,
+			Tenant:       tenant,
+			Linked:       true,
+		}, nil
+	}
+
+	// Multiple email matches: generate selection tokens (after linking all)
+	var availableOrgs []OrgOption
+	for _, h := range emailHosts {
+		tenant, err := s.repos.Tenant.GetByID(ctx, h.TenantID)
+		if err != nil {
+			return nil, err
+		}
+		if tenant == nil {
+			continue
+		}
+
+		selectionToken, err := s.generateSelectionToken(h.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		availableOrgs = append(availableOrgs, OrgOption{
+			TenantID:       tenant.ID,
+			TenantSlug:     tenant.Slug,
+			TenantName:     tenant.Name,
+			HostID:         h.ID,
+			SelectionToken: selectionToken,
+		})
+	}
+
+	return &GoogleLoginResult{
+		RequiresOrgSelection: true,
+		AvailableOrgs:        availableOrgs,
+		Linked:               true,
+	}, nil
 }
 
 // GetTenantBySlug retrieves a tenant by slug
