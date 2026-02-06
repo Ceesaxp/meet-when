@@ -395,6 +395,95 @@ func createDefaultWorkingHours(hostID string) []*models.WorkingHours {
 	return hours
 }
 
+// RegisterWithGoogle creates a new tenant and host using Google identity (no password).
+func (s *AuthService) RegisterWithGoogle(ctx context.Context, googleID, email, name, tenantName, tenantSlug, timezone string) (string, error) {
+	// Normalize email
+	email = strings.ToLower(email)
+
+	// Validate email
+	if !isValidEmail(email) {
+		return "", ErrInvalidEmail
+	}
+
+	// Normalize slug
+	slug := slugify(tenantSlug)
+	if slug == "" {
+		slug = slugify(tenantName)
+	}
+
+	// Check if tenant exists
+	existing, err := s.repos.Tenant.GetBySlug(ctx, slug)
+	if err != nil {
+		return "", err
+	}
+	if existing != nil {
+		return "", ErrTenantExists
+	}
+
+	// Create tenant
+	now := models.Now()
+	tenant := &models.Tenant{
+		ID:        uuid.New().String(),
+		Slug:      slug,
+		Name:      tenantName,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	if err := s.repos.Tenant.Create(ctx, tenant); err != nil {
+		return "", err
+	}
+
+	// Default timezone
+	if timezone == "" {
+		timezone = s.cfg.App.DefaultTimezone
+	}
+
+	// Create host slug from name or email
+	hostSlug := slugify(name)
+	if hostSlug == "" {
+		hostSlug = strings.Split(email, "@")[0]
+		hostSlug = slugify(hostSlug)
+	}
+
+	// Create host with Google identity, no password
+	host := &models.Host{
+		ID:           uuid.New().String(),
+		TenantID:     tenant.ID,
+		Email:        email,
+		PasswordHash: "",
+		Name:         name,
+		Slug:         hostSlug,
+		Timezone:     timezone,
+		IsAdmin:      true,
+		GoogleID:     &googleID,
+		GoogleEmail:  &email,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	if err := s.repos.Host.Create(ctx, host); err != nil {
+		return "", err
+	}
+
+	// Create default working hours (Mon-Fri 9:00-17:00)
+	defaultHours := createDefaultWorkingHours(host.ID)
+	if err := s.repos.WorkingHours.SetForHost(ctx, host.ID, defaultHours); err != nil {
+		return "", err
+	}
+
+	// Create session
+	sessionToken, err := s.session.CreateSession(ctx, host.ID)
+	if err != nil {
+		return "", err
+	}
+
+	// Audit log
+	s.auditLog.Log(ctx, tenant.ID, &host.ID, "host.registered", "host", host.ID, nil, "method:google")
+
+	return sessionToken, nil
+}
+
 // GetTenantBySlug retrieves a tenant by slug
 func (s *AuthService) GetTenantBySlug(ctx context.Context, slug string) (*models.Tenant, error) {
 	return s.repos.Tenant.GetBySlug(ctx, slug)
