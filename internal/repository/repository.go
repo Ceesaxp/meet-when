@@ -282,6 +282,58 @@ func (r *HostRepository) GetByTenantID(ctx context.Context, tenantID string) ([]
 	return hosts, nil
 }
 
+// GetByGoogleID returns all hosts with the given Google ID across all tenants.
+// Used for Google login flow where a Google account may be linked to multiple organizations.
+// Returns empty slice (not error) when no hosts found.
+func (r *HostRepository) GetByGoogleID(ctx context.Context, googleID string) ([]*models.Host, error) {
+	query := q(r.driver, `
+		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
+		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false),
+		       google_id, google_email, created_at, updated_at
+		FROM hosts WHERE google_id = $1
+	`)
+	rows, err := r.db.QueryContext(ctx, query, googleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var hosts []*models.Host
+	for rows.Next() {
+		host := &models.Host{}
+		err := rows.Scan(
+			&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
+			&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
+			&host.OnboardingCompleted, &host.GoogleID, &host.GoogleEmail,
+			&host.CreatedAt, &host.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		hosts = append(hosts, host)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if hosts == nil {
+		hosts = []*models.Host{}
+	}
+
+	return hosts, nil
+}
+
+// LinkGoogleIdentity updates the google_id and google_email fields on a host.
+// Used to link an existing password-based account with a Google identity.
+func (r *HostRepository) LinkGoogleIdentity(ctx context.Context, hostID, googleID, googleEmail string) error {
+	query := q(r.driver, `
+		UPDATE hosts SET google_id = $1, google_email = $2, updated_at = $3
+		WHERE id = $4
+	`)
+	_, err := r.db.ExecContext(ctx, query, googleID, googleEmail, models.Now(), hostID)
+	return err
+}
+
 // CalendarRepository handles calendar connection database operations
 type CalendarRepository struct {
 	db     *sql.DB
