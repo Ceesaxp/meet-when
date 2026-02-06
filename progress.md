@@ -1257,3 +1257,49 @@ The following features from the requirements document are already fully implemen
   - This completes the simplified login flow: email+password → multi-org selection → dashboard
 
 ---
+
+**ralph run 202602061000 — Google Auth PRD**
+
+---
+
+## 2026-02-06 - US-001 - Add APP_BASE_URL config value
+- What was implemented:
+  - Added `BaseURL` field to `AppConfig` struct in `internal/config/config.go`
+  - Loads from `APP_BASE_URL` env var with default `http://localhost:8080`
+  - Existing config loading is not disrupted — all builds and tests pass
+  - Note: there is already a `Server.BaseURL` loaded from `BASE_URL` env var. The new `App.BaseURL` is specifically for OAuth callback URL derivation as required by the Google Auth PRD
+- Files changed:
+  - `internal/config/config.go` - Added `BaseURL` field to AppConfig struct and loading in Load()
+- **Learnings for future iterations:**
+  - The codebase already has `cfg.Server.BaseURL` (from `BASE_URL` env var) used extensively for email links, template rendering, and onboarding
+  - The new `cfg.App.BaseURL` (from `APP_BASE_URL` env var) is a separate config value for OAuth-specific URL derivation
+  - Future Google auth stories (US-005+) should use `cfg.App.BaseURL` for constructing OAuth redirect URLs
+
+---
+
+## 2026-02-06 - US-002 - Add Google identity columns to hosts table
+- What was implemented:
+  - Added `google_id` (nullable string, unique) and `google_email` (nullable string) columns to hosts table
+  - Made `password_hash` column nullable in PostgreSQL via `ALTER COLUMN ... DROP NOT NULL` (SQLite TEXT already accepts NULL)
+  - Created PostgreSQL migration `migrations/009_add_google_identity.up.sql` with partial unique index on `google_id` (WHERE google_id IS NOT NULL)
+  - Created SQLite migration `migrations/sqlite/009_add_google_identity.up.sql` with unique index on `google_id`
+  - Added `GoogleID *string` and `GoogleEmail *string` fields to Host struct in `internal/models/models.go` with json and db tags
+  - Updated all 6 HostRepository methods that touch host columns:
+    - `Create`: INSERT now includes `google_id` and `google_email` (13 params instead of 11)
+    - `GetByID`, `GetByEmail`, `GetAllByEmail`, `GetBySlug`, `GetByTenantID`: SELECT and Scan now include `google_id` and `google_email`
+  - Existing hosts retain their data unchanged — new columns default to NULL
+  - Build and all tests pass
+- Files changed:
+  - `migrations/009_add_google_identity.up.sql` - PostgreSQL migration adding google_id, google_email columns and making password_hash nullable
+  - `migrations/sqlite/009_add_google_identity.up.sql` - SQLite migration adding google_id, google_email columns
+  - `internal/models/models.go` - Added GoogleID and GoogleEmail pointer string fields to Host struct
+  - `internal/repository/repository.go` - Updated Create, GetByID, GetByEmail, GetAllByEmail, GetBySlug, GetByTenantID to include new columns
+- **Learnings for future iterations:**
+  - PostgreSQL uses `ALTER TABLE ... ALTER COLUMN ... DROP NOT NULL` to make existing columns nullable; SQLite TEXT columns already accept NULL
+  - PostgreSQL supports partial unique indexes (`WHERE column IS NOT NULL`) which is cleaner for nullable unique columns
+  - The Host struct is scanned in 6 different repository methods — when adding new columns, all must be updated consistently
+  - The `Update` method only updates name/slug/timezone/default_calendar_id so it didn't need changes for google_id/google_email
+  - US-003 (Update Host model struct) acceptance criteria were naturally fulfilled as part of US-002 since the model needed updating for the repository to compile
+  - Next migration number is 010
+
+---

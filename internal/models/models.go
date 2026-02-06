@@ -86,6 +86,8 @@ type Host struct {
 	DefaultCalendarID   *string    `json:"default_calendar_id" db:"default_calendar_id"`
 	IsAdmin             bool       `json:"is_admin" db:"is_admin"`
 	OnboardingCompleted bool       `json:"onboarding_completed" db:"onboarding_completed"`
+	GoogleID            *string    `json:"google_id,omitempty" db:"google_id"`
+	GoogleEmail         *string    `json:"google_email,omitempty" db:"google_email"`
 	CreatedAt           SQLiteTime `json:"created_at" db:"created_at"`
 	UpdatedAt           SQLiteTime `json:"updated_at" db:"updated_at"`
 }
