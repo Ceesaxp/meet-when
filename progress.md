@@ -1303,3 +1303,159 @@ The following features from the requirements document are already fully implemen
   - Next migration number is 010
 
 ---
+
+## 2026-02-06 - US-003 - Update Host model struct for Google identity
+- Already completed as part of US-002 implementation
+- GoogleID (*string) and GoogleEmail (*string) fields already exist on Host struct (lines 89-90 of models.go)
+- PasswordHash remains `string` type (not *string), handling empty string for Google-only users as allowed by acceptance criteria
+- PRD updated to mark US-003 as passing
+- Files changed: None (already done)
+
+---
+
+## 2026-02-06 - US-004 - Add Google identity repository methods
+- What was implemented:
+  - Added `GetByGoogleID(ctx, googleID)` method to HostRepository
+  - Method queries hosts table with google_id filter across all tenants (no tenant_id filter)
+  - Returns `[]*models.Host` slice; empty slice (not nil) when no hosts found
+  - Follows exact same pattern as `GetAllByEmail`: q() helper, multi-row scan with all 14 Host fields, rows.Err() check
+  - Added `LinkGoogleIdentity(ctx, hostID, googleID, googleEmail)` method to HostRepository
+  - Updates google_id and google_email fields plus updated_at timestamp
+  - Uses q() helper for driver compatibility
+  - Create() method already supports google_id/google_email fields (done in US-002)
+- Files changed:
+  - `internal/repository/repository.go` - Added GetByGoogleID (~35 lines) and LinkGoogleIdentity (~10 lines) methods
+- **Learnings for future iterations:**
+  - The HostRepository now has 8 query methods that scan Host rows: Create, GetByID, GetByEmail, GetAllByEmail, GetBySlug, GetByTenantID, GetByGoogleID (7 that SELECT + scan all fields)
+  - When adding new Host columns in the future, all 7 SELECT methods must be updated consistently
+  - The GetByGoogleID follows the exact same pattern as GetAllByEmail: cross-tenant multi-row query returning empty slice on no match
+  - LinkGoogleIdentity also updates `updated_at` to track when the identity was linked
+
+---
+
+## 2026-02-06 - US-005 - Implement Google Auth URL generation and CSRF nonce
+- What was implemented:
+  - Added `GetGoogleAuthURL(flow string) (authURL string, nonce string, error)` method to AuthService
+  - OAuth URL requests scopes: `openid email profile` (OpenID Connect scopes for auth, not calendar scopes)
+  - State parameter encodes flow context as `auth:{flow}:{nonce}` (e.g., `auth:signup:abc123...`)
+  - Redirect URL derived from `cfg.App.BaseURL` (APP_BASE_URL env) + `/auth/google/auth-callback`
+  - Nonce generated via existing `generateToken(16)` helper — 16 bytes of `crypto/rand`, hex encoded to 32 chars
+  - Uses `url.Values` for proper URL parameter encoding (safer than fmt.Sprintf for URL construction)
+  - Uses `prompt=select_account` to let users choose which Google account to use
+- Files changed:
+  - `internal/services/auth.go` - Added `net/url` import and `GetGoogleAuthURL` method (~30 lines)
+- **Learnings for future iterations:**
+  - The existing `CalendarService.GetGoogleAuthURL` uses `fmt.Sprintf` for URL construction; the new method uses `url.Values` for proper encoding
+  - The calendar OAuth uses scopes `calendar.readonly` and `calendar.events`; the auth OAuth uses OpenID Connect scopes `openid email profile`
+  - The calendar OAuth uses `access_type=offline&prompt=consent` for refresh tokens; auth OAuth uses `prompt=select_account` since we only need one-time token exchange
+  - The `generateToken(n)` helper in auth.go generates `n` random bytes and hex-encodes them, reused for nonce generation
+  - State format `auth:{flow}:{nonce}` allows downstream handler (US-012) to parse both the flow type and verify the CSRF nonce
+
+---
+
+## 2026-02-06 - US-006 - Implement Google token exchange and userinfo fetch
+- What was implemented:
+  - Added `GoogleUserInfo` struct with fields: Sub, Email, EmailVerified, Name (matches Google's userinfo v3 API response)
+  - Added `HandleGoogleCallback(code, state, expectedNonce string) (*GoogleUserInfo, string, error)` method to AuthService
+  - Parses state parameter format `auth:{flow}:{nonce}` and validates flow is "signup" or "login"
+  - Validates CSRF nonce against expectedNonce; returns `ErrInvalidOAuthState` on mismatch
+  - Added `exchangeGoogleAuthCode(code)` private method that exchanges authorization code for tokens via `https://oauth2.googleapis.com/token`
+  - Uses `url.Values` for proper URL parameter encoding (consistent with GetGoogleAuthURL pattern from US-005)
+  - Redirect URL derived from `cfg.App.BaseURL` + `/auth/google/auth-callback` (same as US-005)
+  - Added `fetchGoogleUserInfo(accessToken)` private method that fetches user profile from `https://www.googleapis.com/oauth2/v3/userinfo`
+  - Only accepts users with `email_verified: true`; returns `ErrGoogleEmailNotVerified` otherwise
+  - Added `googleAuthTokenResponse` struct for token exchange response (separate from calendar service's `googleTokenResponse` to avoid coupling)
+  - Added two new error variables: `ErrGoogleEmailNotVerified` and `ErrInvalidOAuthState`
+- Files changed:
+  - `internal/services/auth.go` - Added imports (encoding/json, io, log, net/http), GoogleUserInfo struct, googleAuthTokenResponse struct, HandleGoogleCallback, exchangeGoogleAuthCode, fetchGoogleUserInfo methods (~134 lines)
+- **Learnings for future iterations:**
+  - The auth service token exchange uses `url.Values.Encode()` instead of `fmt.Sprintf` (safer than calendar service's approach) - but both patterns work
+  - The `googleAuthTokenResponse` is kept separate from calendar service's `googleTokenResponse` to avoid coupling auth and calendar concerns
+  - Google's userinfo v3 endpoint returns `email_verified` as a boolean directly (not a string) - Go's JSON decoder handles this natively
+  - The state parameter parsing splits on ":" which means none of the components (flow, nonce) can contain colons
+  - Error handling follows existing pattern: wrap external errors with `fmt.Errorf` context, return specific sentinel errors for validation failures
+
+---
+
+## 2026-02-06 - US-007 - Implement RegisterWithGoogle service method
+- What was implemented:
+  - Added `RegisterWithGoogle(ctx, googleID, email, name, tenantName, tenantSlug, timezone string) (sessionToken string, error)` method to AuthService
+  - Validates and slugifies tenant slug (same logic as existing Register method)
+  - Checks for duplicate tenant slug, returns `ErrTenantExists` if exists
+  - Creates Tenant record with uuid, slug, name, timestamps
+  - Creates Host record with google_id and google_email set, password_hash empty string, IsAdmin=true
+  - Host slug derived from name (falls back to email prefix), same as Register()
+  - Creates default working hours (Mon-Fri 9:00-17:00) via `createDefaultWorkingHours`
+  - Creates session via SessionService
+  - Logs audit event `host.registered` with notes "method:google"
+  - Normalizes email to lowercase
+- Files changed:
+  - `internal/services/auth.go` - Added RegisterWithGoogle method (~89 lines)
+- **Learnings for future iterations:**
+  - The RegisterWithGoogle method follows the exact same pattern as Register() minus the password hashing step
+  - GoogleID and GoogleEmail are `*string` on Host struct, so use `&googleID` and `&email` to set them
+  - The audit log notes field is used to distinguish registration method ("method:google" vs no notes for password registration)
+  - The method returns only `(sessionToken, error)` - simpler than Register() which returns `(*RegisterResult, error)` with full Tenant/Host objects; the handler only needs the session token for the cookie
+
+---
+
+## 2026-02-06 - US-008 - Implement LoginWithGoogle service method
+- What was implemented:
+  - Added `GoogleLoginResult` struct with fields: RequiresOrgSelection, AvailableOrgs, SessionToken, Host, Tenant, Linked
+  - Added `ErrGoogleAccountNotFound` sentinel error for when no account matches the Google identity or email
+  - Added `LoginWithGoogle(ctx, googleID, email string) (*GoogleLoginResult, error)` method to AuthService
+  - Step 1: Looks up hosts by `google_id` first via `GetByGoogleID` repository method
+  - Single google_id match: creates session, returns session token directly
+  - Multiple google_id matches (multi-org): generates selection tokens (same as SimplifiedLogin), returns available orgs
+  - Step 2: No google_id match — falls back to checking `GetAllByEmail` for email match
+  - If email match(es) found: auto-links Google identity via `LinkGoogleIdentity` on all matching hosts
+  - Single email match: creates session, returns with `Linked: true` flag
+  - Multiple email matches: generates selection tokens, returns with `Linked: true`
+  - If no match at all: returns `ErrGoogleAccountNotFound`
+  - Logs audit event `host.login` with notes `method:google`
+- Files changed:
+  - `internal/services/auth.go` - Added GoogleLoginResult struct, ErrGoogleAccountNotFound error, LoginWithGoogle method (~150 lines)
+- **Learnings for future iterations:**
+  - The GoogleLoginResult follows the same pattern as SimplifiedLoginResult but adds a `Linked` bool to indicate auto-linking occurred
+  - When auto-linking by email, all matching hosts across tenants get linked (not just the first one) — this ensures subsequent logins find them via google_id
+  - The `generateSelectionToken` / `CompleteOrgSelection` pattern is reused for multi-org Google login — the handler will use the same org selection flow
+  - The method normalizes email to lowercase before querying, consistent with other auth methods
+
+---
+
+## 2026-02-06 - US-009 - Update SimplifiedLogin to skip Google-only accounts
+- What was implemented:
+  - Updated `SimplifiedLogin` to skip bcrypt comparison for hosts with empty `PasswordHash` (Google-only accounts)
+  - Added `didBcrypt` flag to track whether any bcrypt comparison was performed; if not (all accounts are Google-only), a dummy bcrypt comparison runs to maintain constant-time behavior
+  - Updated `Login` (tenant-slug-based) to also reject Google-only accounts early before hitting bcrypt with an empty hash
+  - All three timing attack scenarios are covered: no hosts found, all hosts Google-only, mixed hosts
+- Files changed:
+  - `internal/services/auth.go` - Updated `SimplifiedLogin` loop and `Login` method to handle empty password_hash
+- **Learnings for future iterations:**
+  - Both `Login` and `SimplifiedLogin` need updating when password-related logic changes — `Login` is the older tenant-slug-based method, `SimplifiedLogin` is the newer email-only flow
+  - `bcrypt.CompareHashAndPassword` with an empty hash string returns an error (not a panic), but skipping it entirely is cleaner and avoids unnecessary computation
+  - The dummy hash pattern `$2a$10$dummy.hash...` was already in the codebase for timing attack prevention — reuse it consistently
+
+---
+
+## 2026-02-06 - US-010 - Create Google registration completion template
+- What was implemented:
+  - Created `register_google.html` template in `templates/pages/` for post-Google-OAuth registration
+  - Consistent visual style with existing `register.html`: same auth-card layout, CSS, head/favicon/fonts, auth-page body class
+  - Shows Google email as read-only displayed text (not an input field) under "Google Account" label
+  - Shows Google profile name as editable input, pre-filled from Google profile data
+  - Form fields: organization name (required), organization slug (required, pattern `[a-z0-9-]+`), timezone dropdown
+  - JavaScript auto-detects browser timezone via `Intl.DateTimeFormat().resolvedOptions().timeZone` and pre-selects it in the dropdown on page load
+  - Form posts to `/auth/register/complete-google`
+  - Handles flash messages for validation errors (same pattern as register.html using `.Flash.Type` and `.Flash.Message`)
+  - Hidden field for `ref` parameter if present (for signup conversion tracking)
+  - Terms of Service and Privacy Policy links, and "Already have an account? Sign in" footer
+- Files changed:
+  - `templates/pages/register_google.html` - New file (~115 lines)
+- **Learnings for future iterations:**
+  - The template data is passed as `PageData` with `.Data` containing a `map[string]interface{}` — access fields like `.Data.name`, `.Data.email`, `.Data.ref`
+  - Email is displayed as plain text (not an input) since it comes from Google and shouldn't be editable — the handler (US-012) will pass it via the signed cookie data
+  - The template loading in `handlers.go` automatically picks up new files from `templates/pages/` via `filepath.Glob` — no code changes needed to register templates
+  - The handler for this template doesn't exist yet (US-012 will create it) — template was verified by confirming server starts without template parsing errors
+
+---
