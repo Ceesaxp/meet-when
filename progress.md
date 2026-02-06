@@ -1459,3 +1459,45 @@ The following features from the requirements document are already fully implemen
   - The handler for this template doesn't exist yet (US-012 will create it) — template was verified by confirming server starts without template parsing errors
 
 ---
+
+## 2026-02-06 - US-011 - Wire up Google buttons in login and register templates
+- What was implemented:
+  - Changed Google button in `register.html` from `<button>` to `<a>` tag pointing to `/auth/google/signup`
+  - Changed Google button in `login.html` from `<button>` to `<a>` tag pointing to `/auth/google/login`
+  - Register page Google button conditionally appends `?ref=value` when ref query param is present (using `{{if .Data.ref}}?ref={{.Data.ref}}{{end}}`)
+  - Buttons are visually unchanged — `.social-btn` CSS class already has `text-decoration: none` and `display: flex` which work identically on `<a>` tags
+- Files changed:
+  - `templates/pages/register.html` - Changed `<button>` to `<a href="/auth/google/signup...">` (2 lines changed)
+  - `templates/pages/login.html` - Changed `<button>` to `<a href="/auth/google/login">` (2 lines changed)
+- **Learnings for future iterations:**
+  - The `.social-btn` CSS class was already designed to work with both `<button>` and `<a>` elements — it has `text-decoration: none`, `display: flex`, and `cursor: pointer`
+  - Go template conditionals like `{{if .Data.ref}}?ref={{.Data.ref}}{{end}}` work inline within HTML attributes
+  - This was a minimal change (4 lines total) — the visual design required no CSS modifications
+
+---
+
+## 2026-02-06 - US-012 - Add Google auth handler endpoints and register routes
+- What was implemented:
+  - `GoogleSignupStart()` handler - GET /auth/google/signup: generates Google auth URL, stores CSRF nonce in HttpOnly cookie (10-min expiry), stores ref param in cookie, redirects to Google
+  - `GoogleLoginStart()` handler - GET /auth/google/login: generates Google auth URL, stores CSRF nonce in HttpOnly cookie, redirects to Google
+  - `GoogleAuthCallback()` handler - GET /auth/google/auth-callback: validates CSRF nonce cookie against state param, calls HandleGoogleCallback, routes to signup or login flow based on state, clears nonce cookie
+  - For signup callback: stores Google profile in signed cookie (HMAC-SHA256 with EncryptionKey, 10-min expiry), redirects to /auth/register/complete-google
+  - For login callback: calls LoginWithGoogle, handles session creation/multi-org/not-found cases with appropriate redirects and flash messages
+  - `CompleteGoogleRegisterPage()` handler - GET /auth/register/complete-google: reads signed Google profile cookie, renders register_google.html with pre-filled data
+  - `CompleteGoogleRegister()` handler - POST /auth/register/complete-google: validates signed cookie, calls RegisterWithGoogle, sets session cookie, redirects to /onboarding/step/1
+  - Cookie signing helpers: `signGoogleProfileCookie()` and `readGoogleProfileCookie()` using HMAC-SHA256 with base64 encoding
+  - All 5 new routes registered in cmd/server/main.go as public routes (no auth middleware)
+  - Preserves ref parameter through the entire signup flow via cookies
+  - Tracks signup conversion if ref parameter indicates booking source
+- Files changed:
+  - `internal/handlers/auth.go` - Added 7 new handler methods + 2 cookie signing helpers (~360 lines)
+  - `cmd/server/main.go` - Added 5 new route registrations for Google auth flow
+- **Learnings for future iterations:**
+  - Google OAuth uses two separate callback routes: `/auth/google/callback` for calendar connections (state=hostID) and `/auth/google/auth-callback` for auth flows (state=auth:flow:nonce)
+  - CSRF nonce stored in HttpOnly cookie with SameSite=Lax is the cleanest approach — no database storage needed
+  - Signed cookies (HMAC-SHA256 with base64 payload + signature separated by ".") are a good pattern for short-lived cross-request data like Google profile during signup completion
+  - The `GoogleLoginResult` struct from `LoginWithGoogle()` covers all cases: direct session, multi-org selection, auto-linking, and not-found
+  - The `register_google.html` template was already created in US-010 — it expects `.Data.email`, `.Data.name`, `.Data.ref` in PageData
+  - Pre-existing lint issues in the codebase (errcheck on db.Close, bcrypt.CompareHashAndPassword, rows.Close) are not related to this change
+
+---
