@@ -246,6 +246,11 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (*HostWithTen
 		return nil, "", ErrInvalidCredentials
 	}
 
+	// Google-only accounts have no password — reject with same error to avoid leaking info
+	if host.PasswordHash == "" {
+		return nil, "", ErrInvalidCredentials
+	}
+
 	// Check password
 	if err := bcrypt.CompareHashAndPassword([]byte(host.PasswordHash), []byte(input.Password)); err != nil {
 		return nil, "", ErrInvalidCredentials
@@ -286,15 +291,27 @@ func (s *AuthService) SimplifiedLogin(ctx context.Context, input SimplifiedLogin
 		return nil, ErrInvalidCredentials
 	}
 
-	// Check password against each host and collect valid matches
+	// Check password against each host and collect valid matches.
+	// Skip hosts with empty password_hash (Google-only accounts).
 	var validHosts []*models.Host
+	didBcrypt := false
 	for _, host := range hosts {
+		if host.PasswordHash == "" {
+			continue // Google-only account — skip password check
+		}
+		didBcrypt = true
 		if err := bcrypt.CompareHashAndPassword([]byte(host.PasswordHash), []byte(input.Password)); err == nil {
 			validHosts = append(validHosts, host)
 		}
 	}
 
-	// No valid matches (wrong password for all accounts)
+	// Timing attack prevention: if no bcrypt comparison was performed (all accounts are
+	// Google-only), do a dummy comparison to maintain constant response time.
+	if !didBcrypt {
+		bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(input.Password))
+	}
+
+	// No valid matches (wrong password for all accounts, or all are Google-only)
 	if len(validHosts) == 0 {
 		return nil, ErrInvalidCredentials
 	}
