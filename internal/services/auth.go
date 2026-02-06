@@ -7,8 +7,13 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -29,7 +34,18 @@ var (
 	ErrWeakPassword           = errors.New("password must be at least 8 characters")
 	ErrInvalidSelectionToken  = errors.New("invalid or expired selection token")
 	ErrHostNotFound           = errors.New("host not found")
+	ErrGoogleEmailNotVerified  = errors.New("google email is not verified")
+	ErrInvalidOAuthState       = errors.New("invalid OAuth state parameter")
+	ErrGoogleAccountNotFound   = errors.New("no account found for this Google identity")
 )
+
+// GoogleUserInfo contains the user profile information returned by Google's userinfo endpoint.
+type GoogleUserInfo struct {
+	Sub           string `json:"sub"`
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"email_verified"`
+	Name          string `json:"name"`
+}
 
 // SelectionTokenExpiry is the duration for which selection tokens are valid
 const SelectionTokenExpiry = 5 * time.Minute
@@ -200,6 +216,16 @@ type SimplifiedLoginResult struct {
 	Tenant               *models.Tenant // Populated when single org match
 }
 
+// GoogleLoginResult represents the result of a Google login attempt.
+type GoogleLoginResult struct {
+	RequiresOrgSelection bool           // True if user has multiple orgs and must select one
+	AvailableOrgs        []OrgOption    // Populated when RequiresOrgSelection is true
+	SessionToken         string         // Populated when single match (direct login)
+	Host                 *models.Host   // Populated when single match
+	Tenant               *models.Tenant // Populated when single match
+	Linked               bool           // True if Google identity was auto-linked to an existing email account
+}
+
 // Login authenticates a user
 func (s *AuthService) Login(ctx context.Context, input LoginInput) (*HostWithTenant, string, error) {
 	// Get tenant
@@ -217,6 +243,11 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (*HostWithTen
 		return nil, "", err
 	}
 	if host == nil {
+		return nil, "", ErrInvalidCredentials
+	}
+
+	// Google-only accounts have no password — reject with same error to avoid leaking info
+	if host.PasswordHash == "" {
 		return nil, "", ErrInvalidCredentials
 	}
 
@@ -260,15 +291,27 @@ func (s *AuthService) SimplifiedLogin(ctx context.Context, input SimplifiedLogin
 		return nil, ErrInvalidCredentials
 	}
 
-	// Check password against each host and collect valid matches
+	// Check password against each host and collect valid matches.
+	// Skip hosts with empty password_hash (Google-only accounts).
 	var validHosts []*models.Host
+	didBcrypt := false
 	for _, host := range hosts {
+		if host.PasswordHash == "" {
+			continue // Google-only account — skip password check
+		}
+		didBcrypt = true
 		if err := bcrypt.CompareHashAndPassword([]byte(host.PasswordHash), []byte(input.Password)); err == nil {
 			validHosts = append(validHosts, host)
 		}
 	}
 
-	// No valid matches (wrong password for all accounts)
+	// Timing attack prevention: if no bcrypt comparison was performed (all accounts are
+	// Google-only), do a dummy comparison to maintain constant response time.
+	if !didBcrypt {
+		bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(input.Password))
+	}
+
+	// No valid matches (wrong password for all accounts, or all are Google-only)
 	if len(validHosts) == 0 {
 		return nil, ErrInvalidCredentials
 	}
@@ -380,6 +423,244 @@ func createDefaultWorkingHours(hostID string) []*models.WorkingHours {
 	return hours
 }
 
+// RegisterWithGoogle creates a new tenant and host using Google identity (no password).
+func (s *AuthService) RegisterWithGoogle(ctx context.Context, googleID, email, name, tenantName, tenantSlug, timezone string) (string, error) {
+	// Normalize email
+	email = strings.ToLower(email)
+
+	// Validate email
+	if !isValidEmail(email) {
+		return "", ErrInvalidEmail
+	}
+
+	// Normalize slug
+	slug := slugify(tenantSlug)
+	if slug == "" {
+		slug = slugify(tenantName)
+	}
+
+	// Check if tenant exists
+	existing, err := s.repos.Tenant.GetBySlug(ctx, slug)
+	if err != nil {
+		return "", err
+	}
+	if existing != nil {
+		return "", ErrTenantExists
+	}
+
+	// Create tenant
+	now := models.Now()
+	tenant := &models.Tenant{
+		ID:        uuid.New().String(),
+		Slug:      slug,
+		Name:      tenantName,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	if err := s.repos.Tenant.Create(ctx, tenant); err != nil {
+		return "", err
+	}
+
+	// Default timezone
+	if timezone == "" {
+		timezone = s.cfg.App.DefaultTimezone
+	}
+
+	// Create host slug from name or email
+	hostSlug := slugify(name)
+	if hostSlug == "" {
+		hostSlug = strings.Split(email, "@")[0]
+		hostSlug = slugify(hostSlug)
+	}
+
+	// Create host with Google identity, no password
+	host := &models.Host{
+		ID:           uuid.New().String(),
+		TenantID:     tenant.ID,
+		Email:        email,
+		PasswordHash: "",
+		Name:         name,
+		Slug:         hostSlug,
+		Timezone:     timezone,
+		IsAdmin:      true,
+		GoogleID:     &googleID,
+		GoogleEmail:  &email,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	if err := s.repos.Host.Create(ctx, host); err != nil {
+		return "", err
+	}
+
+	// Create default working hours (Mon-Fri 9:00-17:00)
+	defaultHours := createDefaultWorkingHours(host.ID)
+	if err := s.repos.WorkingHours.SetForHost(ctx, host.ID, defaultHours); err != nil {
+		return "", err
+	}
+
+	// Create session
+	sessionToken, err := s.session.CreateSession(ctx, host.ID)
+	if err != nil {
+		return "", err
+	}
+
+	// Audit log
+	s.auditLog.Log(ctx, tenant.ID, &host.ID, "host.registered", "host", host.ID, nil, "method:google")
+
+	return sessionToken, nil
+}
+
+// LoginWithGoogle handles Google-based login, including auto-linking by email and multi-org support.
+func (s *AuthService) LoginWithGoogle(ctx context.Context, googleID, email string) (*GoogleLoginResult, error) {
+	email = strings.ToLower(email)
+
+	// Step 1: Look up hosts by google_id first
+	hosts, err := s.repos.Host.GetByGoogleID(ctx, googleID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Google ID matched one or more hosts
+	if len(hosts) == 1 {
+		// Single match: create session directly
+		host := hosts[0]
+		tenant, err := s.repos.Tenant.GetByID(ctx, host.TenantID)
+		if err != nil {
+			return nil, err
+		}
+		if tenant == nil {
+			return nil, ErrInvalidCredentials
+		}
+
+		sessionToken, err := s.session.CreateSession(ctx, host.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		s.auditLog.Log(ctx, tenant.ID, &host.ID, "host.login", "host", host.ID, nil, "method:google")
+
+		return &GoogleLoginResult{
+			SessionToken: sessionToken,
+			Host:         host,
+			Tenant:       tenant,
+		}, nil
+	}
+
+	if len(hosts) > 1 {
+		// Multiple matches (multi-org): generate selection tokens
+		var availableOrgs []OrgOption
+		for _, host := range hosts {
+			tenant, err := s.repos.Tenant.GetByID(ctx, host.TenantID)
+			if err != nil {
+				return nil, err
+			}
+			if tenant == nil {
+				continue
+			}
+
+			selectionToken, err := s.generateSelectionToken(host.ID)
+			if err != nil {
+				return nil, err
+			}
+
+			availableOrgs = append(availableOrgs, OrgOption{
+				TenantID:       tenant.ID,
+				TenantSlug:     tenant.Slug,
+				TenantName:     tenant.Name,
+				HostID:         host.ID,
+				SelectionToken: selectionToken,
+			})
+		}
+
+		return &GoogleLoginResult{
+			RequiresOrgSelection: true,
+			AvailableOrgs:        availableOrgs,
+		}, nil
+	}
+
+	// Step 2: No match by google_id — check if host exists with same email
+	emailHosts, err := s.repos.Host.GetAllByEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(emailHosts) == 0 {
+		return nil, ErrGoogleAccountNotFound
+	}
+
+	// Auto-link: link Google identity to the first email match and create session
+	// For multi-org email matches, link the first and let user re-login to access others
+	host := emailHosts[0]
+	if err := s.repos.Host.LinkGoogleIdentity(ctx, host.ID, googleID, email); err != nil {
+		return nil, fmt.Errorf("failed to link google identity: %w", err)
+	}
+
+	// If there are multiple email matches, link all of them
+	for _, h := range emailHosts[1:] {
+		if err := s.repos.Host.LinkGoogleIdentity(ctx, h.ID, googleID, email); err != nil {
+			log.Printf("Warning: failed to link google identity for host %s: %v", h.ID, err)
+		}
+	}
+
+	if len(emailHosts) == 1 {
+		// Single email match: create session directly
+		tenant, err := s.repos.Tenant.GetByID(ctx, host.TenantID)
+		if err != nil {
+			return nil, err
+		}
+		if tenant == nil {
+			return nil, ErrInvalidCredentials
+		}
+
+		sessionToken, err := s.session.CreateSession(ctx, host.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		s.auditLog.Log(ctx, tenant.ID, &host.ID, "host.login", "host", host.ID, nil, "method:google")
+
+		return &GoogleLoginResult{
+			SessionToken: sessionToken,
+			Host:         host,
+			Tenant:       tenant,
+			Linked:       true,
+		}, nil
+	}
+
+	// Multiple email matches: generate selection tokens (after linking all)
+	var availableOrgs []OrgOption
+	for _, h := range emailHosts {
+		tenant, err := s.repos.Tenant.GetByID(ctx, h.TenantID)
+		if err != nil {
+			return nil, err
+		}
+		if tenant == nil {
+			continue
+		}
+
+		selectionToken, err := s.generateSelectionToken(h.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		availableOrgs = append(availableOrgs, OrgOption{
+			TenantID:       tenant.ID,
+			TenantSlug:     tenant.Slug,
+			TenantName:     tenant.Name,
+			HostID:         h.ID,
+			SelectionToken: selectionToken,
+		})
+	}
+
+	return &GoogleLoginResult{
+		RequiresOrgSelection: true,
+		AvailableOrgs:        availableOrgs,
+		Linked:               true,
+	}, nil
+}
+
 // GetTenantBySlug retrieves a tenant by slug
 func (s *AuthService) GetTenantBySlug(ctx context.Context, slug string) (*models.Tenant, error) {
 	return s.repos.Tenant.GetBySlug(ctx, slug)
@@ -398,6 +679,156 @@ func (s *AuthService) GetHostByID(ctx context.Context, id string) (*models.Host,
 // UpdateHost updates a host's profile
 func (s *AuthService) UpdateHost(ctx context.Context, host *models.Host) error {
 	return s.repos.Host.Update(ctx, host)
+}
+
+// GetGoogleAuthURL generates a Google OAuth authorization URL with CSRF protection.
+// The flow parameter should be "signup" or "login" to indicate the auth context.
+// Returns the authorization URL, a CSRF nonce for verification, and any error.
+func (s *AuthService) GetGoogleAuthURL(flow string) (string, string, error) {
+	// Generate cryptographically random nonce (16 bytes, hex encoded = 32 chars)
+	nonce, err := generateToken(16)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to generate nonce: %w", err)
+	}
+
+	// State encodes flow context plus CSRF nonce: "auth:{flow}:{nonce}"
+	state := fmt.Sprintf("auth:%s:%s", flow, nonce)
+
+	// Redirect URL derived from APP_BASE_URL config
+	redirectURL := s.cfg.App.BaseURL + "/auth/google/auth-callback"
+
+	// Build Google OAuth URL with OpenID Connect scopes
+	params := url.Values{
+		"client_id":     {s.cfg.OAuth.Google.ClientID},
+		"redirect_uri":  {redirectURL},
+		"response_type": {"code"},
+		"scope":         {"openid email profile"},
+		"state":         {state},
+		"prompt":        {"select_account"},
+	}
+	authURL := "https://accounts.google.com/o/oauth2/v2/auth?" + params.Encode()
+
+	return authURL, nonce, nil
+}
+
+// googleAuthTokenResponse represents the token response from Google's OAuth token endpoint.
+type googleAuthTokenResponse struct {
+	AccessToken string `json:"access_token"`
+	IDToken     string `json:"id_token"`
+	ExpiresIn   int    `json:"expires_in"`
+	TokenType   string `json:"token_type"`
+}
+
+// HandleGoogleCallback exchanges an authorization code for tokens, fetches user info,
+// and validates the CSRF nonce. Returns the user info, the flow string (signup or login),
+// and any error.
+func (s *AuthService) HandleGoogleCallback(code, state, expectedNonce string) (*GoogleUserInfo, string, error) {
+	// Parse state: "auth:{flow}:{nonce}"
+	parts := strings.Split(state, ":")
+	if len(parts) != 3 || parts[0] != "auth" {
+		return nil, "", ErrInvalidOAuthState
+	}
+	flow := parts[1]
+	nonce := parts[2]
+
+	// Validate flow
+	if flow != "signup" && flow != "login" {
+		return nil, "", ErrInvalidOAuthState
+	}
+
+	// Validate CSRF nonce
+	if nonce != expectedNonce {
+		return nil, "", ErrInvalidOAuthState
+	}
+
+	// Exchange authorization code for tokens
+	tokens, err := s.exchangeGoogleAuthCode(code)
+	if err != nil {
+		return nil, "", fmt.Errorf("google token exchange failed: %w", err)
+	}
+
+	// Fetch user info from Google's userinfo endpoint
+	userInfo, err := s.fetchGoogleUserInfo(tokens.AccessToken)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to fetch google user info: %w", err)
+	}
+
+	// Only accept users with verified email
+	if !userInfo.EmailVerified {
+		return nil, "", ErrGoogleEmailNotVerified
+	}
+
+	return userInfo, flow, nil
+}
+
+// exchangeGoogleAuthCode exchanges an authorization code for tokens via Google's token endpoint.
+func (s *AuthService) exchangeGoogleAuthCode(code string) (*googleAuthTokenResponse, error) {
+	redirectURL := s.cfg.App.BaseURL + "/auth/google/auth-callback"
+
+	data := url.Values{
+		"code":          {code},
+		"client_id":     {s.cfg.OAuth.Google.ClientID},
+		"client_secret": {s.cfg.OAuth.Google.ClientSecret},
+		"redirect_uri":  {redirectURL},
+		"grant_type":    {"authorization_code"},
+	}
+
+	resp, err := http.Post(
+		"https://oauth2.googleapis.com/token",
+		"application/x-www-form-urlencoded",
+		strings.NewReader(data.Encode()),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("token exchange failed: %s", string(body))
+	}
+
+	var tokens googleAuthTokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&tokens); err != nil {
+		return nil, err
+	}
+
+	return &tokens, nil
+}
+
+// fetchGoogleUserInfo fetches the user's profile from Google's userinfo endpoint.
+func (s *AuthService) fetchGoogleUserInfo(accessToken string) (*GoogleUserInfo, error) {
+	req, err := http.NewRequest("GET", "https://www.googleapis.com/oauth2/v3/userinfo", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("userinfo request failed: %s", string(body))
+	}
+
+	var userInfo GoogleUserInfo
+	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
+		return nil, err
+	}
+
+	return &userInfo, nil
 }
 
 // CompleteOnboarding marks a host's onboarding as complete

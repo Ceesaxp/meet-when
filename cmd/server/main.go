@@ -88,7 +88,14 @@ func main() {
 	mux.HandleFunc("POST /auth/logout", h.Auth.Logout)
 	mux.HandleFunc("GET /signup/track", h.Auth.TrackSignupCTA)
 
-	// OAuth callbacks
+	// Google auth flow (login/signup)
+	mux.HandleFunc("GET /auth/google/signup", h.Auth.GoogleSignupStart)
+	mux.HandleFunc("GET /auth/google/login", h.Auth.GoogleLoginStart)
+	mux.HandleFunc("GET /auth/google/auth-callback", h.Auth.GoogleAuthCallback)
+	mux.HandleFunc("GET /auth/register/complete-google", h.Auth.CompleteGoogleRegisterPage)
+	mux.HandleFunc("POST /auth/register/complete-google", h.Auth.CompleteGoogleRegister)
+
+	// OAuth callbacks (calendar/conferencing)
 	mux.HandleFunc("GET /auth/google/callback", h.Auth.GoogleCallback)
 	mux.HandleFunc("GET /auth/zoom/callback", h.Auth.ZoomCallback)
 

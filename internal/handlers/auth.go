@@ -1,7 +1,14 @@
 package handlers
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -317,4 +324,365 @@ func (h *AuthHandler) TrackSignupCTA(w http.ResponseWriter, r *http.Request) {
 	} else {
 		h.handlers.redirect(w, r, "/auth/register")
 	}
+}
+
+// GoogleSignupStart initiates the Google OAuth flow for signup.
+// GET /auth/google/signup
+func (h *AuthHandler) GoogleSignupStart(w http.ResponseWriter, r *http.Request) {
+	authURL, nonce, err := h.handlers.services.Auth.GetGoogleAuthURL("signup")
+	if err != nil {
+		log.Printf("Error generating Google auth URL: %v", err)
+		h.handlers.render(w, "register.html", PageData{
+			Title: "Create Account",
+			Flash: &FlashMessage{Type: "error", Message: "Failed to connect to Google. Please try again."},
+		})
+		return
+	}
+
+	// Store nonce in HttpOnly cookie for CSRF verification on callback
+	http.SetCookie(w, &http.Cookie{
+		Name:     "google_auth_nonce",
+		Value:    nonce,
+		Path:     "/",
+		MaxAge:   600, // 10 minutes
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Store ref parameter if present, so we can recover it after callback
+	if ref := r.URL.Query().Get("ref"); ref != "" {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "google_auth_ref",
+			Value:    ref,
+			Path:     "/",
+			MaxAge:   600,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		})
+	}
+
+	http.Redirect(w, r, authURL, http.StatusFound)
+}
+
+// GoogleLoginStart initiates the Google OAuth flow for login.
+// GET /auth/google/login
+func (h *AuthHandler) GoogleLoginStart(w http.ResponseWriter, r *http.Request) {
+	authURL, nonce, err := h.handlers.services.Auth.GetGoogleAuthURL("login")
+	if err != nil {
+		log.Printf("Error generating Google auth URL: %v", err)
+		h.handlers.render(w, "login.html", PageData{
+			Title: "Login",
+			Flash: &FlashMessage{Type: "error", Message: "Failed to connect to Google. Please try again."},
+		})
+		return
+	}
+
+	// Store nonce in HttpOnly cookie for CSRF verification on callback
+	http.SetCookie(w, &http.Cookie{
+		Name:     "google_auth_nonce",
+		Value:    nonce,
+		Path:     "/",
+		MaxAge:   600, // 10 minutes
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	http.Redirect(w, r, authURL, http.StatusFound)
+}
+
+// GoogleAuthCallback handles the Google OAuth callback for auth flows (login/signup).
+// GET /auth/google/auth-callback
+func (h *AuthHandler) GoogleAuthCallback(w http.ResponseWriter, r *http.Request) {
+	code := r.URL.Query().Get("code")
+	state := r.URL.Query().Get("state")
+
+	if code == "" {
+		h.handlers.render(w, "login.html", PageData{
+			Title: "Login",
+			Flash: &FlashMessage{Type: "error", Message: "Google authentication was cancelled or failed."},
+		})
+		return
+	}
+
+	// Retrieve CSRF nonce from cookie
+	nonceCookie, err := r.Cookie("google_auth_nonce")
+	if err != nil || nonceCookie.Value == "" {
+		h.handlers.render(w, "login.html", PageData{
+			Title: "Login",
+			Flash: &FlashMessage{Type: "error", Message: "Authentication session expired. Please try again."},
+		})
+		return
+	}
+
+	// Clear the nonce cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "google_auth_nonce",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+
+	// Validate callback and get user info
+	userInfo, flow, err := h.handlers.services.Auth.HandleGoogleCallback(code, state, nonceCookie.Value)
+	if err != nil {
+		log.Printf("Google auth callback error: %v", err)
+		redirectPage := "login.html"
+		title := "Login"
+		if strings.Contains(state, ":signup:") {
+			redirectPage = "register.html"
+			title = "Create Account"
+		}
+		h.handlers.render(w, redirectPage, PageData{
+			Title: title,
+			Flash: &FlashMessage{Type: "error", Message: "Google authentication failed. Please try again."},
+		})
+		return
+	}
+
+	if flow == "signup" {
+		h.handleGoogleSignupCallback(w, r, userInfo)
+	} else {
+		h.handleGoogleLoginCallback(w, r, userInfo)
+	}
+}
+
+// handleGoogleSignupCallback stores Google profile in a signed cookie and redirects to completion form.
+func (h *AuthHandler) handleGoogleSignupCallback(w http.ResponseWriter, r *http.Request, userInfo *services.GoogleUserInfo) {
+	// Create signed cookie with Google profile data
+	cookieValue, err := h.signGoogleProfileCookie(userInfo)
+	if err != nil {
+		log.Printf("Error signing Google profile cookie: %v", err)
+		h.handlers.render(w, "register.html", PageData{
+			Title: "Create Account",
+			Flash: &FlashMessage{Type: "error", Message: "Something went wrong. Please try again."},
+		})
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "google_profile",
+		Value:    cookieValue,
+		Path:     "/",
+		MaxAge:   600, // 10 minutes
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	http.Redirect(w, r, "/auth/register/complete-google", http.StatusFound)
+}
+
+// handleGoogleLoginCallback processes Google login: session creation, multi-org, or not-found.
+func (h *AuthHandler) handleGoogleLoginCallback(w http.ResponseWriter, r *http.Request, userInfo *services.GoogleUserInfo) {
+	result, err := h.handlers.services.Auth.LoginWithGoogle(r.Context(), userInfo.Sub, userInfo.Email)
+	if err != nil {
+		if err == services.ErrGoogleAccountNotFound {
+			h.handlers.render(w, "login.html", PageData{
+				Title: "Login",
+				Flash: &FlashMessage{Type: "error", Message: "No account found for this Google identity. Please sign up first."},
+			})
+			return
+		}
+		log.Printf("Google login error: %v", err)
+		h.handlers.render(w, "login.html", PageData{
+			Title: "Login",
+			Flash: &FlashMessage{Type: "error", Message: "Login failed. Please try again."},
+		})
+		return
+	}
+
+	// Handle multi-org case
+	if result.RequiresOrgSelection {
+		h.handlers.render(w, "login_select_org.html", PageData{
+			Title: "Select Organization",
+			Data: map[string]interface{}{
+				"AvailableOrgs": result.AvailableOrgs,
+			},
+		})
+		return
+	}
+
+	// Single-org case: set session cookie and redirect
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    result.SessionToken,
+		Path:     "/",
+		MaxAge:   int(24 * time.Hour / time.Second),
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	h.handlers.redirect(w, r, "/dashboard")
+}
+
+// CompleteGoogleRegisterPage renders the Google registration completion form.
+// GET /auth/register/complete-google
+func (h *AuthHandler) CompleteGoogleRegisterPage(w http.ResponseWriter, r *http.Request) {
+	userInfo, err := h.readGoogleProfileCookie(r)
+	if err != nil {
+		h.handlers.render(w, "register.html", PageData{
+			Title: "Create Account",
+			Flash: &FlashMessage{Type: "error", Message: "Your Google sign-up session has expired. Please try again."},
+		})
+		return
+	}
+
+	// Recover ref parameter from cookie
+	var ref string
+	if refCookie, err := r.Cookie("google_auth_ref"); err == nil {
+		ref = refCookie.Value
+	}
+
+	h.handlers.render(w, "register_google.html", PageData{
+		Title: "Complete Registration",
+		Data: map[string]interface{}{
+			"email": userInfo.Email,
+			"name":  userInfo.Name,
+			"ref":   ref,
+		},
+	})
+}
+
+// CompleteGoogleRegister handles Google registration completion form submission.
+// POST /auth/register/complete-google
+func (h *AuthHandler) CompleteGoogleRegister(w http.ResponseWriter, r *http.Request) {
+	userInfo, err := h.readGoogleProfileCookie(r)
+	if err != nil {
+		h.handlers.render(w, "register.html", PageData{
+			Title: "Create Account",
+			Flash: &FlashMessage{Type: "error", Message: "Your Google sign-up session has expired. Please try again."},
+		})
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		h.handlers.error(w, r, http.StatusBadRequest, "Invalid form data")
+		return
+	}
+
+	name := r.FormValue("name")
+	tenantName := r.FormValue("tenant_name")
+	tenantSlug := r.FormValue("tenant_slug")
+	timezone := r.FormValue("timezone")
+
+	sessionToken, err := h.handlers.services.Auth.RegisterWithGoogle(
+		r.Context(), userInfo.Sub, userInfo.Email, name, tenantName, tenantSlug, timezone,
+	)
+	if err != nil {
+		message := "Registration failed"
+		switch err {
+		case services.ErrEmailExists:
+			message = "Email already registered"
+		case services.ErrTenantExists:
+			message = "Organization name already taken"
+		case services.ErrInvalidEmail:
+			message = "Invalid email format"
+		}
+
+		// Recover ref
+		ref := r.FormValue("ref")
+
+		h.handlers.render(w, "register_google.html", PageData{
+			Title: "Complete Registration",
+			Flash: &FlashMessage{Type: "error", Message: message},
+			Data: map[string]interface{}{
+				"email":       userInfo.Email,
+				"name":        name,
+				"tenant_name": tenantName,
+				"tenant_slug": tenantSlug,
+				"ref":         ref,
+			},
+		})
+		return
+	}
+
+	// Clear Google profile cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "google_profile",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+
+	// Clear ref cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "google_auth_ref",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+
+	// Set session cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    sessionToken,
+		Path:     "/",
+		MaxAge:   int(24 * time.Hour / time.Second),
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Track signup conversion if ref parameter indicates booking source
+	ref := r.FormValue("ref")
+	if ref != "" && len(ref) > 8 && ref[:8] == "booking:" {
+		_ = h.handlers.repos.SignupConversion.MarkRegistered(r.Context(), userInfo.Email)
+	}
+
+	h.handlers.redirect(w, r, "/onboarding/step/1")
+}
+
+// signGoogleProfileCookie creates a signed cookie value containing Google user info.
+// Format: base64(json) + "." + base64(hmac-sha256(json))
+func (h *AuthHandler) signGoogleProfileCookie(userInfo *services.GoogleUserInfo) (string, error) {
+	data, err := json.Marshal(userInfo)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal user info: %w", err)
+	}
+
+	payload := base64.URLEncoding.EncodeToString(data)
+
+	mac := hmac.New(sha256.New, []byte(h.handlers.cfg.App.EncryptionKey))
+	mac.Write(data)
+	sig := base64.URLEncoding.EncodeToString(mac.Sum(nil))
+
+	return payload + "." + sig, nil
+}
+
+// readGoogleProfileCookie reads and validates the signed Google profile cookie.
+func (h *AuthHandler) readGoogleProfileCookie(r *http.Request) (*services.GoogleUserInfo, error) {
+	cookie, err := r.Cookie("google_profile")
+	if err != nil {
+		return nil, fmt.Errorf("google profile cookie not found: %w", err)
+	}
+
+	parts := strings.SplitN(cookie.Value, ".", 2)
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid cookie format")
+	}
+
+	data, err := base64.URLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode payload: %w", err)
+	}
+
+	sig, err := base64.URLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode signature: %w", err)
+	}
+
+	// Verify HMAC
+	mac := hmac.New(sha256.New, []byte(h.handlers.cfg.App.EncryptionKey))
+	mac.Write(data)
+	if !hmac.Equal(sig, mac.Sum(nil)) {
+		return nil, fmt.Errorf("invalid cookie signature")
+	}
+
+	var userInfo services.GoogleUserInfo
+	if err := json.Unmarshal(data, &userInfo); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal user info: %w", err)
+	}
+
+	return &userInfo, nil
 }
