@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -398,6 +399,36 @@ func (s *AuthService) GetHostByID(ctx context.Context, id string) (*models.Host,
 // UpdateHost updates a host's profile
 func (s *AuthService) UpdateHost(ctx context.Context, host *models.Host) error {
 	return s.repos.Host.Update(ctx, host)
+}
+
+// GetGoogleAuthURL generates a Google OAuth authorization URL with CSRF protection.
+// The flow parameter should be "signup" or "login" to indicate the auth context.
+// Returns the authorization URL, a CSRF nonce for verification, and any error.
+func (s *AuthService) GetGoogleAuthURL(flow string) (string, string, error) {
+	// Generate cryptographically random nonce (16 bytes, hex encoded = 32 chars)
+	nonce, err := generateToken(16)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to generate nonce: %w", err)
+	}
+
+	// State encodes flow context plus CSRF nonce: "auth:{flow}:{nonce}"
+	state := fmt.Sprintf("auth:%s:%s", flow, nonce)
+
+	// Redirect URL derived from APP_BASE_URL config
+	redirectURL := s.cfg.App.BaseURL + "/auth/google/auth-callback"
+
+	// Build Google OAuth URL with OpenID Connect scopes
+	params := url.Values{
+		"client_id":     {s.cfg.OAuth.Google.ClientID},
+		"redirect_uri":  {redirectURL},
+		"response_type": {"code"},
+		"scope":         {"openid email profile"},
+		"state":         {state},
+		"prompt":        {"select_account"},
+	}
+	authURL := "https://accounts.google.com/o/oauth2/v2/auth?" + params.Encode()
+
+	return authURL, nonce, nil
 }
 
 // CompleteOnboarding marks a host's onboarding as complete
