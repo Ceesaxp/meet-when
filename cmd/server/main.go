@@ -67,6 +67,11 @@ func main() {
 	// Landing page
 	mux.HandleFunc("GET /{$}", h.Landing)
 
+	// SEO files
+	mux.HandleFunc("GET /robots.txt", h.RobotsTxt)
+	mux.HandleFunc("GET /sitemap.xml", h.Sitemap)
+	mux.HandleFunc("GET /llms.txt", h.LlmsTxt)
+
 	// Public routes (booking pages) - prefixed with /m/ to avoid route conflicts
 	mux.HandleFunc("GET /m/{tenant}/{host}", h.Public.HostPage)
 	mux.HandleFunc("GET /m/{tenant}/{host}/{template}", h.Public.TemplatePage)

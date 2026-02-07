@@ -79,6 +79,10 @@ type AppConfig struct {
 	DefaultTimezone   string
 	EncryptionKey     string
 	BaseURL           string // APP_BASE_URL - used for OAuth callback URLs
+
+	// SEO & Analytics
+	GoogleSiteVerification string // GOOGLE_SITE_VERIFICATION - Search Console verification code
+	GoogleAnalyticsID      string // GOOGLE_ANALYTICS_ID - GA4 measurement ID (e.g., "G-XXXXXXXXXX")
 }
 
 // ConnectionString returns the database connection string
@@ -133,12 +137,14 @@ func Load() (*Config, error) {
 			SMTPPassword:  getEnv("SMTP_PASSWORD", ""),
 		},
 		App: AppConfig{
-			Environment:       getEnv("APP_ENV", "development"),
-			MaxSchedulingDays: getEnvInt("MAX_SCHEDULING_DAYS", 90),
-			SessionDuration:   time.Duration(getEnvInt("SESSION_DURATION_HOURS", 24)) * time.Hour,
-			DefaultTimezone:   getEnv("DEFAULT_TIMEZONE", "UTC"),
-			EncryptionKey:     getEnv("ENCRYPTION_KEY", ""),
-			BaseURL:           getEnv("APP_BASE_URL", "http://localhost:8080"),
+			Environment:            getEnv("APP_ENV", "development"),
+			MaxSchedulingDays:      getEnvInt("MAX_SCHEDULING_DAYS", 90),
+			SessionDuration:        time.Duration(getEnvInt("SESSION_DURATION_HOURS", 24)) * time.Hour,
+			DefaultTimezone:        getEnv("DEFAULT_TIMEZONE", "UTC"),
+			EncryptionKey:          getEnv("ENCRYPTION_KEY", ""),
+			BaseURL:                getEnv("APP_BASE_URL", "http://localhost:8080"),
+			GoogleSiteVerification: getEnv("GOOGLE_SITE_VERIFICATION", ""),
+			GoogleAnalyticsID:      getEnv("GOOGLE_ANALYTICS_ID", ""),
 		},
 	}
 

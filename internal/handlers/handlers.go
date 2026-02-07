@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/meet-when/meet-when/internal/config"
@@ -152,8 +154,85 @@ func (h *Handlers) error(w http.ResponseWriter, r *http.Request, status int, mes
 // Landing renders the landing page
 func (h *Handlers) Landing(w http.ResponseWriter, r *http.Request) {
 	h.render(w, "landing.html", map[string]interface{}{
-		"Year": time.Now().Year(),
+		"Year":                   time.Now().Year(),
+		"BaseURL":                strings.TrimRight(h.cfg.Server.BaseURL, "/"),
+		"GoogleSiteVerification": h.cfg.App.GoogleSiteVerification,
+		"GoogleAnalyticsID":      h.cfg.App.GoogleAnalyticsID,
 	})
+}
+
+// RobotsTxt serves the robots.txt file
+func (h *Handlers) RobotsTxt(w http.ResponseWriter, r *http.Request) {
+	baseURL := strings.TrimRight(h.cfg.Server.BaseURL, "/")
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	fmt.Fprintf(w, `User-agent: *
+Allow: /$
+Allow: /llms.txt
+Disallow: /m/
+Disallow: /booking/
+Disallow: /dashboard/
+Disallow: /auth/
+Disallow: /onboarding/
+Disallow: /api/
+Disallow: /*?*
+
+User-agent: CCBot
+Allow: /$
+Allow: /llms.txt
+Disallow: /
+
+User-agent: ia_archiver
+Allow: /$
+Allow: /llms.txt
+Disallow: /
+
+Host: %s
+Sitemap: %s/sitemap.xml
+`, baseURL, baseURL)
+}
+
+// Sitemap serves the sitemap.xml file
+func (h *Handlers) Sitemap(w http.ResponseWriter, r *http.Request) {
+	baseURL := strings.TrimRight(h.cfg.Server.BaseURL, "/")
+
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	fmt.Fprintf(w, `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>%s/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>
+`, baseURL)
+}
+
+// LlmsTxt serves the llms.txt file for AI agents
+func (h *Handlers) LlmsTxt(w http.ResponseWriter, r *http.Request) {
+	baseURL := strings.TrimRight(h.cfg.Server.BaseURL, "/")
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	fmt.Fprintf(w, `# Meet When
+
+> Scheduling made simple. Share your availability, let others book time with you, and eliminate the back-and-forth.
+
+Meet When is a self-hosted scheduling platform. Hosts connect their calendars, define availability, and share booking links. Invitees pick a time that works, and everyone gets a calendar invite.
+
+## Features
+
+- Calendar sync (Google Calendar, CalDAV, iCloud)
+- Shareable booking pages per host and meeting type
+- Automatic timezone conversion for invitees
+- Video conferencing links (Google Meet, Zoom)
+- Booking approval workflows
+- Email notifications and reminders
+- Multi-tenant and pooled host support
+
+## Links
+
+- Homepage: %s/
+`, baseURL)
 }
 
 // templateFuncs returns custom template functions
