@@ -6,6 +6,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meet When - Scheduling Made Simple</title>
     <meta name="description" content="Schedule meetings effortlessly. Share your availability, let others book time with you, and eliminate the back-and-forth.">
+    <link rel="canonical" href="{{.BaseURL}}/">
+    <!-- Open Graph -->
+    <meta property="og:title" content="Meet When - Scheduling Made Simple">
+    <meta property="og:description" content="Schedule meetings effortlessly. Share your availability, let others book time with you, and eliminate the back-and-forth.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{.BaseURL}}/">
+    <meta property="og:image" content="{{.BaseURL}}/static/icons/android-chrome-512x512.png">
+    <meta property="og:site_name" content="Meet When">
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Meet When - Scheduling Made Simple">
+    <meta name="twitter:description" content="Schedule meetings effortlessly. Share your availability, let others book time with you, and eliminate the back-and-forth.">
+    <meta name="twitter:image" content="{{.BaseURL}}/static/icons/android-chrome-512x512.png">
+    {{if .GoogleSiteVerification}}<meta name="google-site-verification" content="{{.GoogleSiteVerification}}">{{end}}
     <link rel="icon" type="image/svg+xml" href="/static/icons/mw.svg">
     <link rel="icon" type="image/x-icon" href="/static/icons/favicon.ico">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32x32.png">
@@ -17,6 +31,15 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
+    {{if .GoogleAnalyticsID}}
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{.GoogleAnalyticsID}}"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', '{{.GoogleAnalyticsID}}');
+    </script>
+    {{end}}
 </head>
 <body class="landing">
     <nav class="nav">
