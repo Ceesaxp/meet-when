@@ -738,6 +738,36 @@ func (s *EmailService) sendMailgun(to, subject, body, icsAttachment string) erro
 	return s.sendSMTP(to, subject, body, icsAttachment)
 }
 
+// SendCalendarSyncFailed notifies the host that their calendar sync has failed
+func (s *EmailService) SendCalendarSyncFailed(ctx context.Context, host *models.Host, calendarName, errMsg string) {
+	subject := fmt.Sprintf("Calendar sync failed: %s", calendarName)
+
+	body := fmt.Sprintf(`Hello %s,
+
+Your calendar "%s" has stopped syncing. This usually means the connection has expired and needs to be reconnected.
+
+Error: %s
+
+Please reconnect your calendar:
+%s/dashboard/calendars
+
+Until reconnected, new bookings will not appear on your calendar automatically. You can use the "Retry Calendar Sync" button on each booking to add them manually after reconnecting.
+
+Best regards,
+Meet When`,
+		host.Name,
+		calendarName,
+		errMsg,
+		s.cfg.Server.BaseURL,
+	)
+
+	go func() {
+		if err := s.sendEmail(host.Email, subject, body, ""); err != nil {
+			log.Printf("[EMAIL] Error sending calendar sync failure notification to %s: %v", host.Email, err)
+		}
+	}()
+}
+
 func formatCancelReason(reason string) string {
 	if reason == "" {
 		return ""

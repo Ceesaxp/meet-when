@@ -54,6 +54,32 @@
                     </a>
                 </div>
                 {{end}}
+                {{if eq .Booking.Status "confirmed"}}
+                <div class="booking-detail-row">
+                    <span class="label">Calendar Event</span>
+                    {{if .Booking.CalendarEventID}}
+                    <span class="badge badge-confirmed">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        Synced
+                    </span>
+                    {{else}}
+                    <span style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span class="badge badge-pending">Not synced</span>
+                        <form action="/dashboard/bookings/{{.Booking.ID}}/retry-calendar" method="POST" style="display:inline" onclick="event.stopPropagation()">
+                            <button type="submit" class="btn-sm btn-primary" onclick="return confirm('Retry creating calendar event?')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                                    <polyline points="23 4 23 10 17 10"/>
+                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                                </svg>
+                                Retry Sync
+                            </button>
+                        </form>
+                    </span>
+                    {{end}}
+                </div>
+                {{end}}
             </div>
 
             <div class="booking-detail-section">
