@@ -1,4 +1,5 @@
-.PHONY: build run test clean docker-build docker-up docker-down dev
+.PHONY: build run test clean docker-build docker-up docker-down dev \
+       hub-build hub-push hub-prod hub-down
 
 # Go parameters
 GOCMD=go
@@ -59,6 +60,34 @@ backup:
 # Restore database from backup
 restore:
 	@echo "Usage: cat backup.sql | docker-compose exec -T db psql -U meetwhen meetwhen"
+
+# Docker Hub workaround (when GHCR/Actions unavailable)
+DOCKER_HUB_USER=ceesaxp
+DOCKER_HUB_IMAGE=$(DOCKER_HUB_USER)/meet-when
+VERSION?=$(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)
+
+# Build multi-arch image and push to Docker Hub
+hub-build:
+	docker buildx build --builder mybuilder \
+		--platform linux/amd64,linux/arm64 \
+		-t $(DOCKER_HUB_IMAGE):$(VERSION) \
+		-t $(DOCKER_HUB_IMAGE):latest \
+		--push .
+
+# Push existing local image to Docker Hub (single arch)
+hub-push:
+	docker tag meetwhen $(DOCKER_HUB_IMAGE):$(VERSION)
+	docker tag meetwhen $(DOCKER_HUB_IMAGE):latest
+	docker push $(DOCKER_HUB_IMAGE):$(VERSION)
+	docker push $(DOCKER_HUB_IMAGE):latest
+
+# Start production using Docker Hub image
+hub-prod:
+	IMAGE_TAG=$(VERSION) docker compose -f docker-compose-hub.yml --profile prod up -d
+
+# Stop Docker Hub production containers
+hub-down:
+	docker compose -f docker-compose-hub.yml --profile prod down
 
 # Development helpers
 fmt:
