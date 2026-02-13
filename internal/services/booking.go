@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -576,6 +577,108 @@ func (s *BookingService) BulkArchiveBookings(ctx context.Context, hostID, tenant
 	}
 
 	return count, nil
+}
+
+// RetryCalendarEvent retries calendar event creation for a confirmed booking
+// that has no calendar event (e.g., due to expired token at booking time).
+// Unlike processConfirmedBooking, this does NOT re-send emails or re-create conference links.
+func (s *BookingService) RetryCalendarEvent(ctx context.Context, hostID, tenantID, bookingID string) error {
+	booking, err := s.repos.Booking.GetByID(ctx, bookingID)
+	if err != nil || booking == nil || booking.HostID != hostID {
+		return ErrBookingNotFound
+	}
+
+	if booking.Status != models.BookingStatusConfirmed {
+		return fmt.Errorf("booking is not confirmed")
+	}
+
+	if booking.CalendarEventID != "" {
+		return fmt.Errorf("calendar event already exists")
+	}
+
+	template, err := s.repos.Template.GetByID(ctx, booking.TemplateID)
+	if err != nil || template == nil {
+		return ErrTemplateNotFound
+	}
+
+	host, _ := s.repos.Host.GetByID(ctx, hostID)
+	tenant, _ := s.repos.Tenant.GetByID(ctx, tenantID)
+
+	details := &BookingWithDetails{
+		Booking:  booking,
+		Template: template,
+		Host:     host,
+		Tenant:   tenant,
+	}
+
+	// Load pooled hosts for this template
+	pooledHosts, err := s.repos.TemplateHost.GetByTemplateIDWithHost(ctx, template.ID)
+	if err != nil {
+		pooledHosts = nil
+	}
+
+	if len(pooledHosts) > 0 {
+		s.createPooledHostCalendarEvents(ctx, details, pooledHosts)
+	} else {
+		eventID, err := s.calendar.CreateEvent(ctx, details)
+		if err != nil {
+			return fmt.Errorf("failed to create calendar event: %w", err)
+		}
+		if eventID != "" {
+			details.Booking.CalendarEventID = eventID
+		}
+	}
+
+	// Update booking with the new event ID
+	if err := s.repos.Booking.Update(ctx, details.Booking); err != nil {
+		return fmt.Errorf("failed to update booking: %w", err)
+	}
+
+	// Audit log
+	s.auditLog.Log(ctx, tenantID, &hostID, "booking.calendar_retry", "booking", bookingID, nil, "")
+
+	return nil
+}
+
+// BulkRetryCalendarEvents retries calendar event creation for all confirmed bookings
+// with no calendar event ID. Returns success count and fail count.
+func (s *BookingService) BulkRetryCalendarEvents(ctx context.Context, hostID, tenantID string) (int, int, error) {
+	confirmedStatus := models.BookingStatusConfirmed
+	bookings, err := s.repos.Booking.GetByHostID(ctx, hostID, &confirmedStatus, false)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	successCount := 0
+	failCount := 0
+
+	for _, booking := range bookings {
+		if booking.CalendarEventID != "" {
+			continue // Already has a calendar event
+		}
+
+		// Check that the template has a calendar configured
+		template, err := s.repos.Template.GetByID(ctx, booking.TemplateID)
+		if err != nil || template == nil || template.CalendarID == "" {
+			continue // No calendar configured for this template
+		}
+
+		if err := s.RetryCalendarEvent(ctx, hostID, tenantID, booking.ID); err != nil {
+			log.Printf("[BOOKING] Failed to retry calendar event for booking %s: %v", booking.ID, err)
+			failCount++
+		} else {
+			successCount++
+		}
+	}
+
+	if successCount > 0 {
+		s.auditLog.Log(ctx, tenantID, &hostID, "booking.bulk_calendar_retry", "booking", "", models.JSONMap{
+			"success_count": successCount,
+			"fail_count":    failCount,
+		}, "")
+	}
+
+	return successCount, failCount, nil
 }
 
 // processConfirmedBooking handles post-confirmation actions

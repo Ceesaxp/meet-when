@@ -695,12 +695,35 @@ func (h *DashboardHandler) Bookings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Count bookings that need calendar retry (confirmed, no calendar event, template has calendar)
+	calRetryCount := 0
+	for _, b := range confirmedBookings {
+		if b.CalendarEventID == "" {
+			if tmpl, ok := templateMap[b.TemplateID]; ok && tmpl.CalendarID != "" {
+				calRetryCount++
+			}
+		}
+	}
+
+	// Check for flash messages from query params
+	var flash *FlashMessage
+	if success := r.URL.Query().Get("success"); success == "calendar_synced" {
+		flash = &FlashMessage{Type: "success", Message: "Calendar event created successfully"}
+	} else if success == "calendar_bulk_synced" {
+		flash = &FlashMessage{Type: "success", Message: "Calendar events synced successfully"}
+	} else if errType := r.URL.Query().Get("error"); errType == "calendar_retry_failed" {
+		flash = &FlashMessage{Type: "error", Message: "Failed to create calendar event. Please check your calendar connection."}
+	} else if errType == "calendar_bulk_retry_failed" {
+		flash = &FlashMessage{Type: "error", Message: "Some calendar events could not be synced. Please check your calendar connection."}
+	}
+
 	h.handlers.render(w, "dashboard_bookings.html", PageData{
 		Title:        "Bookings",
 		Host:         host.Host,
 		Tenant:       host.Tenant,
 		ActiveNav:    "bookings",
 		PendingCount: len(pendingBookings),
+		Flash:        flash,
 		Data: map[string]interface{}{
 			"Bookings":        bookings,
 			"Templates":       templateMap,
@@ -711,6 +734,7 @@ func (h *DashboardHandler) Bookings(w http.ResponseWriter, r *http.Request) {
 			"ConfirmedCount":  len(confirmedBookings),
 			"CancelledCount":  len(cancelledBookings),
 			"ArchivableCount": archivableCount,
+			"CalRetryCount":   calRetryCount,
 		},
 	})
 }
@@ -876,6 +900,55 @@ func (h *DashboardHandler) BulkArchiveBookings(w http.ResponseWriter, r *http.Re
 
 	log.Printf("[DASHBOARD] Bulk archived %d bookings for host %s", count, host.Host.ID)
 	h.handlers.redirect(w, r, "/dashboard/bookings")
+}
+
+// RetryCalendarEvent retries calendar event creation for a single booking
+func (h *DashboardHandler) RetryCalendarEvent(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	bookingID := r.PathValue("id")
+	err := h.handlers.services.Booking.RetryCalendarEvent(r.Context(), host.Host.ID, host.Tenant.ID, bookingID)
+	if err != nil {
+		log.Printf("[DASHBOARD] Calendar retry failed for booking %s: %v", bookingID, err)
+		h.handlers.redirect(w, r, "/dashboard/bookings?error=calendar_retry_failed")
+		return
+	}
+
+	h.handlers.redirect(w, r, "/dashboard/bookings?success=calendar_synced")
+}
+
+// BulkRetryCalendarEvents retries calendar event creation for all eligible bookings
+func (h *DashboardHandler) BulkRetryCalendarEvents(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	successCount, failCount, err := h.handlers.services.Booking.BulkRetryCalendarEvents(r.Context(), host.Host.ID, host.Tenant.ID)
+
+	if r.Header.Get("HX-Request") == "true" {
+		if err != nil {
+			http.Error(w, "Failed to retry calendar events", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("HX-Redirect", "/dashboard/bookings?success=calendar_bulk_synced")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if err != nil || failCount > 0 {
+		log.Printf("[DASHBOARD] Bulk calendar retry: %d succeeded, %d failed", successCount, failCount)
+		h.handlers.redirect(w, r, "/dashboard/bookings?error=calendar_bulk_retry_failed")
+		return
+	}
+
+	log.Printf("[DASHBOARD] Bulk calendar retry: %d succeeded", successCount)
+	h.handlers.redirect(w, r, "/dashboard/bookings?success=calendar_bulk_synced")
 }
 
 // Settings renders the settings page

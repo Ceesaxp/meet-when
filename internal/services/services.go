@@ -34,7 +34,7 @@ func New(cfg *config.Config, repos *repository.Repositories) *Services {
 	sessionSvc := NewSessionService(cfg, repos)
 	authSvc := NewAuthService(cfg, repos, sessionSvc, auditLogSvc)
 	reminderSvc := NewReminderService(repos, emailSvc)
-	calendarSyncSvc := NewCalendarSyncService(calendarSvc)
+	calendarSyncSvc := NewCalendarSyncService(calendarSvc, emailSvc, repos)
 
 	timezoneSvc := NewTimezoneService()
 

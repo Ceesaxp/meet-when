@@ -142,6 +142,8 @@ func main() {
 	dashboard.HandleFunc("POST /dashboard/bookings/{id}/archive", h.Dashboard.ArchiveBooking)
 	dashboard.HandleFunc("POST /dashboard/bookings/{id}/unarchive", h.Dashboard.UnarchiveBooking)
 	dashboard.HandleFunc("POST /dashboard/bookings/archive-all", h.Dashboard.BulkArchiveBookings)
+	dashboard.HandleFunc("POST /dashboard/bookings/{id}/retry-calendar", h.Dashboard.RetryCalendarEvent)
+	dashboard.HandleFunc("POST /dashboard/bookings/retry-calendar-all", h.Dashboard.BulkRetryCalendarEvents)
 
 	// Settings
 	dashboard.HandleFunc("GET /dashboard/settings", h.Dashboard.Settings)

@@ -411,7 +411,8 @@ func (s *CalendarService) exchangeGoogleAuthCode(code, redirectURI string) (*goo
 
 func (s *CalendarService) refreshGoogleToken(cal *models.CalendarConnection) error {
 	// Use UTC for consistent timezone comparison (TokenExpiry is always stored in UTC)
-	if cal.TokenExpiry == nil || time.Now().UTC().Before(cal.TokenExpiry.Add(-5*time.Minute)) {
+	// Nil expiry means unknown/expired — always refresh in that case
+	if cal.TokenExpiry != nil && time.Now().UTC().Before(cal.TokenExpiry.Add(-5*time.Minute)) {
 		return nil // Token still valid
 	}
 
@@ -435,6 +436,8 @@ func (s *CalendarService) refreshGoogleToken(cal *models.CalendarConnection) err
 	}()
 
 	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("[CALENDAR] Google token refresh failed (status %d) for calendar %s: %s", resp.StatusCode, cal.ID, string(body))
 		return ErrCalendarAuth
 	}
 
