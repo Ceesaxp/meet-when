@@ -1654,3 +1654,20 @@ The following features from the requirements document are already fully implemen
   - Host was already loaded in both methods but after end time calc — moving it earlier was sufficient
   - US-011 (reschedule) was trivially covered by the same change as US-010
 ----
+
+## 2026-03-06 - US-012 - Remove status restriction on booking archival
+- What was implemented:
+  - Changed `ArchiveBooking` service method to use time-based check instead of status-based check
+  - Any booking whose `end_time` is in the past can now be archived regardless of status
+  - Future bookings with confirmed or pending status are still protected from archival
+  - Added `isPast` template function to `templateFuncs()` for checking if a `SQLiteTime` is in the past
+  - Updated dashboard bookings template to show archive/unarchive button for past confirmed bookings
+- Files changed:
+  - `internal/services/booking.go` - Changed ArchiveBooking from status check to time-based check
+  - `internal/handlers/handlers.go` - Added `isPast` template function, imported models package
+  - `templates/pages/dashboard_bookings.html` - Added archive button for past confirmed bookings
+- **Learnings for future iterations:**
+  - `SQLiteTime` embeds `time.Time` so methods like `.Before()` are promoted and can be called directly
+  - Template functions need to be registered in `templateFuncs()` in handlers.go
+  - The bookings template uses nested `{{if}}/{{else if}}` blocks for status-based action buttons — adding archive to confirmed status requires nesting within that block
+----

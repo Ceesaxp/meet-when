@@ -178,7 +178,7 @@
         "Build succeeds"
       ],
       "priority": 12,
-      "passes": false,
+      "passes": true,
       "notes": "Modify ArchiveBooking in internal/services/booking.go — change the status check to a time check."
     },
     {
