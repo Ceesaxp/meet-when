@@ -20,6 +20,21 @@ var (
 	ErrBookingCancelled   = errors.New("booking has already been cancelled")
 )
 
+// calculateSmartDuration adjusts a meeting duration to end early, giving buffer time.
+// Durations <= 30 min subtract 5 min; durations > 30 min subtract 10 min.
+// Minimum resulting duration is 5 minutes.
+func calculateSmartDuration(duration int) int {
+	if duration <= 30 {
+		duration -= 5
+	} else {
+		duration -= 10
+	}
+	if duration < 5 {
+		duration = 5
+	}
+	return duration
+}
+
 // BookingService handles booking operations
 type BookingService struct {
 	cfg          *config.Config
@@ -92,8 +107,16 @@ func (s *BookingService) CreateBooking(ctx context.Context, input CreateBookingI
 		input.Duration = template.Durations[0]
 	}
 
-	// Calculate end time
-	endTime := input.StartTime.Add(time.Duration(input.Duration) * time.Minute)
+	// Get host and tenant
+	host, _ := s.repos.Host.GetByID(ctx, input.HostID)
+	tenant, _ := s.repos.Tenant.GetByID(ctx, input.TenantID)
+
+	// Calculate end time (apply smart duration if enabled)
+	actualDuration := input.Duration
+	if host != nil && host.SmartDurations {
+		actualDuration = calculateSmartDuration(input.Duration)
+	}
+	endTime := input.StartTime.Add(time.Duration(actualDuration) * time.Minute)
 
 	// Validate time is in the future with minimum notice
 	minNotice := time.Duration(template.MinNoticeMinutes) * time.Minute
@@ -139,10 +162,6 @@ func (s *BookingService) CreateBooking(ctx context.Context, input CreateBookingI
 	if err := s.repos.Booking.Create(ctx, booking); err != nil {
 		return nil, err
 	}
-
-	// Get host and tenant for emails
-	host, _ := s.repos.Host.GetByID(ctx, input.HostID)
-	tenant, _ := s.repos.Tenant.GetByID(ctx, input.TenantID)
 
 	details := &BookingWithDetails{
 		Booking:  booking,
@@ -414,8 +433,16 @@ func (s *BookingService) RescheduleBooking(ctx context.Context, input Reschedule
 		input.NewDuration = template.Durations[0]
 	}
 
-	// Calculate new end time
-	newEndTime := input.NewStartTime.Add(time.Duration(input.NewDuration) * time.Minute)
+	// Get host and tenant
+	host, _ := s.repos.Host.GetByID(ctx, oldBooking.HostID)
+	tenant, _ := s.repos.Tenant.GetByID(ctx, host.TenantID)
+
+	// Calculate new end time (apply smart duration if enabled)
+	actualDuration := input.NewDuration
+	if host != nil && host.SmartDurations {
+		actualDuration = calculateSmartDuration(input.NewDuration)
+	}
+	newEndTime := input.NewStartTime.Add(time.Duration(actualDuration) * time.Minute)
 
 	// Validate time is in the future with minimum notice
 	minNotice := time.Duration(template.MinNoticeMinutes) * time.Minute
@@ -437,10 +464,6 @@ func (s *BookingService) RescheduleBooking(ctx context.Context, input Reschedule
 	if err := s.repos.Booking.Update(ctx, oldBooking); err != nil {
 		return nil, time.Time{}, err
 	}
-
-	// Get host and tenant
-	host, _ := s.repos.Host.GetByID(ctx, oldBooking.HostID)
-	tenant, _ := s.repos.Tenant.GetByID(ctx, host.TenantID)
 
 	details := &BookingWithDetails{
 		Booking:  oldBooking,
