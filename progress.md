@@ -1528,4 +1528,6 @@ The following features from the requirements document are already fully implemen
   - buildEmailTemplateData (email.go:78) builds template data used by both default and custom email templates — updating RescheduleLink there covers both paths
   - There are 3 default email bodies with reschedule links: confirmation (line ~106), reminder (line ~488), and reschedule notification (line ~446)
   - The reschedule notification email uses inline fmt.Sprintf rather than buildEmailTemplateData — so it needs separate URL construction
+  - When adding new URL formats in emails, always verify a matching route handler exists in cmd/server/main.go
+  - Added RescheduleByID handler that redirects /m/{tenant}/{host}/{template}/reschedule/{booking_id} to /booking/{token}/reschedule — avoids duplicating reschedule page logic
 ----
