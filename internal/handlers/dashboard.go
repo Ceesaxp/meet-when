@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -1389,4 +1390,36 @@ func (h *DashboardHandler) Contacts(w http.ResponseWriter, r *http.Request) {
 		BaseURL:      h.handlers.cfg.Server.BaseURL,
 		Data:         data,
 	})
+}
+
+// ContactBookings renders the booking history for a contact (HTMX partial)
+func (h *DashboardHandler) ContactBookings(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	email, err := url.QueryUnescape(r.PathValue("email"))
+	if err != nil || email == "" {
+		http.Error(w, "Invalid email", http.StatusBadRequest)
+		return
+	}
+
+	bookings, err := h.handlers.services.Contact.GetBookings(r.Context(), host.Tenant.ID, email)
+	if err != nil {
+		log.Printf("[CONTACTS] Error getting bookings for %s: %v", email, err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	contact, _ := h.handlers.services.Contact.GetByEmail(r.Context(), host.Tenant.ID, email)
+
+	data := map[string]interface{}{
+		"Bookings": bookings,
+		"Contact":  contact,
+		"Email":    email,
+	}
+
+	h.handlers.renderPartial(w, "contact_bookings_partial.html", data)
 }

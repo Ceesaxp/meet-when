@@ -12,16 +12,37 @@
     </thead>
     <tbody>
         {{range .Contacts}}
-        <tr>
-            <td>{{if .Name}}{{.Name}}{{else}}<span style="color: var(--text-muted);">-</span>{{end}}</td>
+        <tr class="contact-row"
+            style="cursor: pointer;"
+            hx-get="/dashboard/contacts/{{urlEncode .Email}}/bookings"
+            hx-target="next .contact-bookings-container"
+            hx-swap="innerHTML"
+            hx-trigger="click once"
+            onclick="this.classList.toggle('expanded')">
+            <td>
+                <span style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                    <svg class="contact-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="transition: transform 0.2s;">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                    {{if .Name}}{{.Name}}{{else}}<span style="color: var(--text-muted);">-</span>{{end}}
+                </span>
+            </td>
             <td>{{.Email}}</td>
             <td>{{.MeetingCount}}</td>
             <td>{{if .LastMet}}{{timeAgo .LastMet}}{{else}}<span style="color: var(--text-muted);">Never</span>{{end}}</td>
+        </tr>
+        <tr class="contact-bookings-container" style="display: none;">
+            <td colspan="4" style="padding: 0;"></td>
         </tr>
         {{end}}
     </tbody>
 </table>
 </div>
+<style>
+    .contact-row:hover { background: var(--bg-secondary); }
+    .contact-row.expanded + .contact-bookings-container { display: table-row !important; }
+    .contact-row.expanded .contact-chevron { transform: rotate(90deg); }
+</style>
 {{else}}
 <div class="empty-state">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48" style="opacity: 0.4; margin-bottom: 1rem;">

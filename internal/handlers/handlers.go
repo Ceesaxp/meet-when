@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -272,6 +273,9 @@ func templateFuncs() template.FuncMap {
 		},
 		"isPast": func(t models.SQLiteTime) bool {
 			return t.Before(time.Now())
+		},
+		"urlEncode": func(s string) string {
+			return url.PathEscape(s)
 		},
 	}
 }

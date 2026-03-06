@@ -115,8 +115,8 @@ func (s *ContactService) GetByEmail(ctx context.Context, tenantID, email string)
 	return s.repos.Contact.GetByEmail(ctx, tenantID, email)
 }
 
-// GetBookings returns bookings for a contact
-func (s *ContactService) GetBookings(ctx context.Context, tenantID, email string) ([]*models.Booking, error) {
+// GetBookings returns bookings for a contact with template names
+func (s *ContactService) GetBookings(ctx context.Context, tenantID, email string) ([]*models.ContactBookingView, error) {
 	return s.repos.Contact.GetBookings(ctx, tenantID, email)
 }
 

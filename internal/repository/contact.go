@@ -136,15 +136,17 @@ func (r *ContactRepository) GetByEmail(ctx context.Context, tenantID, email stri
 }
 
 // GetBookings returns bookings for a given contact email within a tenant
-func (r *ContactRepository) GetBookings(ctx context.Context, tenantID, email string) ([]*models.Booking, error) {
+func (r *ContactRepository) GetBookings(ctx context.Context, tenantID, email string) ([]*models.ContactBookingView, error) {
 	query := q(r.driver, `
 		SELECT b.id, b.template_id, b.host_id, b.token, b.status, b.start_time, b.end_time, b.duration,
 		       b.invitee_name, b.invitee_email, COALESCE(b.invitee_timezone, ''), COALESCE(b.invitee_phone, ''),
 		       b.additional_guests, b.answers, COALESCE(b.conference_link, ''), COALESCE(b.calendar_event_id, ''),
 		       COALESCE(b.cancelled_by, ''), COALESCE(b.cancel_reason, ''), COALESCE(b.reminder_sent, false),
-		       COALESCE(b.is_archived, false), b.created_at, b.updated_at
+		       COALESCE(b.is_archived, false), b.created_at, b.updated_at,
+		       COALESCE(t.name, 'Unknown')
 		FROM bookings b
 		JOIN hosts h ON b.host_id = h.id
+		LEFT JOIN meeting_templates t ON b.template_id = t.id
 		WHERE h.tenant_id = $1 AND b.invitee_email = $2
 		ORDER BY b.start_time DESC
 	`)
@@ -159,9 +161,10 @@ func (r *ContactRepository) GetBookings(ctx context.Context, tenantID, email str
 		}
 	}()
 
-	var bookings []*models.Booking
+	var views []*models.ContactBookingView
 	for rows.Next() {
 		booking := &models.Booking{}
+		var templateName string
 		err := rows.Scan(
 			&booking.ID, &booking.TemplateID, &booking.HostID, &booking.Token,
 			&booking.Status, &booking.StartTime, &booking.EndTime, &booking.Duration,
@@ -169,14 +172,18 @@ func (r *ContactRepository) GetBookings(ctx context.Context, tenantID, email str
 			&booking.InviteePhone, &booking.AdditionalGuests, &booking.Answers,
 			&booking.ConferenceLink, &booking.CalendarEventID,
 			&booking.CancelledBy, &booking.CancelReason, &booking.ReminderSent,
-			&booking.IsArchived, &booking.CreatedAt, &booking.UpdatedAt)
+			&booking.IsArchived, &booking.CreatedAt, &booking.UpdatedAt,
+			&templateName)
 		if err != nil {
 			return nil, err
 		}
-		bookings = append(bookings, booking)
+		views = append(views, &models.ContactBookingView{
+			Booking:      booking,
+			TemplateName: templateName,
+		})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	return bookings, nil
+	return views, nil
 }

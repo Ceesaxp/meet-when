@@ -269,6 +269,12 @@ type Contact struct {
 	UpdatedAt    SQLiteTime  `json:"updated_at" db:"updated_at"`
 }
 
+// ContactBookingView pairs a booking with its template name for contact history display
+type ContactBookingView struct {
+	Booking      *Booking
+	TemplateName string
+}
+
 // SignupConversion represents a conversion tracking record for registration CTAs
 type SignupConversion struct {
 	ID              string      `json:"id" db:"id"`

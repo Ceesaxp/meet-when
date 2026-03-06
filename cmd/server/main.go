@@ -149,6 +149,7 @@ func main() {
 
 	// Contacts
 	dashboard.HandleFunc("GET /dashboard/contacts", h.Dashboard.Contacts)
+	dashboard.HandleFunc("GET /dashboard/contacts/{email}/bookings", h.Dashboard.ContactBookings)
 
 	// Settings
 	dashboard.HandleFunc("GET /dashboard/settings", h.Dashboard.Settings)
