@@ -1515,3 +1515,17 @@ The following features from the requirements document are already fully implemen
   - AuthHandler accesses config via `h.handlers.cfg` (AuthHandler -> Handlers -> cfg)
   - There are also google_auth_nonce and google_profile cookies with MaxAge=600 (10 min) and logout/clear cookies with MaxAge=-1 — these are intentionally different and should NOT use SessionDuration
 ----
+
+## 2026-03-06 - US-002 - Add reschedule link to confirmation email body
+- Updated reschedule link format from `{BASE_URL}/booking/{token}/reschedule` to `{BASE_URL}/m/{tenant_slug}/{host_slug}/{template_slug}/reschedule/{booking_id}`
+- Changed label from "Reschedule:" to "Reschedule this meeting:" with link on its own line
+- Updated in 3 places: defaultInviteeConfirmationBody, sendInviteeRescheduleNotification, defaultReminderBody
+- Also updated buildEmailTemplateData which generates the RescheduleLink for custom templates
+- Files changed:
+  - `internal/services/email.go` - Updated reschedule link format and label in all email templates
+- **Learnings for future iterations:**
+  - BookingWithDetails has Tenant, Host, Template, and Booking — all slug fields available for URL construction
+  - buildEmailTemplateData (email.go:78) builds template data used by both default and custom email templates — updating RescheduleLink there covers both paths
+  - There are 3 default email bodies with reschedule links: confirmation (line ~106), reminder (line ~488), and reschedule notification (line ~446)
+  - The reschedule notification email uses inline fmt.Sprintf rather than buildEmailTemplateData — so it needs separate URL construction
+----
