@@ -1,5 +1,6 @@
 .PHONY: build run test clean docker-build docker-up docker-down dev \
-       hub-build hub-push hub-prod hub-down
+       hub-build hub-push hub-prod hub-down \
+       deploy deploy-compose ci ci-local
 
 # Go parameters
 GOCMD=go
@@ -88,6 +89,37 @@ hub-prod:
 # Stop Docker Hub production containers
 hub-down:
 	docker compose -f docker-compose-hub.yml --profile prod down
+
+# Remote deployment via SSH (mirrors GHA deploy workflow)
+DEPLOY_KEY?=~/.ssh/mw-app_key
+DEPLOY_USER?=mw-app
+DEPLOY_HOST?=
+DEPLOY_PATH?=/opt/meet-when/mw-prod
+
+# Deploy: pull latest image and restart on remote host
+deploy:
+	@if [ -z "$(DEPLOY_HOST)" ]; then echo "Error: DEPLOY_HOST is required"; exit 1; fi
+	ssh -i $(DEPLOY_KEY) $(DEPLOY_USER)@$(DEPLOY_HOST) '\
+		set -e && \
+		docker pull $(DOCKER_HUB_IMAGE):$(VERSION) && \
+		cd $(DEPLOY_PATH) && \
+		IMAGE_TAG=$(VERSION) docker compose -f docker-compose-hub.yml --profile prod down && \
+		IMAGE_TAG=$(VERSION) docker compose -f docker-compose-hub.yml --profile prod up -d --remove-orphans && \
+		docker system prune -f && \
+		echo "Deployed $(DOCKER_HUB_IMAGE):$(VERSION) successfully"'
+
+# Deploy with updated docker-compose file: copy compose file, then deploy
+deploy-compose:
+	@if [ -z "$(DEPLOY_HOST)" ]; then echo "Error: DEPLOY_HOST is required"; exit 1; fi
+	scp -i $(DEPLOY_KEY) docker-compose-hub.yml $(DEPLOY_USER)@$(DEPLOY_HOST):$(DEPLOY_PATH)/docker-compose-hub.yml
+	$(MAKE) deploy
+
+# CI: run GitHub Actions workflow locally via act
+ci:
+	act push --container-architecture linux/amd64
+
+# CI without Docker: test + build + push (no act required)
+ci-local: test hub-build
 
 # Development helpers
 fmt:
