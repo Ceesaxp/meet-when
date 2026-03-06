@@ -1749,3 +1749,17 @@ The following features from the requirements document are already fully implemen
   - Use `any` instead of `interface{}` to satisfy the modernize linter
   - GetBookings needs to join through hosts table to get tenant_id since bookings only have host_id
 ----
+
+## 2026-03-06 - US-018 - Create contact service and hook into booking confirmation
+- Created `internal/services/contact.go` with ContactService: UpsertFromBooking, BackfillFromBookings, ListContacts, GetByEmail, GetBookings, HasContacts, EnsureBackfilled
+- Added `ListConfirmedByTenant` method to BookingRepository for backfill support
+- Wired ContactService into BookingService via constructor injection
+- Hooked `UpsertFromBooking` into `processConfirmedBooking` -- runs after confirmation emails, errors logged but don't block booking flow
+- Files changed: internal/services/contact.go (new), internal/services/booking.go, internal/services/services.go, internal/repository/repository.go
+- **Learnings for future iterations:**
+  - BookingService uses constructor injection for all dependencies -- add new services as constructor params, not as fields set later
+  - `processConfirmedBooking` is the single hook point for both auto-approved (CreateBooking) and manually approved (ApproveBooking) bookings
+  - Bookings don't have tenant_id directly -- join through hosts table to get tenant scope
+  - Contact upsert uses ON CONFLICT with separate SQLite/Postgres query paths (driver-specific syntax for EXCLUDED vs excluded and timestamp casting)
+  - BackfillFromBookings and EnsureBackfilled are ready for US-021 (backfill contacts from existing bookings)
+----
