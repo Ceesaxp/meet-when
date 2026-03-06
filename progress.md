@@ -1575,3 +1575,18 @@ The following features from the requirements document are already fully implemen
   - Both CreateTemplate and UpdateTemplate share the same input struct pattern with `Durations []int`
   - The validation runs after defaults are set (so the default `[]int{30}` also gets validated, which is fine since 30 is in range)
 ----
+
+## 2026-03-06 - US-006 - Expand preset duration chips in template form
+- What was implemented:
+  - Expanded duration chip options from [15, 30, 45, 60, 90] to [15, 20, 25, 30, 45, 50, 60, 75, 90, 120]
+  - All chips in ascending order
+  - 30 min remains the default selected chip for new templates
+  - Existing templates with current durations continue to work (template editing uses `contains` helper to check each value)
+- Files changed:
+  - `templates/pages/dashboard_template_form.html` - Updated duration chips section with 5 new options (20, 25, 50, 75, 120)
+  - `plans/prd.json` - Marked US-006 as passing
+- **Learnings for future iterations:**
+  - The onboarding page (`templates/pages/onboarding.html`) also has duration chips but with a simpler subset — may want to update separately if consistency is desired
+  - Duration chips use a `contains` template function to check if a value exists in the template's Durations slice
+  - The 30 min chip has special default-selected logic: `{{else}}selected{{end}}` for when no template exists yet
+----

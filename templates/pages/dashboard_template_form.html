@@ -58,6 +58,14 @@
                 <input type="checkbox" name="durations" value="15" {{if .Data.Template}}{{if contains .Data.Template.Durations 15}}checked{{end}}{{end}}>
                 15 min
             </label>
+            <label class="duration-chip {{if .Data.Template}}{{if contains .Data.Template.Durations 20}}selected{{end}}{{end}}">
+                <input type="checkbox" name="durations" value="20" {{if .Data.Template}}{{if contains .Data.Template.Durations 20}}checked{{end}}{{end}}>
+                20 min
+            </label>
+            <label class="duration-chip {{if .Data.Template}}{{if contains .Data.Template.Durations 25}}selected{{end}}{{end}}">
+                <input type="checkbox" name="durations" value="25" {{if .Data.Template}}{{if contains .Data.Template.Durations 25}}checked{{end}}{{end}}>
+                25 min
+            </label>
             <label class="duration-chip {{if .Data.Template}}{{if contains .Data.Template.Durations 30}}selected{{else}}{{end}}{{else}}selected{{end}}">
                 <input type="checkbox" name="durations" value="30" {{if .Data.Template}}{{if contains .Data.Template.Durations 30}}checked{{end}}{{else}}checked{{end}}>
                 30 min
@@ -66,13 +74,25 @@
                 <input type="checkbox" name="durations" value="45" {{if .Data.Template}}{{if contains .Data.Template.Durations 45}}checked{{end}}{{end}}>
                 45 min
             </label>
+            <label class="duration-chip {{if .Data.Template}}{{if contains .Data.Template.Durations 50}}selected{{end}}{{end}}">
+                <input type="checkbox" name="durations" value="50" {{if .Data.Template}}{{if contains .Data.Template.Durations 50}}checked{{end}}{{end}}>
+                50 min
+            </label>
             <label class="duration-chip {{if .Data.Template}}{{if contains .Data.Template.Durations 60}}selected{{end}}{{end}}">
                 <input type="checkbox" name="durations" value="60" {{if .Data.Template}}{{if contains .Data.Template.Durations 60}}checked{{end}}{{end}}>
                 60 min
             </label>
+            <label class="duration-chip {{if .Data.Template}}{{if contains .Data.Template.Durations 75}}selected{{end}}{{end}}">
+                <input type="checkbox" name="durations" value="75" {{if .Data.Template}}{{if contains .Data.Template.Durations 75}}checked{{end}}{{end}}>
+                75 min
+            </label>
             <label class="duration-chip {{if .Data.Template}}{{if contains .Data.Template.Durations 90}}selected{{end}}{{end}}">
                 <input type="checkbox" name="durations" value="90" {{if .Data.Template}}{{if contains .Data.Template.Durations 90}}checked{{end}}{{end}}>
                 90 min
+            </label>
+            <label class="duration-chip {{if .Data.Template}}{{if contains .Data.Template.Durations 120}}selected{{end}}{{end}}">
+                <input type="checkbox" name="durations" value="120" {{if .Data.Template}}{{if contains .Data.Template.Durations 120}}checked{{end}}{{end}}>
+                120 min
             </label>
         </div>
     </section>

@@ -88,7 +88,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "Edit templates/pages/dashboard_template_form.html — update the hardcoded chip values."
     },
     {
