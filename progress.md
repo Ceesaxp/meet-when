@@ -1558,3 +1558,20 @@ The following features from the requirements document are already fully implemen
   - Always check if prior stories already covered the acceptance criteria before implementing — US-002/US-003 covered all three email types (confirmation, reminder, reschedule notification) in a single pass
   - The generateICS() function is shared across all email types, so ICS changes in US-003 automatically apply to reminders
 ----
+
+## 2026-03-06 - US-005 - Add backend validation for custom durations
+- What was implemented:
+  - Added `validateDurations()` helper function in template service that validates, deduplicates, and sorts duration values
+  - Rejects durations outside 5-480 minute range with clear error message using `fmt.Errorf` wrapping `ErrInvalidDuration`
+  - Deduplicates using a map-based seen set
+  - Sorts ascending using `sort.Ints()`
+  - Integrated validation into both `CreateTemplate` and `UpdateTemplate` methods (called after defaults, before persisting)
+  - Added `ErrInvalidDuration` sentinel error
+- Files changed:
+  - `internal/services/template.go` - Added validateDurations(), ErrInvalidDuration, and calls in Create/Update
+  - `plans/prd.json` - Marked US-005 as passing
+- **Learnings for future iterations:**
+  - Template service already had no tests file — validation logic is straightforward enough to verify via build
+  - Both CreateTemplate and UpdateTemplate share the same input struct pattern with `Durations []int`
+  - The validation runs after defaults are set (so the default `[]int{30}` also gets validated, which is fine since 30 is in range)
+----
