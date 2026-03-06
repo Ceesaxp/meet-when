@@ -147,6 +147,9 @@ func main() {
 	dashboard.HandleFunc("POST /dashboard/bookings/{id}/retry-calendar", h.Dashboard.RetryCalendarEvent)
 	dashboard.HandleFunc("POST /dashboard/bookings/retry-calendar-all", h.Dashboard.BulkRetryCalendarEvents)
 
+	// Contacts
+	dashboard.HandleFunc("GET /dashboard/contacts", h.Dashboard.Contacts)
+
 	// Settings
 	dashboard.HandleFunc("GET /dashboard/settings", h.Dashboard.Settings)
 	dashboard.HandleFunc("PUT /dashboard/settings", h.Dashboard.UpdateSettings)

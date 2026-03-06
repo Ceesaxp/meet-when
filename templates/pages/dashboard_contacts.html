@@ -1,0 +1,31 @@
+{{define "dashboard_contacts.html"}}
+{{template "dashboard" .}}
+{{end}}
+
+{{define "content"}}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Contacts</h1>
+        <p class="page-subtitle">People you've met with</p>
+    </div>
+</div>
+
+<div style="margin-bottom: 1.5rem;">
+    <input type="search"
+           name="search"
+           placeholder="Search by name or email..."
+           value="{{.Data.Search}}"
+           class="form-input"
+           style="max-width: 400px;"
+           hx-get="/dashboard/contacts"
+           hx-trigger="input changed delay:300ms, search"
+           hx-target="#contacts-table"
+           hx-swap="innerHTML"
+           hx-include="this"
+    >
+</div>
+
+<div id="contacts-table">
+    {{template "contacts_table_partial.html" .Data}}
+</div>
+{{end}}

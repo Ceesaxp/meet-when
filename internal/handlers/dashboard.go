@@ -1348,3 +1348,45 @@ func filterAvailableHosts(allHosts []*models.Host, pooledHosts []*models.Templat
 	}
 	return available
 }
+
+// Contacts renders the contacts list page
+func (h *DashboardHandler) Contacts(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	search := r.URL.Query().Get("search")
+
+	// Ensure contacts are backfilled from existing bookings on first access
+	if err := h.handlers.services.Contact.EnsureBackfilled(r.Context(), host.Tenant.ID); err != nil {
+		log.Printf("[CONTACTS] Error ensuring backfill: %v", err)
+	}
+
+	contacts, err := h.handlers.services.Contact.ListContacts(r.Context(), host.Tenant.ID, search, 0, 100)
+	if err != nil {
+		log.Printf("[CONTACTS] Error listing contacts: %v", err)
+	}
+
+	data := map[string]interface{}{
+		"Contacts": contacts,
+		"Search":   search,
+	}
+
+	// For HTMX search requests, render just the table partial
+	if r.Header.Get("HX-Request") == "true" {
+		h.handlers.renderPartial(w, "contacts_table_partial.html", data)
+		return
+	}
+
+	h.handlers.render(w, "dashboard_contacts.html", PageData{
+		Title:        "Contacts",
+		Host:         host.Host,
+		Tenant:       host.Tenant,
+		ActiveNav:    "contacts",
+		PendingCount: h.getPendingCount(r, host.Host.ID),
+		BaseURL:      h.handlers.cfg.Server.BaseURL,
+		Data:         data,
+	})
+}
