@@ -1717,3 +1717,21 @@ The following features from the requirements document are already fully implemen
   - `ArchiveOldBookings` is the cross-tenant version (from US-013), perfect for background jobs; `ArchiveOldBookingsByHostID` is the host-scoped version for dashboard buttons
   - Context cancellation is wired before server.Shutdown so the worker stops before the server fully shuts down
 ----
+
+## 2026-03-06, 11:30 - US-016 - Create contacts table and model
+- What was implemented:
+  - Migration 011_add_contacts.up.sql for both Postgres and SQLite
+  - Postgres version uses UUID PK, TIMESTAMP WITH TIME ZONE, VARCHAR types
+  - SQLite version uses TEXT PK, TEXT timestamps with strftime default, TEXT types
+  - Both have UNIQUE(tenant_id, email) constraint and indexes on tenant_id and email
+  - Contact model struct in internal/models/models.go with all fields matching the schema
+  - Phone, Timezone, FirstMet, LastMet are nullable (pointer types)
+- Files changed:
+  - `migrations/011_add_contacts.up.sql` - Postgres contacts table
+  - `migrations/sqlite/011_add_contacts.up.sql` - SQLite contacts table
+  - `internal/models/models.go` - Added Contact struct
+- **Learnings for future iterations:**
+  - Migrations must be created in both `migrations/` (Postgres) and `migrations/sqlite/` directories
+  - Postgres uses UUID, TIMESTAMP WITH TIME ZONE, VARCHAR; SQLite uses TEXT for everything with strftime defaults
+  - Nullable time fields use *SQLiteTime (pointer) in the model struct
+----
