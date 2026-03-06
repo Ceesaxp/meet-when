@@ -1031,7 +1031,7 @@ func (r *BookingRepository) ArchiveOldBookings(ctx context.Context, cutoffTime t
 	query := q(r.driver, `
 		UPDATE bookings
 		SET is_archived = true
-		WHERE is_archived = false
+		WHERE (is_archived = false OR is_archived IS NULL)
 		  AND end_time < $1
 	`)
 	result, err := r.db.ExecContext(ctx, query, cutoffTime)
