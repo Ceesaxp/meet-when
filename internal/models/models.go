@@ -88,6 +88,7 @@ type Host struct {
 	OnboardingCompleted bool       `json:"onboarding_completed" db:"onboarding_completed"`
 	GoogleID            *string    `json:"google_id,omitempty" db:"google_id"`
 	GoogleEmail         *string    `json:"google_email,omitempty" db:"google_email"`
+	SmartDurations      bool       `json:"smart_durations" db:"smart_durations"`
 	CreatedAt           SQLiteTime `json:"created_at" db:"created_at"`
 	UpdatedAt           SQLiteTime `json:"updated_at" db:"updated_at"`
 }

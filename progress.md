@@ -1612,3 +1612,14 @@ The following features from the requirements document are already fully implemen
   - The `contains` template function only works with `[]int` — for checking membership in a literal list, use JavaScript instead
   - Custom chips are appended to a separate `#custom-durations` div to keep them visually distinct from presets
 ----
+
+## 2026-03-06, 10:00 AM - US-008 - Add smart_durations column to hosts table
+- Added migration 010_add_smart_durations for both PostgreSQL (BOOLEAN NOT NULL DEFAULT false) and SQLite (INTEGER NOT NULL DEFAULT 0)
+- Added SmartDurations bool field to Host model struct in internal/models/models.go
+- Updated HostRepository: INSERT query (Create), all SELECT queries (GetByID, GetByEmail, GetAllByEmail, GetBySlug, GetByTenantID, GetByGoogleID) and their Scan calls
+- Used COALESCE(smart_durations, false) in SELECT queries for safety with existing rows
+- **Learnings for future iterations:**
+  - Host queries use explicit column lists (not SELECT *), so every new column requires updating 7+ locations in repository.go
+  - SQLite uses INTEGER for booleans (0/1), PostgreSQL uses BOOLEAN — migration files differ
+  - COALESCE wrapping in SELECTs is the pattern used for newer boolean columns (see onboarding_completed)
+----

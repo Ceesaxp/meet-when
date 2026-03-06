@@ -119,7 +119,7 @@
         "Build succeeds"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "Schema-only change. Create a new migration file in migrations/ directory."
     },
     {

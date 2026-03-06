@@ -115,13 +115,13 @@ type HostRepository struct {
 
 func (r *HostRepository) Create(ctx context.Context, host *models.Host) error {
 	query := q(r.driver, `
-		INSERT INTO hosts (id, tenant_id, email, password_hash, name, slug, timezone, is_admin, onboarding_completed, google_id, google_email, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		INSERT INTO hosts (id, tenant_id, email, password_hash, name, slug, timezone, is_admin, onboarding_completed, google_id, google_email, smart_durations, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	`)
 	_, err := r.db.ExecContext(ctx, query,
 		host.ID, host.TenantID, host.Email, host.PasswordHash, host.Name,
 		host.Slug, host.Timezone, host.IsAdmin, host.OnboardingCompleted,
-		host.GoogleID, host.GoogleEmail, host.CreatedAt, host.UpdatedAt)
+		host.GoogleID, host.GoogleEmail, host.SmartDurations, host.CreatedAt, host.UpdatedAt)
 	return err
 }
 
@@ -130,14 +130,14 @@ func (r *HostRepository) GetByID(ctx context.Context, id string) (*models.Host, 
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
 		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false),
-		       google_id, google_email, created_at, updated_at
+		       google_id, google_email, COALESCE(smart_durations, false), created_at, updated_at
 		FROM hosts WHERE id = $1
 	`)
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
 		&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
 		&host.OnboardingCompleted, &host.GoogleID, &host.GoogleEmail,
-		&host.CreatedAt, &host.UpdatedAt)
+		&host.SmartDurations, &host.CreatedAt, &host.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -149,14 +149,14 @@ func (r *HostRepository) GetByEmail(ctx context.Context, tenantID, email string)
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
 		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false),
-		       google_id, google_email, created_at, updated_at
+		       google_id, google_email, COALESCE(smart_durations, false), created_at, updated_at
 		FROM hosts WHERE tenant_id = $1 AND email = $2
 	`)
 	err := r.db.QueryRowContext(ctx, query, tenantID, email).Scan(
 		&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
 		&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
 		&host.OnboardingCompleted, &host.GoogleID, &host.GoogleEmail,
-		&host.CreatedAt, &host.UpdatedAt)
+		&host.SmartDurations, &host.CreatedAt, &host.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -170,7 +170,7 @@ func (r *HostRepository) GetAllByEmail(ctx context.Context, email string) ([]*mo
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
 		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false),
-		       google_id, google_email, created_at, updated_at
+		       google_id, google_email, COALESCE(smart_durations, false), created_at, updated_at
 		FROM hosts WHERE email = $1
 	`)
 	rows, err := r.db.QueryContext(ctx, query, email)
@@ -210,14 +210,14 @@ func (r *HostRepository) GetBySlug(ctx context.Context, tenantID, slug string) (
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
 		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false),
-		       google_id, google_email, created_at, updated_at
+		       google_id, google_email, COALESCE(smart_durations, false), created_at, updated_at
 		FROM hosts WHERE tenant_id = $1 AND slug = $2
 	`)
 	err := r.db.QueryRowContext(ctx, query, tenantID, slug).Scan(
 		&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
 		&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
 		&host.OnboardingCompleted, &host.GoogleID, &host.GoogleEmail,
-		&host.CreatedAt, &host.UpdatedAt)
+		&host.SmartDurations, &host.CreatedAt, &host.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -252,7 +252,7 @@ func (r *HostRepository) GetByTenantID(ctx context.Context, tenantID string) ([]
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
 		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false),
-		       google_id, google_email, created_at, updated_at
+		       google_id, google_email, COALESCE(smart_durations, false), created_at, updated_at
 		FROM hosts WHERE tenant_id = $1
 		ORDER BY name ASC
 	`)
@@ -289,7 +289,7 @@ func (r *HostRepository) GetByGoogleID(ctx context.Context, googleID string) ([]
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
 		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false),
-		       google_id, google_email, created_at, updated_at
+		       google_id, google_email, COALESCE(smart_durations, false), created_at, updated_at
 		FROM hosts WHERE google_id = $1
 	`)
 	rows, err := r.db.QueryContext(ctx, query, googleID)
