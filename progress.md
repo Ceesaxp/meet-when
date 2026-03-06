@@ -1531,3 +1531,18 @@ The following features from the requirements document are already fully implemen
   - When adding new URL formats in emails, always verify a matching route handler exists in cmd/server/main.go
   - Added RescheduleByID handler that redirects /m/{tenant}/{host}/{template}/reschedule/{booking_id} to /booking/{token}/reschedule — avoids duplicating reschedule page logic
 ----
+
+## 2026-03-06, 10:00 AM - US-003 - Add reschedule link to ICS calendar event descriptions
+- Added reschedule URL to ICS DESCRIPTION field in generateICS() (email.go) — used by confirmation, reminder, and reschedule notification emails
+- Added reschedule URL to Google Calendar event description in createGoogleEvent() (calendar.go)
+- Added reschedule URL to CalDAV event description in createCalDAVEvent() (calendar.go) — uses escaped newlines (\\n) for ICS format
+- Verified reschedule page handles cancelled/rejected bookings gracefully (existing checks at public.go:528-536)
+- Files changed: internal/services/email.go, internal/services/calendar.go
+- **Learnings for future iterations:**
+  - The ICS generateICS() in email.go uses real newlines in description, then escapeICS() handles them — just append normally
+  - CalDAV createCalDAVEvent() in calendar.go uses literal \\n strings in the description (not real newlines) — must match this pattern
+  - Google Calendar createGoogleEvent() uses real newlines like email.go
+  - All three description-building blocks follow the same pattern: template description + agenda + reschedule link
+  - The generateICS() function is shared by confirmation, reminder, and reschedule notification emails — one change covers all three
+  - BookingWithDetails has Tenant, Host, Template with Slug fields, and CalendarService has s.cfg for BaseURL access
+----

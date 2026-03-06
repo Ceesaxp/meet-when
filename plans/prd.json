@@ -1,0 +1,327 @@
+{
+  "project": "MeetWhen",
+  "branchName": "ralph/q2-2026-enhancements",
+  "description": "Q2 2026 Enhancements — session duration fix, reschedule links, custom/smart durations, auto-archive, and CRM lite",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Change session duration default to 7 days and use config value",
+      "description": "As a host, I want to stay logged in for 7 days so I don't have to re-authenticate daily.",
+      "acceptanceCriteria": [
+        "SESSION_DURATION_HOURS default changed from 24 to 168 in internal/config/config.go",
+        "All http.SetCookie calls in internal/handlers/auth.go use cfg.App.SessionDuration for MaxAge instead of hardcoded 24 * time.Hour",
+        "Grep auth.go for all MaxAge occurrences and fix every one (Login, Register, SelectOrg, Google login/signup)",
+        "Session record TTL in database matches the configured duration",
+        "Existing sessions continue to work after deployment (no breaking schema changes)",
+        "Build succeeds"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Add reschedule link to confirmation email body",
+      "description": "As an invitee, I want a reschedule link in my booking confirmation email so I can change the meeting time.",
+      "acceptanceCriteria": [
+        "Confirmation email body includes a clearly labeled 'Reschedule this meeting' link",
+        "Link format: {BASE_URL}/m/{tenant_slug}/{host_slug}/{template_slug}/reschedule/{booking_id}",
+        "Link is on its own line, visually distinct from surrounding text",
+        "Build succeeds"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Edit internal/services/email.go — the confirmation email template function."
+    },
+    {
+      "id": "US-003",
+      "title": "Add reschedule link to ICS calendar event descriptions",
+      "description": "As an invitee, I want a reschedule link in my calendar event details so I can find it when viewing the meeting.",
+      "acceptanceCriteria": [
+        "ICS DESCRIPTION field in email attachment includes reschedule URL on its own line, labeled 'Reschedule this meeting:'",
+        "Google Calendar API event description also includes the reschedule URL",
+        "CalDAV/iCloud event description also includes the reschedule URL",
+        "Verify that the existing reschedule page handles cancelled or past bookings gracefully (shows appropriate message, does not error)",
+        "Build succeeds"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "Three locations: ICS generation in email.go, Google Calendar event in calendar.go, CalDAV event in calendar.go. Also verify FR-203: reschedule page graceful handling of edge cases."
+    },
+    {
+      "id": "US-004",
+      "title": "Add reschedule link to reminder email",
+      "description": "As an invitee, I want a reschedule link in reminder emails so I can adjust if my schedule changed.",
+      "acceptanceCriteria": [
+        "Reminder email body includes the same reschedule link format as confirmation email",
+        "Reminder ICS attachment description includes the reschedule URL",
+        "Build succeeds"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "Edit the reminder email function in internal/services/email.go."
+    },
+    {
+      "id": "US-005",
+      "title": "Add backend validation for custom durations",
+      "description": "As a developer, I need backend validation so only valid durations (5-480 minutes) are accepted.",
+      "acceptanceCriteria": [
+        "Template service rejects durations outside the 5-480 minute range with a clear error message",
+        "Template service rejects non-integer or negative values",
+        "Duplicate durations within a template are deduplicated before save",
+        "Durations are sorted ascending before storage",
+        "Build succeeds"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "Backend-only change in template service. Must be done before UI changes."
+    },
+    {
+      "id": "US-006",
+      "title": "Expand preset duration chips in template form",
+      "description": "As a host, I want more preset duration options (20, 25, 50, 75, 120 min) in the template form.",
+      "acceptanceCriteria": [
+        "Duration chip options are: 15, 20, 25, 30, 45, 50, 60, 75, 90, 120 minutes",
+        "Chips displayed in ascending order",
+        "Existing templates with current durations continue to work unchanged",
+        "Build succeeds",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "Edit templates/pages/dashboard_template_form.html — update the hardcoded chip values."
+    },
+    {
+      "id": "US-007",
+      "title": "Add custom duration free-form input to template form",
+      "description": "As a host, I want to type a custom meeting duration so I can offer non-standard lengths.",
+      "acceptanceCriteria": [
+        "A 'Custom' input field appears alongside the preset chips",
+        "Host can type any integer value between 5 and 480",
+        "Invalid values show an inline error message",
+        "Custom value is added to the template durations array alongside selected presets",
+        "If custom value matches a preset, no duplicate is created",
+        "Build succeeds",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "UI change in templates/pages/dashboard_template_form.html. Backend validation already in place from US-005."
+    },
+    {
+      "id": "US-008",
+      "title": "Add smart_durations column to hosts table",
+      "description": "As a developer, I need a database column to store the smart durations preference per host.",
+      "acceptanceCriteria": [
+        "New migration adds boolean column smart_durations to hosts table with default false",
+        "Migration works with both SQLite and PostgreSQL",
+        "Host model struct in internal/models/models.go includes SmartDurations bool field",
+        "Build succeeds"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "Schema-only change. Create a new migration file in migrations/ directory."
+    },
+    {
+      "id": "US-009",
+      "title": "Add smart durations toggle to settings page",
+      "description": "As a host, I want a toggle on my settings page to enable smart durations.",
+      "acceptanceCriteria": [
+        "Toggle labeled 'Smart durations' on the Settings page",
+        "Helper text: 'End meetings 5-10 minutes early to give you buffer time'",
+        "Toggle saves the smart_durations value to the host record via UpdateSettings handler",
+        "Build succeeds",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "Edit templates/pages/dashboard_settings.html and the UpdateSettings handler."
+    },
+    {
+      "id": "US-010",
+      "title": "Apply smart duration logic at booking creation",
+      "description": "As a system, I need to shave time off meeting end times when smart durations is enabled.",
+      "acceptanceCriteria": [
+        "When host has smart_durations enabled: durations <= 30 min subtract 5 min, durations > 30 min subtract 10 min",
+        "Minimum resulting duration is 5 minutes (never goes to 0)",
+        "Adjusted duration is used for booking end_time calculation",
+        "Adjusted duration is used for ICS DTEND, Google Calendar end time, and CalDAV end time",
+        "Original unadjusted duration is stored on the booking record for display",
+        "Invitee booking page still shows the original duration (e.g. '30 min' not '25 min')",
+        "Build succeeds"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "Apply in booking service layer. Formula: actual = duration <= 30 ? duration - 5 : duration - 10; actual = max(actual, 5). Note: shares ICS/calendar code paths with US-003 (reschedule links) — US-003 runs first."
+    },
+    {
+      "id": "US-011",
+      "title": "Apply smart duration to rescheduled bookings",
+      "description": "As a system, I need smart durations applied consistently when bookings are rescheduled.",
+      "acceptanceCriteria": [
+        "Rescheduled booking end_time uses the same smart duration logic as new bookings",
+        "Uses the host's current smart_durations setting at reschedule time",
+        "Build succeeds"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "Update the RescheduleBooking method in booking service."
+    },
+    {
+      "id": "US-012",
+      "title": "Remove status restriction on booking archival",
+      "description": "As a host, I want to archive any past booking regardless of its status.",
+      "acceptanceCriteria": [
+        "ArchiveBooking service method allows archiving any booking whose end_time is in the past",
+        "Future bookings with status confirmed or pending cannot be archived",
+        "Manual archive button works for individual past confirmed bookings",
+        "Build succeeds"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "Modify ArchiveBooking in internal/services/booking.go — change the status check to a time check."
+    },
+    {
+      "id": "US-013",
+      "title": "Add ArchiveOldBookings repository method",
+      "description": "As a developer, I need a bulk archive query that archives bookings older than a cutoff time.",
+      "acceptanceCriteria": [
+        "New repository method: ArchiveOldBookings(ctx, cutoffTime) returns (count int, err error)",
+        "Archives all unarchived bookings where end_time < cutoffTime, across all tenants",
+        "Uses q() helper for SQLite/Postgres compatibility",
+        "Build succeeds"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": "Add to booking repository. Used by both the background job and the dashboard button."
+    },
+    {
+      "id": "US-014",
+      "title": "Add 'Archive all past' button to bookings dashboard",
+      "description": "As a host, I want a button to archive all past meetings at once.",
+      "acceptanceCriteria": [
+        "'Archive all past' button visible on the bookings dashboard page",
+        "Button calls ArchiveOldBookings with now as cutoff (archives everything past)",
+        "Button is hidden when there are no past unarchived bookings",
+        "Shows confirmation with count before archiving (e.g. 'Archive 12 past meetings?')",
+        "Build succeeds",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": "Add button to dashboard template and a new handler endpoint."
+    },
+    {
+      "id": "US-015",
+      "title": "Add automatic archival background worker",
+      "description": "As a system, I need to auto-archive bookings older than 2 weeks on a daily schedule.",
+      "acceptanceCriteria": [
+        "Background goroutine starts on application boot in main.go",
+        "Runs on a 24-hour ticker",
+        "Calls ArchiveOldBookings with now minus 14 days as cutoff",
+        "Logs the number of bookings archived per run",
+        "Graceful shutdown: stops when application context is cancelled",
+        "Build succeeds"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": "Add worker goroutine in cmd/server/main.go. Use context.Context and time.Ticker."
+    },
+    {
+      "id": "US-016",
+      "title": "Create contacts table and model",
+      "description": "As a developer, I need a contacts data model to store deduplicated invitee information.",
+      "acceptanceCriteria": [
+        "New migration creates contacts table with: id (UUID PK), tenant_id (FK), name (text not null), email (text not null), phone (text nullable), timezone (text nullable), first_met (timestamp), last_met (timestamp), meeting_count (integer default 0), created_at, updated_at",
+        "Unique constraint on (tenant_id, email)",
+        "Index on tenant_id for list queries",
+        "Index on email for lookup",
+        "Migration works with both SQLite and PostgreSQL",
+        "Go model struct added to internal/models/models.go",
+        "Build succeeds"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Create contact repository with Upsert and List methods",
+      "description": "As a developer, I need repository methods to create/update and list contacts.",
+      "acceptanceCriteria": [
+        "Upsert method: INSERT ... ON CONFLICT (tenant_id, email) DO UPDATE — creates or updates a contact atomically",
+        "List method: returns contacts for a tenant with optional search filter (name or email), offset, and limit, sorted by last_met descending",
+        "GetByEmail method: returns a single contact by (tenantID, email) for lookup",
+        "GetBookings method: returns bookings for a given contact email within a tenant",
+        "Uses q() helper for SQLite/Postgres placeholder conversion",
+        "Build succeeds"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": "Create internal/repository/contact.go."
+    },
+    {
+      "id": "US-018",
+      "title": "Create contact service and hook into booking confirmation",
+      "description": "As a system, I need to auto-create/update contacts when bookings are confirmed.",
+      "acceptanceCriteria": [
+        "Contact service with UpsertFromBooking method that extracts name/email/phone/timezone from a booking",
+        "Called from booking service when a booking is confirmed (new or approved)",
+        "If no contact exists: creates with first_met and last_met set to booking start_time, meeting_count = 1",
+        "If contact exists: updates last_met if later, increments meeting_count, fills empty name/phone/timezone",
+        "Contact errors are logged but do not block or fail the booking flow",
+        "Build succeeds"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": "Create internal/services/contact.go. Wire into booking service confirmation flow."
+    },
+    {
+      "id": "US-019",
+      "title": "Add contacts list page to dashboard",
+      "description": "As a host, I want a contacts page showing all people I've met with.",
+      "acceptanceCriteria": [
+        "New dashboard page at /dashboard/contacts",
+        "Navigation link added to the dashboard sidebar/nav",
+        "Displays table with columns: Name, Email, Meetings (count), Last Met (relative date)",
+        "Sorted by last_met descending",
+        "Search input filters by name or email (HTMX-powered with hx-get and debounce)",
+        "Empty state message when no contacts exist",
+        "Build succeeds",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": "Create handler, register route, create template. Follow existing dashboard page patterns."
+    },
+    {
+      "id": "US-020",
+      "title": "Add contact meeting history drill-down",
+      "description": "As a host, I want to click a contact to see their meeting history.",
+      "acceptanceCriteria": [
+        "Clicking a contact row expands inline or navigates to show booking history for that contact",
+        "Shows bookings: date, template name, status, duration",
+        "Sorted by date descending",
+        "Build succeeds",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": "Use HTMX hx-get to load a partial with the booking list for the contact."
+    },
+    {
+      "id": "US-021",
+      "title": "Backfill contacts from existing bookings",
+      "description": "As a host, I want existing confirmed bookings to populate contacts so I don't start from zero.",
+      "acceptanceCriteria": [
+        "Backfill mechanism processes all confirmed bookings and creates/updates contact records",
+        "Runs on first access to contacts page if contacts table is empty for the tenant, or as a manual trigger",
+        "Idempotent: running multiple times produces the same result",
+        "Build succeeds"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": "Can be a service method called from the contacts handler on first load."
+    }
+  ]
+}
