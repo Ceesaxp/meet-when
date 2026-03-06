@@ -291,7 +291,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 19,
-      "passes": false,
+      "passes": true,
       "notes": "Create handler, register route, create template. Follow existing dashboard page patterns."
     },
     {
