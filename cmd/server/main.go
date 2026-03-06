@@ -199,6 +199,29 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
+	// Start auto-archive background worker
+	archiveCtx, archiveCancel := context.WithCancel(context.Background())
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		log.Println("Auto-archive worker started (runs every 24 hours, archives bookings older than 14 days)")
+		for {
+			select {
+			case <-ticker.C:
+				cutoff := time.Now().Add(-14 * 24 * time.Hour)
+				count, err := repos.Booking.ArchiveOldBookings(archiveCtx, cutoff)
+				if err != nil {
+					log.Printf("Auto-archive error: %v", err)
+				} else if count > 0 {
+					log.Printf("Auto-archive: archived %d old bookings", count)
+				}
+			case <-archiveCtx.Done():
+				log.Println("Auto-archive worker stopped")
+				return
+			}
+		}
+	}()
+
 	// Start server in goroutine
 	go func() {
 		log.Printf("Server starting on %s", cfg.Server.Address)
@@ -213,6 +236,8 @@ func main() {
 	<-quit
 
 	log.Println("Server shutting down...")
+	archiveCancel()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
