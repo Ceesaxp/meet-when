@@ -192,7 +192,7 @@
         "Build succeeds"
       ],
       "priority": 13,
-      "passes": false,
+      "passes": true,
       "notes": "Add to booking repository. Used by both the background job and the dashboard button."
     },
     {

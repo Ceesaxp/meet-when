@@ -1671,3 +1671,15 @@ The following features from the requirements document are already fully implemen
   - Template functions need to be registered in `templateFuncs()` in handlers.go
   - The bookings template uses nested `{{if}}/{{else if}}` blocks for status-based action buttons — adding archive to confirmed status requires nesting within that block
 ----
+
+## 2026-03-06, 10:00 - US-013 - Add ArchiveOldBookings repository method
+- Added `ArchiveOldBookings(ctx, cutoffTime)` method to `BookingRepository`
+- Archives all unarchived bookings where `end_time < cutoffTime` across all tenants
+- Returns count of affected rows
+- Uses `q()` helper for SQLite/Postgres compatibility
+- Files changed: `internal/repository/repository.go`
+- **Learnings for future iterations:**
+  - BookingRepository methods follow a consistent pattern: `q(r.driver, query)` + `r.db.ExecContext`/`QueryContext`
+  - New repo methods go between existing BookingRepository methods and SessionRepository (line ~1028)
+  - The `is_archived` boolean field on bookings is used for soft-archive (not delete)
+----
