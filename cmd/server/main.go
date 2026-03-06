@@ -77,6 +77,7 @@ func main() {
 	mux.HandleFunc("GET /m/{tenant}/{host}/{template}", h.Public.TemplatePage)
 	mux.HandleFunc("GET /m/{tenant}/{host}/{template}/slots", h.Public.GetSlots)
 	mux.HandleFunc("POST /m/{tenant}/{host}/{template}/book", h.Public.CreateBooking)
+	mux.HandleFunc("GET /m/{tenant}/{host}/{template}/reschedule/{booking_id}", h.Public.RescheduleByID)
 	mux.HandleFunc("GET /booking/{token}", h.Public.BookingStatus)
 	mux.HandleFunc("POST /booking/{token}/cancel", h.Public.CancelBooking)
 	mux.HandleFunc("GET /booking/{token}/calendar.ics", h.Public.DownloadICS)
