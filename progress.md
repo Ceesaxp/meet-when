@@ -1797,3 +1797,16 @@ The following features from the requirements document are already fully implemen
   - Contact repo's `GetBookings` now returns `ContactBookingView` (breaking change from `[]*models.Booking`)
   - Emails in URL paths need `url.PathEscape` encoding; added `urlEncode` template func for this
 ----
+
+## 2026-03-06 - US-021 - Backfill contacts from existing bookings
+- Feature was already fully implemented in prior iterations (during US-017/US-018/US-019 work)
+- `ContactService.BackfillFromBookings()` processes all confirmed bookings via `ListConfirmedByTenant` and upserts contacts
+- `ContactService.EnsureBackfilled()` checks if contacts exist for tenant, triggers backfill if empty
+- Called from `DashboardHandler.Contacts()` on first access to contacts page (dashboard.go:1364)
+- Idempotent: uses ON CONFLICT upsert, safe to run multiple times
+- No code changes needed — only marked as passing in prd.json
+- Files changed: plans/prd.json
+- **Learnings for future iterations:**
+  - When features are built as part of earlier stories, check all acceptance criteria before assuming more work is needed
+  - The contact backfill pattern (check-then-populate on first access) is a lazy initialization approach
+----

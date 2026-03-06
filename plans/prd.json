@@ -320,8 +320,8 @@
         "Build succeeds"
       ],
       "priority": 21,
-      "passes": false,
-      "notes": "Can be a service method called from the contacts handler on first load."
+      "passes": true,
+      "notes": "Already implemented: BackfillFromBookings in contact service, EnsureBackfilled called from contacts handler on first load, ListConfirmedByTenant in booking repository."
     }
   ]
 }
