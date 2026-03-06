@@ -254,6 +254,21 @@ type AuditLog struct {
 	CreatedAt  SQLiteTime `json:"created_at" db:"created_at"`
 }
 
+// Contact represents a deduplicated invitee record (CRM lite)
+type Contact struct {
+	ID           string      `json:"id" db:"id"`
+	TenantID     string      `json:"tenant_id" db:"tenant_id"`
+	Name         string      `json:"name" db:"name"`
+	Email        string      `json:"email" db:"email"`
+	Phone        *string     `json:"phone,omitempty" db:"phone"`
+	Timezone     *string     `json:"timezone,omitempty" db:"timezone"`
+	FirstMet     *SQLiteTime `json:"first_met,omitempty" db:"first_met"`
+	LastMet      *SQLiteTime `json:"last_met,omitempty" db:"last_met"`
+	MeetingCount int         `json:"meeting_count" db:"meeting_count"`
+	CreatedAt    SQLiteTime  `json:"created_at" db:"created_at"`
+	UpdatedAt    SQLiteTime  `json:"updated_at" db:"updated_at"`
+}
+
 // SignupConversion represents a conversion tracking record for registration CTAs
 type SignupConversion struct {
 	ID              string      `json:"id" db:"id"`
