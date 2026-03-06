@@ -66,7 +66,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		Name:     "session",
 		Value:    result.SessionToken,
 		Path:     "/",
-		MaxAge:   int(24 * time.Hour / time.Second),
+		MaxAge:   int(h.handlers.cfg.App.SessionDuration / time.Second),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
@@ -140,7 +140,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		Name:     "session",
 		Value:    result.SessionToken,
 		Path:     "/",
-		MaxAge:   int(24 * time.Hour / time.Second),
+		MaxAge:   int(h.handlers.cfg.App.SessionDuration / time.Second),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
@@ -277,7 +277,7 @@ func (h *AuthHandler) SelectOrg(w http.ResponseWriter, r *http.Request) {
 		Name:     "session",
 		Value:    sessionToken,
 		Path:     "/",
-		MaxAge:   int(24 * time.Hour / time.Second),
+		MaxAge:   int(h.handlers.cfg.App.SessionDuration / time.Second),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
@@ -507,7 +507,7 @@ func (h *AuthHandler) handleGoogleLoginCallback(w http.ResponseWriter, r *http.R
 		Name:     "session",
 		Value:    result.SessionToken,
 		Path:     "/",
-		MaxAge:   int(24 * time.Hour / time.Second),
+		MaxAge:   int(h.handlers.cfg.App.SessionDuration / time.Second),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
@@ -619,7 +619,7 @@ func (h *AuthHandler) CompleteGoogleRegister(w http.ResponseWriter, r *http.Requ
 		Name:     "session",
 		Value:    sessionToken,
 		Path:     "/",
-		MaxAge:   int(24 * time.Hour / time.Second),
+		MaxAge:   int(h.handlers.cfg.App.SessionDuration / time.Second),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})

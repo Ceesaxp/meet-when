@@ -139,7 +139,7 @@ func Load() (*Config, error) {
 		App: AppConfig{
 			Environment:            getEnv("APP_ENV", "development"),
 			MaxSchedulingDays:      getEnvInt("MAX_SCHEDULING_DAYS", 90),
-			SessionDuration:        time.Duration(getEnvInt("SESSION_DURATION_HOURS", 24)) * time.Hour,
+			SessionDuration:        time.Duration(getEnvInt("SESSION_DURATION_HOURS", 168)) * time.Hour,
 			DefaultTimezone:        getEnv("DEFAULT_TIMEZONE", "UTC"),
 			EncryptionKey:          getEnv("ENCRYPTION_KEY", ""),
 			BaseURL:                getEnv("APP_BASE_URL", "http://localhost:8080"),
