@@ -1779,3 +1779,21 @@ The following features from the requirements document are already fully implemen
   - `timeAgo` template func accepts `*SQLiteTime` via the `toTime` helper
   - `ActiveNav` field in PageData controls which sidebar link is highlighted
 ----
+
+## 2026-03-06 - US-020 - Add contact meeting history drill-down
+- Clicking a contact row expands inline to show booking history (date, template name, status, duration)
+- Added `ContactBookingView` struct in `internal/models/models.go` pairing Booking with TemplateName
+- Modified `GetBookings` in `internal/repository/contact.go` to LEFT JOIN meeting_templates and return `ContactBookingView`
+- Updated `ContactService.GetBookings` return type in `internal/services/contact.go`
+- Added `ContactBookings` handler in `internal/handlers/dashboard.go` for HTMX partial endpoint
+- Registered `GET /dashboard/contacts/{email}/bookings` route in `cmd/server/main.go`
+- Created `templates/partials/contact_bookings_partial.html` for inline booking history table
+- Updated `templates/partials/contacts_table_partial.html` with expandable rows (HTMX hx-get + CSS toggle)
+- Added `urlEncode` template function in `internal/handlers/handlers.go` using `url.PathEscape`
+- Files changed: internal/models/models.go, internal/repository/contact.go, internal/services/contact.go, internal/handlers/dashboard.go, internal/handlers/handlers.go, cmd/server/main.go, templates/partials/contacts_table_partial.html, templates/partials/contact_bookings_partial.html (new)
+- **Learnings for future iterations:**
+  - HTMX `hx-trigger="click once"` prevents re-fetching on subsequent clicks (toggle is CSS-only via class)
+  - `hx-target="next .classname"` targets the next sibling with that class - useful for expand/collapse patterns
+  - Contact repo's `GetBookings` now returns `ContactBookingView` (breaking change from `[]*models.Booking`)
+  - Emails in URL paths need `url.PathEscape` encoding; added `urlEncode` template func for this
+----

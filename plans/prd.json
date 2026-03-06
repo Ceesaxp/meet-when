@@ -306,7 +306,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 20,
-      "passes": false,
+      "passes": true,
       "notes": "Use HTMX hx-get to load a partial with the booking list for the contact."
     },
     {
