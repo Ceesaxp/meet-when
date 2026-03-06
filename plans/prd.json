@@ -105,7 +105,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "UI change in templates/pages/dashboard_template_form.html. Backend validation already in place from US-005."
     },
     {

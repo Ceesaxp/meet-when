@@ -1590,3 +1590,25 @@ The following features from the requirements document are already fully implemen
   - Duration chips use a `contains` template function to check if a value exists in the template's Durations slice
   - The 30 min chip has special default-selected logic: `{{else}}selected{{end}}` for when no template exists yet
 ----
+
+## 2026-03-06 - US-007 - Add custom duration free-form input to template form
+- What was implemented:
+  - Added a "Custom" input field (number input, 5-480 range) with "Add" button below the preset duration chips
+  - Custom values are added as removable chip tags (with × remove button)
+  - If custom value matches a preset chip, the preset chip is selected instead of creating a duplicate
+  - Duplicate custom values are silently ignored
+  - Invalid values show inline error message
+  - Enter key in the input triggers the Add button
+  - When editing a template with non-preset durations, those are rendered as custom chips on page load using Go template range + JavaScript
+  - Custom duration chips include hidden checkbox inputs with name="durations" so they submit with the form
+  - CSS styles added for custom duration row, remove button, and custom durations container
+- Files changed:
+  - `templates/pages/dashboard_template_form.html` - Added custom duration HTML and JavaScript (~70 lines)
+  - `static/css/style.css` - Added custom duration styles (~26 lines)
+  - `plans/prd.json` - Marked US-007 as passing
+- **Learnings for future iterations:**
+  - Go template `{{range}}` can output JavaScript statements inline — useful for initializing JS state from server data
+  - Backend validation (US-005) already handles deduplication and range checking, so the frontend validation is for UX only
+  - The `contains` template function only works with `[]int` — for checking membership in a literal list, use JavaScript instead
+  - Custom chips are appended to a separate `#custom-durations` div to keep them visually distinct from presets
+----
