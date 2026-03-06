@@ -98,7 +98,7 @@ func (s *EmailService) buildEmailTemplateData(details *BookingWithDetails, timez
 		Duration:       details.Booking.Duration,
 		Location:       location,
 		CancelLink:     fmt.Sprintf("%s/booking/%s", s.cfg.Server.BaseURL, details.Booking.Token),
-		RescheduleLink: fmt.Sprintf("%s/booking/%s/reschedule", s.cfg.Server.BaseURL, details.Booking.Token),
+		RescheduleLink: fmt.Sprintf("%s/m/%s/%s/%s/reschedule/%s", s.cfg.Server.BaseURL, details.Tenant.Slug, details.Host.Slug, details.Template.Slug, details.Booking.ID),
 	}
 }
 
@@ -116,7 +116,9 @@ Location: %s
 
 Need to make changes?
 Cancel: %s
-Reschedule: %s
+
+Reschedule this meeting:
+%s
 
 Best regards,
 Meet When`,
@@ -457,7 +459,9 @@ Location: %s
 
 Need to make changes?
 Cancel: %s/booking/%s
-Reschedule: %s/booking/%s/reschedule
+
+Reschedule this meeting:
+%s/m/%s/%s/%s/reschedule/%s
 
 Best regards,
 Meet When`,
@@ -471,7 +475,10 @@ Meet When`,
 		s.cfg.Server.BaseURL,
 		details.Booking.Token,
 		s.cfg.Server.BaseURL,
-		details.Booking.Token,
+		details.Tenant.Slug,
+		details.Host.Slug,
+		details.Template.Slug,
+		details.Booking.ID,
 	)
 
 	// Generate ICS attachment with updated time
@@ -498,7 +505,9 @@ Location: %s
 
 Need to make changes?
 Cancel: %s
-Reschedule: %s
+
+Reschedule this meeting:
+%s
 
 Best regards,
 Meet When`,
