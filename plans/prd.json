@@ -224,7 +224,7 @@
         "Build succeeds"
       ],
       "priority": 15,
-      "passes": false,
+      "passes": true,
       "notes": "Add worker goroutine in cmd/server/main.go. Use context.Context and time.Ticker."
     },
     {

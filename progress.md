@@ -1703,3 +1703,17 @@ The following features from the requirements document are already fully implemen
   - SQLiteTime embeds time.Time, access via .Time field (not type conversion)
   - Existing Archive all button only archives cancelled/rejected; Archive all past archives any past booking
 ----
+
+## 2026-03-06, 11:00 - US-015 - Add automatic archival background worker
+- What was implemented:
+  - Background goroutine in cmd/server/main.go that runs on a 24-hour ticker
+  - Calls `repos.Booking.ArchiveOldBookings()` with `now - 14 days` as cutoff
+  - Logs count of archived bookings per run (only when count > 0)
+  - Graceful shutdown via context cancellation when app receives SIGINT/SIGTERM
+- Files changed:
+  - `cmd/server/main.go` - Added auto-archive goroutine with ticker, context cancellation on shutdown
+- **Learnings for future iterations:**
+  - The codebase already has background services (Reminder, CalendarSync) with Start/Stop patterns, but those are full service structs; a simple goroutine+ticker is sufficient for periodic tasks
+  - `ArchiveOldBookings` is the cross-tenant version (from US-013), perfect for background jobs; `ArchiveOldBookingsByHostID` is the host-scoped version for dashboard buttons
+  - Context cancellation is wired before server.Shutdown so the worker stops before the server fully shuts down
+----
