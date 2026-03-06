@@ -25,6 +25,7 @@ type Repositories struct {
 	SignupConversion     *SignupConversionRepository
 	TemplateHost         *TemplateHostRepository
 	BookingCalendarEvent *BookingCalendarEventRepository
+	Contact              *ContactRepository
 }
 
 // NewRepositories creates all repositories
@@ -42,6 +43,7 @@ func NewRepositories(db *sql.DB, driver string) *Repositories {
 		SignupConversion:     &SignupConversionRepository{db: db, driver: driver},
 		TemplateHost:         &TemplateHostRepository{db: db, driver: driver},
 		BookingCalendarEvent: &BookingCalendarEventRepository{db: db, driver: driver},
+		Contact:              &ContactRepository{db: db, driver: driver},
 	}
 }
 
