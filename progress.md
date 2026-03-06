@@ -1763,3 +1763,19 @@ The following features from the requirements document are already fully implemen
   - Contact upsert uses ON CONFLICT with separate SQLite/Postgres query paths (driver-specific syntax for EXCLUDED vs excluded and timestamp casting)
   - BackfillFromBookings and EnsureBackfilled are ready for US-021 (backfill contacts from existing bookings)
 ----
+
+## 2026-03-06 - US-019 - Add contacts list page to dashboard
+- Created `templates/pages/dashboard_contacts.html` with search input and contacts table
+- Created `templates/partials/contacts_table_partial.html` for HTMX search responses
+- Added `Contacts` handler in `internal/handlers/dashboard.go` with HTMX partial support
+- Added "Contacts" nav link in `templates/layouts/dashboard.html` (between Calendars and Settings)
+- Registered `GET /dashboard/contacts` route in `cmd/server/main.go`
+- Calls `EnsureBackfilled` on page load to auto-populate contacts from existing bookings
+- Files changed: internal/handlers/dashboard.go, cmd/server/main.go, templates/layouts/dashboard.html, templates/pages/dashboard_contacts.html (new), templates/partials/contacts_table_partial.html (new)
+- **Learnings for future iterations:**
+  - CSS uses `.table` and `.table-container` classes (not `data-table`) and `.form-input` (not `form-control`)
+  - HTMX partials are loaded separately via `loadTemplates()` -- just put them in templates/partials/ and they auto-register
+  - `renderPartial` is used for HTMX fragment responses; check `HX-Request` header to decide full page vs partial
+  - `timeAgo` template func accepts `*SQLiteTime` via the `toTime` helper
+  - `ActiveNav` field in PageData controls which sidebar link is highlighted
+----
