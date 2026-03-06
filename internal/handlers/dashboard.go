@@ -1013,6 +1013,7 @@ func (h *DashboardHandler) UpdateSettings(w http.ResponseWriter, r *http.Request
 
 	host.Host.Name = r.FormValue("name")
 	host.Host.Timezone = r.FormValue("timezone")
+	host.Host.SmartDurations = r.FormValue("smart_durations") == "on"
 
 	newSlug := r.FormValue("slug")
 	if newSlug != "" && newSlug != host.Host.Slug {

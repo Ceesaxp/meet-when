@@ -227,11 +227,11 @@ func (r *HostRepository) GetBySlug(ctx context.Context, tenantID, slug string) (
 func (r *HostRepository) Update(ctx context.Context, host *models.Host) error {
 	query := q(r.driver, `
 		UPDATE hosts
-		SET name = $1, slug = $2, timezone = $3, default_calendar_id = $4
-		WHERE id = $5
+		SET name = $1, slug = $2, timezone = $3, default_calendar_id = $4, smart_durations = $5
+		WHERE id = $6
 	`)
 	_, err := r.db.ExecContext(ctx, query,
-		host.Name, host.Slug, host.Timezone, host.DefaultCalendarID, host.ID)
+		host.Name, host.Slug, host.Timezone, host.DefaultCalendarID, host.SmartDurations, host.ID)
 	return err
 }
 

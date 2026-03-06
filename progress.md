@@ -1623,3 +1623,18 @@ The following features from the requirements document are already fully implemen
   - SQLite uses INTEGER for booleans (0/1), PostgreSQL uses BOOLEAN — migration files differ
   - COALESCE wrapping in SELECTs is the pattern used for newer boolean columns (see onboarding_completed)
 ----
+
+## 2026-03-06 - US-009 - Add smart durations toggle to settings page
+- Added "Smart durations" toggle checkbox to the Profile section of dashboard_settings.html
+- Helper text: "End meetings 5-10 minutes early to give you buffer time"
+- Updated UpdateSettings handler in dashboard.go to read smart_durations checkbox value
+- Updated HostRepository.Update to include smart_durations in the UPDATE query (was missing)
+- Files changed:
+  - templates/pages/dashboard_settings.html (added toggle UI)
+  - internal/handlers/dashboard.go (read form value)
+  - internal/repository/repository.go (include smart_durations in UPDATE)
+- **Learnings for future iterations:**
+  - HostRepository.Update only updates a subset of columns (name, slug, timezone, default_calendar_id) — new fields must be explicitly added
+  - Toggle CSS styles (toggle-container, toggle-switch, toggle-input, toggle-label) already exist in static/css/style.css
+  - Checkbox form values come as "on" when checked, absent when unchecked — use `r.FormValue("x") == "on"`
+----

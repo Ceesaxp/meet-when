@@ -28,6 +28,15 @@
             </div>
         </div>
 
+        <div class="form-group">
+            <label class="toggle-container">
+                <input type="checkbox" name="smart_durations" class="toggle-input" {{if .Host.SmartDurations}}checked{{end}}>
+                <span class="toggle-switch"></span>
+                <span class="toggle-label">Smart durations</span>
+            </label>
+            <p class="form-hint">End meetings 5-10 minutes early to give you buffer time</p>
+        </div>
+
         <div class="section-actions">
             <button type="submit" class="btn btn-primary">Save Changes</button>
         </div>
