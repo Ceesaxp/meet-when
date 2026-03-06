@@ -1400,7 +1400,7 @@ func (h *DashboardHandler) ContactBookings(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	email, err := url.QueryUnescape(r.PathValue("email"))
+	email, err := url.PathUnescape(r.PathValue("email"))
 	if err != nil || email == "" {
 		http.Error(w, "Invalid email", http.StatusBadRequest)
 		return
