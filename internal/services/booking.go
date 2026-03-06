@@ -524,16 +524,17 @@ func (s *BookingService) GetBookingCountsByHostID(ctx context.Context, hostID st
 	return s.repos.Booking.GetBookingCountsByHostID(ctx, hostID)
 }
 
-// ArchiveBooking archives a cancelled or rejected booking
+// ArchiveBooking archives a past booking regardless of status
 func (s *BookingService) ArchiveBooking(ctx context.Context, hostID, tenantID, bookingID string) error {
 	booking, err := s.repos.Booking.GetByID(ctx, bookingID)
 	if err != nil || booking == nil || booking.HostID != hostID {
 		return ErrBookingNotFound
 	}
 
-	// Only allow archiving cancelled or rejected bookings
-	if booking.Status != models.BookingStatusCancelled && booking.Status != models.BookingStatusRejected {
-		return errors.New("only cancelled or rejected bookings can be archived")
+	// Allow archiving any past booking; block future confirmed/pending bookings
+	isPast := booking.EndTime.Before(time.Now())
+	if !isPast && (booking.Status == models.BookingStatusConfirmed || booking.Status == models.BookingStatusPending) {
+		return errors.New("future confirmed or pending bookings cannot be archived")
 	}
 
 	booking.IsArchived = true

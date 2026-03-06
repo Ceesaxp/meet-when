@@ -164,6 +164,21 @@ function confirmBulkRetryCalendar(count) {
                             <input type="hidden" name="reason" value="">
                             <button type="submit" class="btn-sm btn-cancel" onclick="return confirm('Cancel this booking?')">Cancel</button>
                         </form>
+                        {{if isPast .EndTime}}
+                        {{if .IsArchived}}
+                        <button type="button" class="btn-sm btn-secondary"
+                            hx-post="/dashboard/bookings/{{.ID}}/unarchive"
+                            hx-target="#booking-row-{{.ID}}"
+                            hx-swap="outerHTML"
+                            hx-confirm="Unarchive this booking?">Unarchive</button>
+                        {{else}}
+                        <button type="button" class="btn-sm btn-secondary"
+                            hx-post="/dashboard/bookings/{{.ID}}/archive"
+                            hx-target="#booking-row-{{.ID}}"
+                            hx-swap="outerHTML"
+                            hx-confirm="Archive this booking?">Archive</button>
+                        {{end}}
+                        {{end}}
                         {{else if or (eq .Status "cancelled") (eq .Status "rejected")}}
                         {{if .IsArchived}}
                         <button type="button" class="btn-sm btn-secondary"
