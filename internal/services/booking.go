@@ -43,6 +43,7 @@ type BookingService struct {
 	conferencing *ConferencingService
 	email        *EmailService
 	auditLog     *AuditLogService
+	contact      *ContactService
 }
 
 // NewBookingService creates a new booking service
@@ -53,6 +54,7 @@ func NewBookingService(
 	conferencing *ConferencingService,
 	email *EmailService,
 	auditLog *AuditLogService,
+	contact *ContactService,
 ) *BookingService {
 	return &BookingService{
 		cfg:          cfg,
@@ -61,6 +63,7 @@ func NewBookingService(
 		conferencing: conferencing,
 		email:        email,
 		auditLog:     auditLog,
+		contact:      contact,
 	}
 }
 
@@ -773,6 +776,9 @@ func (s *BookingService) processConfirmedBooking(ctx context.Context, details *B
 
 	// Send confirmation emails
 	s.email.SendBookingConfirmed(ctx, details)
+
+	// Upsert contact from confirmed booking (errors are logged, not propagated)
+	s.contact.UpsertFromBooking(ctx, details)
 
 	return nil
 }

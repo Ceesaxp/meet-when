@@ -1068,6 +1068,52 @@ func (r *BookingRepository) ArchiveOldBookingsByHostID(ctx context.Context, host
 	return int(count), nil
 }
 
+// ListConfirmedByTenant returns all confirmed bookings for a tenant (via host join)
+func (r *BookingRepository) ListConfirmedByTenant(ctx context.Context, tenantID string) ([]*models.Booking, error) {
+	query := q(r.driver, `
+		SELECT b.id, b.template_id, b.host_id, b.token, b.status, b.start_time, b.end_time, b.duration,
+		       b.invitee_name, b.invitee_email, COALESCE(b.invitee_timezone, ''), COALESCE(b.invitee_phone, ''),
+		       b.additional_guests, b.answers, COALESCE(b.conference_link, ''), COALESCE(b.calendar_event_id, ''),
+		       COALESCE(b.cancelled_by, ''), COALESCE(b.cancel_reason, ''), COALESCE(b.reminder_sent, false),
+		       COALESCE(b.is_archived, false), b.created_at, b.updated_at
+		FROM bookings b
+		JOIN hosts h ON b.host_id = h.id
+		WHERE h.tenant_id = $1 AND b.status = 'confirmed'
+		ORDER BY b.start_time ASC
+	`)
+
+	rows, err := r.db.QueryContext(ctx, query, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error closing rows: %v", err)
+		}
+	}()
+
+	var bookings []*models.Booking
+	for rows.Next() {
+		booking := &models.Booking{}
+		err := rows.Scan(
+			&booking.ID, &booking.TemplateID, &booking.HostID, &booking.Token,
+			&booking.Status, &booking.StartTime, &booking.EndTime, &booking.Duration,
+			&booking.InviteeName, &booking.InviteeEmail, &booking.InviteeTimezone,
+			&booking.InviteePhone, &booking.AdditionalGuests, &booking.Answers,
+			&booking.ConferenceLink, &booking.CalendarEventID,
+			&booking.CancelledBy, &booking.CancelReason, &booking.ReminderSent,
+			&booking.IsArchived, &booking.CreatedAt, &booking.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		bookings = append(bookings, booking)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return bookings, nil
+}
+
 // SessionRepository handles session database operations
 type SessionRepository struct {
 	db     *sql.DB
