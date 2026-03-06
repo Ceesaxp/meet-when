@@ -58,8 +58,8 @@
         "Build succeeds"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": "Edit the reminder email function in internal/services/email.go."
+      "passes": true,
+      "notes": "Already completed as part of US-002 (defaultReminderBody has reschedule link) and US-003 (generateICS has reschedule URL, called for reminders at line 559)."
     },
     {
       "id": "US-005",

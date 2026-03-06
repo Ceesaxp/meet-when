@@ -1546,3 +1546,15 @@ The following features from the requirements document are already fully implemen
   - The generateICS() function is shared by confirmation, reminder, and reschedule notification emails — one change covers all three
   - BookingWithDetails has Tenant, Host, Template with Slug fields, and CalendarService has s.cfg for BaseURL access
 ----
+
+## 2026-03-06 - US-004 - Add reschedule link to reminder email
+- Already completed by prior work in US-002 and US-003:
+  - US-002 updated defaultReminderBody() to include "Reschedule this meeting:" link (email.go:509-510)
+  - US-003 updated generateICS() to include reschedule URL in ICS DESCRIPTION — generateICS() is called for reminders at email.go:559
+- No code changes needed — all acceptance criteria already passing
+- Build succeeds
+- Files changed: None (only prd.json updated)
+- **Learnings for future iterations:**
+  - Always check if prior stories already covered the acceptance criteria before implementing — US-002/US-003 covered all three email types (confirmation, reminder, reschedule notification) in a single pass
+  - The generateICS() function is shared across all email types, so ICS changes in US-003 automatically apply to reminders
+----
