@@ -689,9 +689,15 @@ func (h *DashboardHandler) Bookings(w http.ResponseWriter, r *http.Request) {
 
 	// Count archivable bookings (cancelled or rejected, not yet archived)
 	archivableCount := 0
+	// Count past unarchived bookings (any status, end_time in the past)
+	now := time.Now()
+	pastArchivableCount := 0
 	for _, b := range allBookings {
 		if (b.Status == models.BookingStatusCancelled || b.Status == models.BookingStatusRejected) && !b.IsArchived {
 			archivableCount++
+		}
+		if !b.IsArchived && b.EndTime.Time.Before(now) {
+			pastArchivableCount++
 		}
 	}
 
@@ -733,8 +739,9 @@ func (h *DashboardHandler) Bookings(w http.ResponseWriter, r *http.Request) {
 			"PendingCount":    len(pendingBookings),
 			"ConfirmedCount":  len(confirmedBookings),
 			"CancelledCount":  len(cancelledBookings),
-			"ArchivableCount": archivableCount,
-			"CalRetryCount":   calRetryCount,
+			"ArchivableCount":     archivableCount,
+			"PastArchivableCount": pastArchivableCount,
+			"CalRetryCount":       calRetryCount,
 		},
 	})
 }
@@ -899,6 +906,35 @@ func (h *DashboardHandler) BulkArchiveBookings(w http.ResponseWriter, r *http.Re
 	}
 
 	log.Printf("[DASHBOARD] Bulk archived %d bookings for host %s", count, host.Host.ID)
+	h.handlers.redirect(w, r, "/dashboard/bookings")
+}
+
+// BulkArchivePastBookings archives all past bookings for a host
+func (h *DashboardHandler) BulkArchivePastBookings(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	count, err := h.handlers.services.Booking.BulkArchivePastBookings(r.Context(), host.Host.ID, host.Tenant.ID)
+
+	if r.Header.Get("HX-Request") == "true" {
+		if err != nil {
+			http.Error(w, "Failed to archive past bookings", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("HX-Redirect", "/dashboard/bookings")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if err != nil {
+		h.handlers.redirect(w, r, "/dashboard/bookings?error=bulk_archive_past_failed")
+		return
+	}
+
+	log.Printf("[DASHBOARD] Bulk archived %d past bookings for host %s", count, host.Host.ID)
 	h.handlers.redirect(w, r, "/dashboard/bookings")
 }
 

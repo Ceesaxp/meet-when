@@ -603,6 +603,23 @@ func (s *BookingService) BulkArchiveBookings(ctx context.Context, hostID, tenant
 	return count, nil
 }
 
+// BulkArchivePastBookings archives all past bookings for a host regardless of status.
+// Uses the repository's ArchiveOldBookingsByHostID with time.Now() as cutoff.
+func (s *BookingService) BulkArchivePastBookings(ctx context.Context, hostID, tenantID string) (int, error) {
+	count, err := s.repos.Booking.ArchiveOldBookingsByHostID(ctx, hostID, time.Now())
+	if err != nil {
+		return 0, err
+	}
+
+	if count > 0 {
+		s.auditLog.Log(ctx, tenantID, &hostID, "booking.bulk_archived_past", "booking", "", models.JSONMap{
+			"count": count,
+		}, "")
+	}
+
+	return count, nil
+}
+
 // RetryCalendarEvent retries calendar event creation for a confirmed booking
 // that has no calendar event (e.g., due to expired token at booking time).
 // Unlike processConfirmedBooking, this does NOT re-send emails or re-create conference links.

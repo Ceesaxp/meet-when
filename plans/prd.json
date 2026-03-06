@@ -208,7 +208,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 14,
-      "passes": false,
+      "passes": true,
       "notes": "Add button to dashboard template and a new handler endpoint."
     },
     {

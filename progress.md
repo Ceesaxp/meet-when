@@ -1683,3 +1683,23 @@ The following features from the requirements document are already fully implemen
   - New repo methods go between existing BookingRepository methods and SessionRepository (line ~1028)
   - The `is_archived` boolean field on bookings is used for soft-archive (not delete)
 ----
+
+## 2026-03-06 - US-014 - Add Archive all past button to bookings dashboard
+- What was implemented:
+  - Added ArchiveOldBookingsByHostID repository method (host-scoped version of ArchiveOldBookings)
+  - Added BulkArchivePastBookings service method calling repo with time.Now() cutoff
+  - Added BulkArchivePastBookings dashboard handler with HTMX support
+  - Registered route: POST /dashboard/bookings/archive-all-past
+  - Updated dashboard_bookings.html with Archive all past button and JS confirmation
+  - Added PastArchivableCount to handler data (counts non-archived bookings with end_time in the past)
+- Files changed:
+  - internal/repository/repository.go - Added ArchiveOldBookingsByHostID method
+  - internal/services/booking.go - Added BulkArchivePastBookings method
+  - internal/handlers/dashboard.go - Added handler + PastArchivableCount calculation
+  - cmd/server/main.go - Added route
+  - templates/pages/dashboard_bookings.html - Added button and JS function
+- **Learnings for future iterations:**
+  - ArchiveOldBookings (US-013) is cross-tenant for background jobs; dashboard buttons need host-scoped variants
+  - SQLiteTime embeds time.Time, access via .Time field (not type conversion)
+  - Existing Archive all button only archives cancelled/rejected; Archive all past archives any past booking
+----

@@ -1045,6 +1045,27 @@ func (r *BookingRepository) ArchiveOldBookings(ctx context.Context, cutoffTime t
 	return int(count), nil
 }
 
+// ArchiveOldBookingsByHostID archives all unarchived bookings for a specific host where end_time is before cutoffTime.
+// Returns the number of bookings archived.
+func (r *BookingRepository) ArchiveOldBookingsByHostID(ctx context.Context, hostID string, cutoffTime time.Time) (int, error) {
+	query := q(r.driver, `
+		UPDATE bookings
+		SET is_archived = true
+		WHERE (is_archived = false OR is_archived IS NULL)
+		  AND host_id = $1
+		  AND end_time < $2
+	`)
+	result, err := r.db.ExecContext(ctx, query, hostID, cutoffTime)
+	if err != nil {
+		return 0, err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return int(count), nil
+}
+
 // SessionRepository handles session database operations
 type SessionRepository struct {
 	db     *sql.DB
