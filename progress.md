@@ -1735,3 +1735,17 @@ The following features from the requirements document are already fully implemen
   - Postgres uses UUID, TIMESTAMP WITH TIME ZONE, VARCHAR; SQLite uses TEXT for everything with strftime defaults
   - Nullable time fields use *SQLiteTime (pointer) in the model struct
 ----
+
+## 2026-03-06 - US-017 - Create contact repository with Upsert and List methods
+- Implemented ContactRepository with Upsert, List, GetByEmail, and GetBookings methods
+- Upsert uses ON CONFLICT (tenant_id, email) DO UPDATE for atomic create/update
+- List supports optional search filter (LIKE for SQLite, ILIKE for Postgres), offset, limit, sorted by last_met DESC
+- GetBookings joins bookings with hosts table to filter by tenant_id and invitee_email
+- Files changed:
+  - `internal/repository/contact.go` - New file with all 4 repository methods
+  - `internal/repository/repository.go` - Added Contact field to Repositories struct and NewRepositories
+- **Learnings for future iterations:**
+  - Search queries with LIKE vs ILIKE need driver-specific SQL (can't use q() helper for this)
+  - Use `any` instead of `interface{}` to satisfy the modernize linter
+  - GetBookings needs to join through hosts table to get tenant_id since bookings only have host_id
+----
