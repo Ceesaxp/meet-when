@@ -1638,3 +1638,19 @@ The following features from the requirements document are already fully implemen
   - Toggle CSS styles (toggle-container, toggle-switch, toggle-input, toggle-label) already exist in static/css/style.css
   - Checkbox form values come as "on" when checked, absent when unchecked — use `r.FormValue("x") == "on"`
 ----
+
+## 2026-03-06 - US-010 & US-011 - Apply smart duration logic at booking creation and rescheduling
+- What was implemented:
+  - Added `calculateSmartDuration` helper function: durations <= 30 min subtract 5, > 30 min subtract 10, minimum 5
+  - Modified `CreateBooking` to load host before end time calculation and apply smart duration adjustment
+  - Modified `RescheduleBooking` to load host before end time calculation and apply smart duration adjustment
+  - Original duration is preserved in `booking.Duration` for display; only `EndTime` is adjusted
+  - Calendar events (ICS, Google, CalDAV) already use `booking.EndTime` so no changes needed there
+- Files changed:
+  - `internal/services/booking.go` - Added calculateSmartDuration(), moved host loading earlier in CreateBooking and RescheduleBooking, applied smart duration to end time calculation
+- **Learnings for future iterations:**
+  - Calendar event creation (ICS DTEND, Google Calendar end, CalDAV end) all use `booking.EndTime` — adjusting EndTime at booking creation propagates automatically
+  - Zoom `duration` field uses original `booking.Duration` which is correct (Zoom needs actual call length)
+  - Host was already loaded in both methods but after end time calc — moving it earlier was sufficient
+  - US-011 (reschedule) was trivially covered by the same change as US-010
+----

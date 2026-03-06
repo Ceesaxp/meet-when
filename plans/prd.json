@@ -151,7 +151,7 @@
         "Build succeeds"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "Apply in booking service layer. Formula: actual = duration <= 30 ? duration - 5 : duration - 10; actual = max(actual, 5). Note: shares ICS/calendar code paths with US-003 (reschedule links) — US-003 runs first."
     },
     {
@@ -164,7 +164,7 @@
         "Build succeeds"
       ],
       "priority": 11,
-      "passes": false,
+      "passes": true,
       "notes": "Update the RescheduleBooking method in booking service."
     },
     {
