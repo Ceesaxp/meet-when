@@ -111,6 +111,9 @@ func (r *ContactRepository) List(ctx context.Context, tenantID, search string, o
 		}
 		contacts = append(contacts, c)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return contacts, nil
 }
 
@@ -171,6 +174,9 @@ func (r *ContactRepository) GetBookings(ctx context.Context, tenantID, email str
 			return nil, err
 		}
 		bookings = append(bookings, booking)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return bookings, nil
 }
