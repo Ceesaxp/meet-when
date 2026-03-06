@@ -645,6 +645,14 @@ func (s *EmailService) generateICS(details *BookingWithDetails) string {
 		}
 	}
 
+	// Add reschedule link
+	rescheduleURL := fmt.Sprintf("%s/m/%s/%s/%s/reschedule/%s",
+		s.cfg.Server.BaseURL, details.Tenant.Slug, details.Host.Slug, details.Template.Slug, details.Booking.ID)
+	if description != "" {
+		description += "\n\n"
+	}
+	description += "Reschedule this meeting:\n" + rescheduleURL
+
 	ics := fmt.Sprintf(`BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//MeetWhen//EN
