@@ -1355,7 +1355,7 @@ func (r *TemplateHostRepository) GetByTemplateIDWithHost(ctx context.Context, te
 		       th.created_at, th.updated_at,
 		       h.id, h.tenant_id, h.email, h.name, h.slug, h.timezone,
 		       h.default_calendar_id, h.is_admin, COALESCE(h.onboarding_completed, false),
-		       h.created_at, h.updated_at
+		       COALESCE(h.smart_durations, false), h.created_at, h.updated_at
 		FROM template_hosts th
 		JOIN hosts h ON th.host_id = h.id
 		WHERE th.template_id = $1
@@ -1376,7 +1376,7 @@ func (r *TemplateHostRepository) GetByTemplateIDWithHost(ctx context.Context, te
 			&th.DisplayOrder, &th.CreatedAt, &th.UpdatedAt,
 			&h.ID, &h.TenantID, &h.Email, &h.Name, &h.Slug, &h.Timezone,
 			&h.DefaultCalendarID, &h.IsAdmin, &h.OnboardingCompleted,
-			&h.CreatedAt, &h.UpdatedAt)
+			&h.SmartDurations, &h.CreatedAt, &h.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
