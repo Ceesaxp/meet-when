@@ -1501,3 +1501,17 @@ The following features from the requirements document are already fully implemen
   - Pre-existing lint issues in the codebase (errcheck on db.Close, bcrypt.CompareHashAndPassword, rows.Close) are not related to this change
 
 ---
+
+## 2026-03-06 - US-001 - Change session duration default to 7 days and use config value
+- What was implemented:
+  - Changed SESSION_DURATION_HOURS default from 24 to 168 (7 days) in internal/config/config.go
+  - Replaced all 5 hardcoded `int(24 * time.Hour / time.Second)` MaxAge values in internal/handlers/auth.go with `int(h.handlers.cfg.App.SessionDuration / time.Second)`
+  - Session DB TTL was already using `s.cfg.App.SessionDuration` in internal/services/session.go — no change needed there
+- Files changed:
+  - `internal/config/config.go` - Changed default from 24 to 168
+  - `internal/handlers/auth.go` - 5 cookie MaxAge values now use config
+- **Learnings for future iterations:**
+  - The session service (session.go:44) already used cfg.App.SessionDuration for DB expiry — only cookie MaxAge was hardcoded
+  - AuthHandler accesses config via `h.handlers.cfg` (AuthHandler -> Handlers -> cfg)
+  - There are also google_auth_nonce and google_profile cookies with MaxAge=600 (10 min) and logout/clear cookies with MaxAge=-1 — these are intentionally different and should NOT use SessionDuration
+----
