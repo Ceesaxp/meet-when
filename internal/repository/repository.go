@@ -186,7 +186,7 @@ func (r *HostRepository) GetAllByEmail(ctx context.Context, email string) ([]*mo
 			&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
 			&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
 			&host.OnboardingCompleted, &host.GoogleID, &host.GoogleEmail,
-			&host.CreatedAt, &host.UpdatedAt)
+			&host.SmartDurations, &host.CreatedAt, &host.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -269,7 +269,7 @@ func (r *HostRepository) GetByTenantID(ctx context.Context, tenantID string) ([]
 			&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
 			&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
 			&host.OnboardingCompleted, &host.GoogleID, &host.GoogleEmail,
-			&host.CreatedAt, &host.UpdatedAt)
+			&host.SmartDurations, &host.CreatedAt, &host.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -305,7 +305,7 @@ func (r *HostRepository) GetByGoogleID(ctx context.Context, googleID string) ([]
 			&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
 			&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
 			&host.OnboardingCompleted, &host.GoogleID, &host.GoogleEmail,
-			&host.CreatedAt, &host.UpdatedAt)
+			&host.SmartDurations, &host.CreatedAt, &host.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
