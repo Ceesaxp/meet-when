@@ -61,3 +61,5 @@ tasks/
 tests/
 prompt.md
 scripts/ralph.sh
+tasks
+plans
