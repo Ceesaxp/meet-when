@@ -438,11 +438,14 @@ func (s *BookingService) RescheduleBooking(ctx context.Context, input Reschedule
 
 	// Get host and tenant
 	host, _ := s.repos.Host.GetByID(ctx, oldBooking.HostID)
+	if host == nil {
+		return nil, time.Time{}, fmt.Errorf("host not found: %s", oldBooking.HostID)
+	}
 	tenant, _ := s.repos.Tenant.GetByID(ctx, host.TenantID)
 
 	// Calculate new end time (apply smart duration if enabled)
 	actualDuration := input.NewDuration
-	if host != nil && host.SmartDurations {
+	if host.SmartDurations {
 		actualDuration = calculateSmartDuration(input.NewDuration)
 	}
 	newEndTime := input.NewStartTime.Add(time.Duration(actualDuration) * time.Minute)

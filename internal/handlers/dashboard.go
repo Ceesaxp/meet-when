@@ -697,7 +697,7 @@ func (h *DashboardHandler) Bookings(w http.ResponseWriter, r *http.Request) {
 		if (b.Status == models.BookingStatusCancelled || b.Status == models.BookingStatusRejected) && !b.IsArchived {
 			archivableCount++
 		}
-		if !b.IsArchived && b.EndTime.Time.Before(now) {
+		if !b.IsArchived && b.EndTime.Before(now) {
 			pastArchivableCount++
 		}
 	}
