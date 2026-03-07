@@ -77,6 +77,7 @@ func main() {
 	mux.HandleFunc("GET /m/{tenant}/{host}/{template}", h.Public.TemplatePage)
 	mux.HandleFunc("GET /m/{tenant}/{host}/{template}/slots", h.Public.GetSlots)
 	mux.HandleFunc("POST /m/{tenant}/{host}/{template}/book", h.Public.CreateBooking)
+	mux.HandleFunc("GET /m/{tenant}/{host}/{template}/reschedule/{booking_id}", h.Public.RescheduleByID)
 	mux.HandleFunc("GET /booking/{token}", h.Public.BookingStatus)
 	mux.HandleFunc("POST /booking/{token}/cancel", h.Public.CancelBooking)
 	mux.HandleFunc("GET /booking/{token}/calendar.ics", h.Public.DownloadICS)
@@ -142,8 +143,13 @@ func main() {
 	dashboard.HandleFunc("POST /dashboard/bookings/{id}/archive", h.Dashboard.ArchiveBooking)
 	dashboard.HandleFunc("POST /dashboard/bookings/{id}/unarchive", h.Dashboard.UnarchiveBooking)
 	dashboard.HandleFunc("POST /dashboard/bookings/archive-all", h.Dashboard.BulkArchiveBookings)
+	dashboard.HandleFunc("POST /dashboard/bookings/archive-all-past", h.Dashboard.BulkArchivePastBookings)
 	dashboard.HandleFunc("POST /dashboard/bookings/{id}/retry-calendar", h.Dashboard.RetryCalendarEvent)
 	dashboard.HandleFunc("POST /dashboard/bookings/retry-calendar-all", h.Dashboard.BulkRetryCalendarEvents)
+
+	// Contacts
+	dashboard.HandleFunc("GET /dashboard/contacts", h.Dashboard.Contacts)
+	dashboard.HandleFunc("GET /dashboard/contacts/{email}/bookings", h.Dashboard.ContactBookings)
 
 	// Settings
 	dashboard.HandleFunc("GET /dashboard/settings", h.Dashboard.Settings)
@@ -197,6 +203,29 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
+	// Start auto-archive background worker
+	archiveCtx, archiveCancel := context.WithCancel(context.Background())
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		log.Println("Auto-archive worker started (runs every 24 hours, archives bookings older than 14 days)")
+		for {
+			select {
+			case <-ticker.C:
+				cutoff := time.Now().Add(-14 * 24 * time.Hour)
+				count, err := repos.Booking.ArchiveOldBookings(archiveCtx, cutoff)
+				if err != nil {
+					log.Printf("Auto-archive error: %v", err)
+				} else if count > 0 {
+					log.Printf("Auto-archive: archived %d old bookings", count)
+				}
+			case <-archiveCtx.Done():
+				log.Println("Auto-archive worker stopped")
+				return
+			}
+		}
+	}()
+
 	// Start server in goroutine
 	go func() {
 		log.Printf("Server starting on %s", cfg.Server.Address)
@@ -211,6 +240,8 @@ func main() {
 	<-quit
 
 	log.Println("Server shutting down...")
+	archiveCancel()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 

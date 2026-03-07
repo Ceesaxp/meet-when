@@ -59,3 +59,7 @@ plans/
 tasks/
 .playwright-mcp/
 tests/
+prompt.md
+scripts/ralph.sh
+tasks/
+plans/

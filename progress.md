@@ -1501,3 +1501,312 @@ The following features from the requirements document are already fully implemen
   - Pre-existing lint issues in the codebase (errcheck on db.Close, bcrypt.CompareHashAndPassword, rows.Close) are not related to this change
 
 ---
+
+## 2026-03-06 - US-001 - Change session duration default to 7 days and use config value
+- What was implemented:
+  - Changed SESSION_DURATION_HOURS default from 24 to 168 (7 days) in internal/config/config.go
+  - Replaced all 5 hardcoded `int(24 * time.Hour / time.Second)` MaxAge values in internal/handlers/auth.go with `int(h.handlers.cfg.App.SessionDuration / time.Second)`
+  - Session DB TTL was already using `s.cfg.App.SessionDuration` in internal/services/session.go — no change needed there
+- Files changed:
+  - `internal/config/config.go` - Changed default from 24 to 168
+  - `internal/handlers/auth.go` - 5 cookie MaxAge values now use config
+- **Learnings for future iterations:**
+  - The session service (session.go:44) already used cfg.App.SessionDuration for DB expiry — only cookie MaxAge was hardcoded
+  - AuthHandler accesses config via `h.handlers.cfg` (AuthHandler -> Handlers -> cfg)
+  - There are also google_auth_nonce and google_profile cookies with MaxAge=600 (10 min) and logout/clear cookies with MaxAge=-1 — these are intentionally different and should NOT use SessionDuration
+----
+
+## 2026-03-06 - US-002 - Add reschedule link to confirmation email body
+- Updated reschedule link format from `{BASE_URL}/booking/{token}/reschedule` to `{BASE_URL}/m/{tenant_slug}/{host_slug}/{template_slug}/reschedule/{booking_id}`
+- Changed label from "Reschedule:" to "Reschedule this meeting:" with link on its own line
+- Updated in 3 places: defaultInviteeConfirmationBody, sendInviteeRescheduleNotification, defaultReminderBody
+- Also updated buildEmailTemplateData which generates the RescheduleLink for custom templates
+- Files changed:
+  - `internal/services/email.go` - Updated reschedule link format and label in all email templates
+- **Learnings for future iterations:**
+  - BookingWithDetails has Tenant, Host, Template, and Booking — all slug fields available for URL construction
+  - buildEmailTemplateData (email.go:78) builds template data used by both default and custom email templates — updating RescheduleLink there covers both paths
+  - There are 3 default email bodies with reschedule links: confirmation (line ~106), reminder (line ~488), and reschedule notification (line ~446)
+  - The reschedule notification email uses inline fmt.Sprintf rather than buildEmailTemplateData — so it needs separate URL construction
+  - When adding new URL formats in emails, always verify a matching route handler exists in cmd/server/main.go
+  - Added RescheduleByID handler that redirects /m/{tenant}/{host}/{template}/reschedule/{booking_id} to /booking/{token}/reschedule — avoids duplicating reschedule page logic
+----
+
+## 2026-03-06, 10:00 AM - US-003 - Add reschedule link to ICS calendar event descriptions
+- Added reschedule URL to ICS DESCRIPTION field in generateICS() (email.go) — used by confirmation, reminder, and reschedule notification emails
+- Added reschedule URL to Google Calendar event description in createGoogleEvent() (calendar.go)
+- Added reschedule URL to CalDAV event description in createCalDAVEvent() (calendar.go) — uses escaped newlines (\\n) for ICS format
+- Verified reschedule page handles cancelled/rejected bookings gracefully (existing checks at public.go:528-536)
+- Files changed: internal/services/email.go, internal/services/calendar.go
+- **Learnings for future iterations:**
+  - The ICS generateICS() in email.go uses real newlines in description, then escapeICS() handles them — just append normally
+  - CalDAV createCalDAVEvent() in calendar.go uses literal \\n strings in the description (not real newlines) — must match this pattern
+  - Google Calendar createGoogleEvent() uses real newlines like email.go
+  - All three description-building blocks follow the same pattern: template description + agenda + reschedule link
+  - The generateICS() function is shared by confirmation, reminder, and reschedule notification emails — one change covers all three
+  - BookingWithDetails has Tenant, Host, Template with Slug fields, and CalendarService has s.cfg for BaseURL access
+----
+
+## 2026-03-06 - US-004 - Add reschedule link to reminder email
+- Already completed by prior work in US-002 and US-003:
+  - US-002 updated defaultReminderBody() to include "Reschedule this meeting:" link (email.go:509-510)
+  - US-003 updated generateICS() to include reschedule URL in ICS DESCRIPTION — generateICS() is called for reminders at email.go:559
+- No code changes needed — all acceptance criteria already passing
+- Build succeeds
+- Files changed: None (only prd.json updated)
+- **Learnings for future iterations:**
+  - Always check if prior stories already covered the acceptance criteria before implementing — US-002/US-003 covered all three email types (confirmation, reminder, reschedule notification) in a single pass
+  - The generateICS() function is shared across all email types, so ICS changes in US-003 automatically apply to reminders
+----
+
+## 2026-03-06 - US-005 - Add backend validation for custom durations
+- What was implemented:
+  - Added `validateDurations()` helper function in template service that validates, deduplicates, and sorts duration values
+  - Rejects durations outside 5-480 minute range with clear error message using `fmt.Errorf` wrapping `ErrInvalidDuration`
+  - Deduplicates using a map-based seen set
+  - Sorts ascending using `sort.Ints()`
+  - Integrated validation into both `CreateTemplate` and `UpdateTemplate` methods (called after defaults, before persisting)
+  - Added `ErrInvalidDuration` sentinel error
+- Files changed:
+  - `internal/services/template.go` - Added validateDurations(), ErrInvalidDuration, and calls in Create/Update
+  - `plans/prd.json` - Marked US-005 as passing
+- **Learnings for future iterations:**
+  - Template service already had no tests file — validation logic is straightforward enough to verify via build
+  - Both CreateTemplate and UpdateTemplate share the same input struct pattern with `Durations []int`
+  - The validation runs after defaults are set (so the default `[]int{30}` also gets validated, which is fine since 30 is in range)
+----
+
+## 2026-03-06 - US-006 - Expand preset duration chips in template form
+- What was implemented:
+  - Expanded duration chip options from [15, 30, 45, 60, 90] to [15, 20, 25, 30, 45, 50, 60, 75, 90, 120]
+  - All chips in ascending order
+  - 30 min remains the default selected chip for new templates
+  - Existing templates with current durations continue to work (template editing uses `contains` helper to check each value)
+- Files changed:
+  - `templates/pages/dashboard_template_form.html` - Updated duration chips section with 5 new options (20, 25, 50, 75, 120)
+  - `plans/prd.json` - Marked US-006 as passing
+- **Learnings for future iterations:**
+  - The onboarding page (`templates/pages/onboarding.html`) also has duration chips but with a simpler subset — may want to update separately if consistency is desired
+  - Duration chips use a `contains` template function to check if a value exists in the template's Durations slice
+  - The 30 min chip has special default-selected logic: `{{else}}selected{{end}}` for when no template exists yet
+----
+
+## 2026-03-06 - US-007 - Add custom duration free-form input to template form
+- What was implemented:
+  - Added a "Custom" input field (number input, 5-480 range) with "Add" button below the preset duration chips
+  - Custom values are added as removable chip tags (with × remove button)
+  - If custom value matches a preset chip, the preset chip is selected instead of creating a duplicate
+  - Duplicate custom values are silently ignored
+  - Invalid values show inline error message
+  - Enter key in the input triggers the Add button
+  - When editing a template with non-preset durations, those are rendered as custom chips on page load using Go template range + JavaScript
+  - Custom duration chips include hidden checkbox inputs with name="durations" so they submit with the form
+  - CSS styles added for custom duration row, remove button, and custom durations container
+- Files changed:
+  - `templates/pages/dashboard_template_form.html` - Added custom duration HTML and JavaScript (~70 lines)
+  - `static/css/style.css` - Added custom duration styles (~26 lines)
+  - `plans/prd.json` - Marked US-007 as passing
+- **Learnings for future iterations:**
+  - Go template `{{range}}` can output JavaScript statements inline — useful for initializing JS state from server data
+  - Backend validation (US-005) already handles deduplication and range checking, so the frontend validation is for UX only
+  - The `contains` template function only works with `[]int` — for checking membership in a literal list, use JavaScript instead
+  - Custom chips are appended to a separate `#custom-durations` div to keep them visually distinct from presets
+----
+
+## 2026-03-06, 10:00 AM - US-008 - Add smart_durations column to hosts table
+- Added migration 010_add_smart_durations for both PostgreSQL (BOOLEAN NOT NULL DEFAULT false) and SQLite (INTEGER NOT NULL DEFAULT 0)
+- Added SmartDurations bool field to Host model struct in internal/models/models.go
+- Updated HostRepository: INSERT query (Create), all SELECT queries (GetByID, GetByEmail, GetAllByEmail, GetBySlug, GetByTenantID, GetByGoogleID) and their Scan calls
+- Used COALESCE(smart_durations, false) in SELECT queries for safety with existing rows
+- **Learnings for future iterations:**
+  - Host queries use explicit column lists (not SELECT *), so every new column requires updating 7+ locations in repository.go
+  - SQLite uses INTEGER for booleans (0/1), PostgreSQL uses BOOLEAN — migration files differ
+  - COALESCE wrapping in SELECTs is the pattern used for newer boolean columns (see onboarding_completed)
+----
+
+## 2026-03-06 - US-009 - Add smart durations toggle to settings page
+- Added "Smart durations" toggle checkbox to the Profile section of dashboard_settings.html
+- Helper text: "End meetings 5-10 minutes early to give you buffer time"
+- Updated UpdateSettings handler in dashboard.go to read smart_durations checkbox value
+- Updated HostRepository.Update to include smart_durations in the UPDATE query (was missing)
+- Files changed:
+  - templates/pages/dashboard_settings.html (added toggle UI)
+  - internal/handlers/dashboard.go (read form value)
+  - internal/repository/repository.go (include smart_durations in UPDATE)
+- **Learnings for future iterations:**
+  - HostRepository.Update only updates a subset of columns (name, slug, timezone, default_calendar_id) — new fields must be explicitly added
+  - Toggle CSS styles (toggle-container, toggle-switch, toggle-input, toggle-label) already exist in static/css/style.css
+  - Checkbox form values come as "on" when checked, absent when unchecked — use `r.FormValue("x") == "on"`
+----
+
+## 2026-03-06 - US-010 & US-011 - Apply smart duration logic at booking creation and rescheduling
+- What was implemented:
+  - Added `calculateSmartDuration` helper function: durations <= 30 min subtract 5, > 30 min subtract 10, minimum 5
+  - Modified `CreateBooking` to load host before end time calculation and apply smart duration adjustment
+  - Modified `RescheduleBooking` to load host before end time calculation and apply smart duration adjustment
+  - Original duration is preserved in `booking.Duration` for display; only `EndTime` is adjusted
+  - Calendar events (ICS, Google, CalDAV) already use `booking.EndTime` so no changes needed there
+- Files changed:
+  - `internal/services/booking.go` - Added calculateSmartDuration(), moved host loading earlier in CreateBooking and RescheduleBooking, applied smart duration to end time calculation
+- **Learnings for future iterations:**
+  - Calendar event creation (ICS DTEND, Google Calendar end, CalDAV end) all use `booking.EndTime` — adjusting EndTime at booking creation propagates automatically
+  - Zoom `duration` field uses original `booking.Duration` which is correct (Zoom needs actual call length)
+  - Host was already loaded in both methods but after end time calc — moving it earlier was sufficient
+  - US-011 (reschedule) was trivially covered by the same change as US-010
+----
+
+## 2026-03-06 - US-012 - Remove status restriction on booking archival
+- What was implemented:
+  - Changed `ArchiveBooking` service method to use time-based check instead of status-based check
+  - Any booking whose `end_time` is in the past can now be archived regardless of status
+  - Future bookings with confirmed or pending status are still protected from archival
+  - Added `isPast` template function to `templateFuncs()` for checking if a `SQLiteTime` is in the past
+  - Updated dashboard bookings template to show archive/unarchive button for past confirmed bookings
+- Files changed:
+  - `internal/services/booking.go` - Changed ArchiveBooking from status check to time-based check
+  - `internal/handlers/handlers.go` - Added `isPast` template function, imported models package
+  - `templates/pages/dashboard_bookings.html` - Added archive button for past confirmed bookings
+- **Learnings for future iterations:**
+  - `SQLiteTime` embeds `time.Time` so methods like `.Before()` are promoted and can be called directly
+  - Template functions need to be registered in `templateFuncs()` in handlers.go
+  - The bookings template uses nested `{{if}}/{{else if}}` blocks for status-based action buttons — adding archive to confirmed status requires nesting within that block
+----
+
+## 2026-03-06, 10:00 - US-013 - Add ArchiveOldBookings repository method
+- Added `ArchiveOldBookings(ctx, cutoffTime)` method to `BookingRepository`
+- Archives all unarchived bookings where `end_time < cutoffTime` across all tenants
+- Returns count of affected rows
+- Uses `q()` helper for SQLite/Postgres compatibility
+- Files changed: `internal/repository/repository.go`
+- **Learnings for future iterations:**
+  - BookingRepository methods follow a consistent pattern: `q(r.driver, query)` + `r.db.ExecContext`/`QueryContext`
+  - New repo methods go between existing BookingRepository methods and SessionRepository (line ~1028)
+  - The `is_archived` boolean field on bookings is used for soft-archive (not delete)
+----
+
+## 2026-03-06 - US-014 - Add Archive all past button to bookings dashboard
+- What was implemented:
+  - Added ArchiveOldBookingsByHostID repository method (host-scoped version of ArchiveOldBookings)
+  - Added BulkArchivePastBookings service method calling repo with time.Now() cutoff
+  - Added BulkArchivePastBookings dashboard handler with HTMX support
+  - Registered route: POST /dashboard/bookings/archive-all-past
+  - Updated dashboard_bookings.html with Archive all past button and JS confirmation
+  - Added PastArchivableCount to handler data (counts non-archived bookings with end_time in the past)
+- Files changed:
+  - internal/repository/repository.go - Added ArchiveOldBookingsByHostID method
+  - internal/services/booking.go - Added BulkArchivePastBookings method
+  - internal/handlers/dashboard.go - Added handler + PastArchivableCount calculation
+  - cmd/server/main.go - Added route
+  - templates/pages/dashboard_bookings.html - Added button and JS function
+- **Learnings for future iterations:**
+  - ArchiveOldBookings (US-013) is cross-tenant for background jobs; dashboard buttons need host-scoped variants
+  - SQLiteTime embeds time.Time, access via .Time field (not type conversion)
+  - Existing Archive all button only archives cancelled/rejected; Archive all past archives any past booking
+----
+
+## 2026-03-06, 11:00 - US-015 - Add automatic archival background worker
+- What was implemented:
+  - Background goroutine in cmd/server/main.go that runs on a 24-hour ticker
+  - Calls `repos.Booking.ArchiveOldBookings()` with `now - 14 days` as cutoff
+  - Logs count of archived bookings per run (only when count > 0)
+  - Graceful shutdown via context cancellation when app receives SIGINT/SIGTERM
+- Files changed:
+  - `cmd/server/main.go` - Added auto-archive goroutine with ticker, context cancellation on shutdown
+- **Learnings for future iterations:**
+  - The codebase already has background services (Reminder, CalendarSync) with Start/Stop patterns, but those are full service structs; a simple goroutine+ticker is sufficient for periodic tasks
+  - `ArchiveOldBookings` is the cross-tenant version (from US-013), perfect for background jobs; `ArchiveOldBookingsByHostID` is the host-scoped version for dashboard buttons
+  - Context cancellation is wired before server.Shutdown so the worker stops before the server fully shuts down
+----
+
+## 2026-03-06, 11:30 - US-016 - Create contacts table and model
+- What was implemented:
+  - Migration 011_add_contacts.up.sql for both Postgres and SQLite
+  - Postgres version uses UUID PK, TIMESTAMP WITH TIME ZONE, VARCHAR types
+  - SQLite version uses TEXT PK, TEXT timestamps with strftime default, TEXT types
+  - Both have UNIQUE(tenant_id, email) constraint and indexes on tenant_id and email
+  - Contact model struct in internal/models/models.go with all fields matching the schema
+  - Phone, Timezone, FirstMet, LastMet are nullable (pointer types)
+- Files changed:
+  - `migrations/011_add_contacts.up.sql` - Postgres contacts table
+  - `migrations/sqlite/011_add_contacts.up.sql` - SQLite contacts table
+  - `internal/models/models.go` - Added Contact struct
+- **Learnings for future iterations:**
+  - Migrations must be created in both `migrations/` (Postgres) and `migrations/sqlite/` directories
+  - Postgres uses UUID, TIMESTAMP WITH TIME ZONE, VARCHAR; SQLite uses TEXT for everything with strftime defaults
+  - Nullable time fields use *SQLiteTime (pointer) in the model struct
+----
+
+## 2026-03-06 - US-017 - Create contact repository with Upsert and List methods
+- Implemented ContactRepository with Upsert, List, GetByEmail, and GetBookings methods
+- Upsert uses ON CONFLICT (tenant_id, email) DO UPDATE for atomic create/update
+- List supports optional search filter (LIKE for SQLite, ILIKE for Postgres), offset, limit, sorted by last_met DESC
+- GetBookings joins bookings with hosts table to filter by tenant_id and invitee_email
+- Files changed:
+  - `internal/repository/contact.go` - New file with all 4 repository methods
+  - `internal/repository/repository.go` - Added Contact field to Repositories struct and NewRepositories
+- **Learnings for future iterations:**
+  - Search queries with LIKE vs ILIKE need driver-specific SQL (can't use q() helper for this)
+  - Use `any` instead of `interface{}` to satisfy the modernize linter
+  - GetBookings needs to join through hosts table to get tenant_id since bookings only have host_id
+----
+
+## 2026-03-06 - US-018 - Create contact service and hook into booking confirmation
+- Created `internal/services/contact.go` with ContactService: UpsertFromBooking, BackfillFromBookings, ListContacts, GetByEmail, GetBookings, HasContacts, EnsureBackfilled
+- Added `ListConfirmedByTenant` method to BookingRepository for backfill support
+- Wired ContactService into BookingService via constructor injection
+- Hooked `UpsertFromBooking` into `processConfirmedBooking` -- runs after confirmation emails, errors logged but don't block booking flow
+- Files changed: internal/services/contact.go (new), internal/services/booking.go, internal/services/services.go, internal/repository/repository.go
+- **Learnings for future iterations:**
+  - BookingService uses constructor injection for all dependencies -- add new services as constructor params, not as fields set later
+  - `processConfirmedBooking` is the single hook point for both auto-approved (CreateBooking) and manually approved (ApproveBooking) bookings
+  - Bookings don't have tenant_id directly -- join through hosts table to get tenant scope
+  - Contact upsert uses ON CONFLICT with separate SQLite/Postgres query paths (driver-specific syntax for EXCLUDED vs excluded and timestamp casting)
+  - BackfillFromBookings and EnsureBackfilled are ready for US-021 (backfill contacts from existing bookings)
+----
+
+## 2026-03-06 - US-019 - Add contacts list page to dashboard
+- Created `templates/pages/dashboard_contacts.html` with search input and contacts table
+- Created `templates/partials/contacts_table_partial.html` for HTMX search responses
+- Added `Contacts` handler in `internal/handlers/dashboard.go` with HTMX partial support
+- Added "Contacts" nav link in `templates/layouts/dashboard.html` (between Calendars and Settings)
+- Registered `GET /dashboard/contacts` route in `cmd/server/main.go`
+- Calls `EnsureBackfilled` on page load to auto-populate contacts from existing bookings
+- Files changed: internal/handlers/dashboard.go, cmd/server/main.go, templates/layouts/dashboard.html, templates/pages/dashboard_contacts.html (new), templates/partials/contacts_table_partial.html (new)
+- **Learnings for future iterations:**
+  - CSS uses `.table` and `.table-container` classes (not `data-table`) and `.form-input` (not `form-control`)
+  - HTMX partials are loaded separately via `loadTemplates()` -- just put them in templates/partials/ and they auto-register
+  - `renderPartial` is used for HTMX fragment responses; check `HX-Request` header to decide full page vs partial
+  - `timeAgo` template func accepts `*SQLiteTime` via the `toTime` helper
+  - `ActiveNav` field in PageData controls which sidebar link is highlighted
+----
+
+## 2026-03-06 - US-020 - Add contact meeting history drill-down
+- Clicking a contact row expands inline to show booking history (date, template name, status, duration)
+- Added `ContactBookingView` struct in `internal/models/models.go` pairing Booking with TemplateName
+- Modified `GetBookings` in `internal/repository/contact.go` to LEFT JOIN meeting_templates and return `ContactBookingView`
+- Updated `ContactService.GetBookings` return type in `internal/services/contact.go`
+- Added `ContactBookings` handler in `internal/handlers/dashboard.go` for HTMX partial endpoint
+- Registered `GET /dashboard/contacts/{email}/bookings` route in `cmd/server/main.go`
+- Created `templates/partials/contact_bookings_partial.html` for inline booking history table
+- Updated `templates/partials/contacts_table_partial.html` with expandable rows (HTMX hx-get + CSS toggle)
+- Added `urlEncode` template function in `internal/handlers/handlers.go` using `url.PathEscape`
+- Files changed: internal/models/models.go, internal/repository/contact.go, internal/services/contact.go, internal/handlers/dashboard.go, internal/handlers/handlers.go, cmd/server/main.go, templates/partials/contacts_table_partial.html, templates/partials/contact_bookings_partial.html (new)
+- **Learnings for future iterations:**
+  - HTMX `hx-trigger="click once"` prevents re-fetching on subsequent clicks (toggle is CSS-only via class)
+  - `hx-target="next .classname"` targets the next sibling with that class - useful for expand/collapse patterns
+  - Contact repo's `GetBookings` now returns `ContactBookingView` (breaking change from `[]*models.Booking`)
+  - Emails in URL paths need `url.PathEscape` encoding; added `urlEncode` template func for this
+----
+
+## 2026-03-06 - US-021 - Backfill contacts from existing bookings
+- Feature was already fully implemented in prior iterations (during US-017/US-018/US-019 work)
+- `ContactService.BackfillFromBookings()` processes all confirmed bookings via `ListConfirmedByTenant` and upserts contacts
+- `ContactService.EnsureBackfilled()` checks if contacts exist for tenant, triggers backfill if empty
+- Called from `DashboardHandler.Contacts()` on first access to contacts page (dashboard.go:1364)
+- Idempotent: uses ON CONFLICT upsert, safe to run multiple times
+- No code changes needed — only marked as passing in prd.json
+- Files changed: plans/prd.json
+- **Learnings for future iterations:**
+  - When features are built as part of earlier stories, check all acceptance criteria before assuming more work is needed
+  - The contact backfill pattern (check-then-populate on first access) is a lazy initialization approach
+----

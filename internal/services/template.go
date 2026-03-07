@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sort"
 	"strconv"
 
 	"github.com/google/uuid"
@@ -18,8 +20,34 @@ var (
 	ErrCannotRemoveOwner    = errors.New("cannot remove the template owner")
 	ErrPooledHostLimit      = errors.New("maximum 5 hosts per template")
 	ErrHostNotInTenant      = errors.New("host must be in the same tenant")
+	ErrInvalidDuration      = errors.New("invalid duration")
 	MaxPooledHostsPerTemplate = 5
 )
+
+// validateDurations validates, deduplicates, and sorts durations.
+// Returns the cleaned slice or an error.
+func validateDurations(durations []int) ([]int, error) {
+	for _, d := range durations {
+		if d < 5 || d > 480 {
+			return nil, fmt.Errorf("%w: %d is outside the 5-480 minute range", ErrInvalidDuration, d)
+		}
+	}
+
+	// Deduplicate
+	seen := make(map[int]struct{}, len(durations))
+	unique := make([]int, 0, len(durations))
+	for _, d := range durations {
+		if _, ok := seen[d]; !ok {
+			seen[d] = struct{}{}
+			unique = append(unique, d)
+		}
+	}
+
+	// Sort ascending
+	sort.Ints(unique)
+
+	return unique, nil
+}
 
 // TemplateService handles meeting template operations
 type TemplateService struct {
@@ -79,6 +107,13 @@ func (s *TemplateService) CreateTemplate(ctx context.Context, input CreateTempla
 	if input.MaxScheduleDays == 0 {
 		input.MaxScheduleDays = 14 // 2 weeks default
 	}
+
+	// Validate, deduplicate, and sort durations
+	validDurations, err := validateDurations(input.Durations)
+	if err != nil {
+		return nil, err
+	}
+	input.Durations = validDurations
 
 	now := models.Now()
 	template := &models.MeetingTemplate{
@@ -167,6 +202,13 @@ func (s *TemplateService) UpdateTemplate(ctx context.Context, input UpdateTempla
 			return nil, ErrTemplateSlugExists
 		}
 	}
+
+	// Validate, deduplicate, and sort durations
+	validDurations, err := validateDurations(input.Durations)
+	if err != nil {
+		return nil, err
+	}
+	input.Durations = validDurations
 
 	template.Slug = input.Slug
 	template.Name = input.Name

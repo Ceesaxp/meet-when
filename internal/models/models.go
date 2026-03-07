@@ -88,6 +88,7 @@ type Host struct {
 	OnboardingCompleted bool       `json:"onboarding_completed" db:"onboarding_completed"`
 	GoogleID            *string    `json:"google_id,omitempty" db:"google_id"`
 	GoogleEmail         *string    `json:"google_email,omitempty" db:"google_email"`
+	SmartDurations      bool       `json:"smart_durations" db:"smart_durations"`
 	CreatedAt           SQLiteTime `json:"created_at" db:"created_at"`
 	UpdatedAt           SQLiteTime `json:"updated_at" db:"updated_at"`
 }
@@ -251,6 +252,27 @@ type AuditLog struct {
 	Details    JSONMap    `json:"details" db:"details"`
 	IPAddress  string     `json:"ip_address" db:"ip_address"`
 	CreatedAt  SQLiteTime `json:"created_at" db:"created_at"`
+}
+
+// Contact represents a deduplicated invitee record (CRM lite)
+type Contact struct {
+	ID           string      `json:"id" db:"id"`
+	TenantID     string      `json:"tenant_id" db:"tenant_id"`
+	Name         string      `json:"name" db:"name"`
+	Email        string      `json:"email" db:"email"`
+	Phone        *string     `json:"phone,omitempty" db:"phone"`
+	Timezone     *string     `json:"timezone,omitempty" db:"timezone"`
+	FirstMet     *SQLiteTime `json:"first_met,omitempty" db:"first_met"`
+	LastMet      *SQLiteTime `json:"last_met,omitempty" db:"last_met"`
+	MeetingCount int         `json:"meeting_count" db:"meeting_count"`
+	CreatedAt    SQLiteTime  `json:"created_at" db:"created_at"`
+	UpdatedAt    SQLiteTime  `json:"updated_at" db:"updated_at"`
+}
+
+// ContactBookingView pairs a booking with its template name for contact history display
+type ContactBookingView struct {
+	Booking      *Booking
+	TemplateName string
 }
 
 // SignupConversion represents a conversion tracking record for registration CTAs

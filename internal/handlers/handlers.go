@@ -5,11 +5,13 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/meet-when/meet-when/internal/config"
+	"github.com/meet-when/meet-when/internal/models"
 	"github.com/meet-when/meet-when/internal/repository"
 	"github.com/meet-when/meet-when/internal/services"
 )
@@ -268,6 +270,12 @@ func templateFuncs() template.FuncMap {
 				return m
 			}
 			return nil
+		},
+		"isPast": func(t models.SQLiteTime) bool {
+			return t.Before(time.Now())
+		},
+		"urlEncode": func(s string) string {
+			return url.PathEscape(s)
 		},
 	}
 }

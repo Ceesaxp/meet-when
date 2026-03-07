@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -689,9 +690,15 @@ func (h *DashboardHandler) Bookings(w http.ResponseWriter, r *http.Request) {
 
 	// Count archivable bookings (cancelled or rejected, not yet archived)
 	archivableCount := 0
+	// Count past unarchived bookings (any status, end_time in the past)
+	now := time.Now()
+	pastArchivableCount := 0
 	for _, b := range allBookings {
 		if (b.Status == models.BookingStatusCancelled || b.Status == models.BookingStatusRejected) && !b.IsArchived {
 			archivableCount++
+		}
+		if !b.IsArchived && b.EndTime.Before(now) {
+			pastArchivableCount++
 		}
 	}
 
@@ -733,8 +740,9 @@ func (h *DashboardHandler) Bookings(w http.ResponseWriter, r *http.Request) {
 			"PendingCount":    len(pendingBookings),
 			"ConfirmedCount":  len(confirmedBookings),
 			"CancelledCount":  len(cancelledBookings),
-			"ArchivableCount": archivableCount,
-			"CalRetryCount":   calRetryCount,
+			"ArchivableCount":     archivableCount,
+			"PastArchivableCount": pastArchivableCount,
+			"CalRetryCount":       calRetryCount,
 		},
 	})
 }
@@ -902,6 +910,35 @@ func (h *DashboardHandler) BulkArchiveBookings(w http.ResponseWriter, r *http.Re
 	h.handlers.redirect(w, r, "/dashboard/bookings")
 }
 
+// BulkArchivePastBookings archives all past bookings for a host
+func (h *DashboardHandler) BulkArchivePastBookings(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	count, err := h.handlers.services.Booking.BulkArchivePastBookings(r.Context(), host.Host.ID, host.Tenant.ID)
+
+	if r.Header.Get("HX-Request") == "true" {
+		if err != nil {
+			http.Error(w, "Failed to archive past bookings", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("HX-Redirect", "/dashboard/bookings")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if err != nil {
+		h.handlers.redirect(w, r, "/dashboard/bookings?error=bulk_archive_past_failed")
+		return
+	}
+
+	log.Printf("[DASHBOARD] Bulk archived %d past bookings for host %s", count, host.Host.ID)
+	h.handlers.redirect(w, r, "/dashboard/bookings")
+}
+
 // RetryCalendarEvent retries calendar event creation for a single booking
 func (h *DashboardHandler) RetryCalendarEvent(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())
@@ -1013,6 +1050,7 @@ func (h *DashboardHandler) UpdateSettings(w http.ResponseWriter, r *http.Request
 
 	host.Host.Name = r.FormValue("name")
 	host.Host.Timezone = r.FormValue("timezone")
+	host.Host.SmartDurations = r.FormValue("smart_durations") == "on"
 
 	newSlug := r.FormValue("slug")
 	if newSlug != "" && newSlug != host.Host.Slug {
@@ -1310,4 +1348,78 @@ func filterAvailableHosts(allHosts []*models.Host, pooledHosts []*models.Templat
 		}
 	}
 	return available
+}
+
+// Contacts renders the contacts list page
+func (h *DashboardHandler) Contacts(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	search := r.URL.Query().Get("search")
+
+	// Ensure contacts are backfilled from existing bookings on first access
+	if err := h.handlers.services.Contact.EnsureBackfilled(r.Context(), host.Tenant.ID); err != nil {
+		log.Printf("[CONTACTS] Error ensuring backfill: %v", err)
+	}
+
+	contacts, err := h.handlers.services.Contact.ListContacts(r.Context(), host.Tenant.ID, search, 0, 100)
+	if err != nil {
+		log.Printf("[CONTACTS] Error listing contacts: %v", err)
+	}
+
+	data := map[string]interface{}{
+		"Contacts": contacts,
+		"Search":   search,
+	}
+
+	// For HTMX search requests, render just the table partial
+	if r.Header.Get("HX-Request") == "true" {
+		h.handlers.renderPartial(w, "contacts_table_partial.html", data)
+		return
+	}
+
+	h.handlers.render(w, "dashboard_contacts.html", PageData{
+		Title:        "Contacts",
+		Host:         host.Host,
+		Tenant:       host.Tenant,
+		ActiveNav:    "contacts",
+		PendingCount: h.getPendingCount(r, host.Host.ID),
+		BaseURL:      h.handlers.cfg.Server.BaseURL,
+		Data:         data,
+	})
+}
+
+// ContactBookings renders the booking history for a contact (HTMX partial)
+func (h *DashboardHandler) ContactBookings(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	email, err := url.PathUnescape(r.PathValue("email"))
+	if err != nil || email == "" {
+		http.Error(w, "Invalid email", http.StatusBadRequest)
+		return
+	}
+
+	bookings, err := h.handlers.services.Contact.GetBookings(r.Context(), host.Tenant.ID, email)
+	if err != nil {
+		log.Printf("[CONTACTS] Error getting bookings for %s: %v", email, err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	contact, _ := h.handlers.services.Contact.GetByEmail(r.Context(), host.Tenant.ID, email)
+
+	data := map[string]interface{}{
+		"Bookings": bookings,
+		"Contact":  contact,
+		"Email":    email,
+	}
+
+	h.handlers.renderPartial(w, "contact_bookings_partial.html", data)
 }
