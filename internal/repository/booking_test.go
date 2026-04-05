@@ -66,16 +66,13 @@ func TestBookingRepository_Update_PersistsTimeFields(t *testing.T) {
 				t.Fatalf("failed to create host: %v", err)
 			}
 
-			// Create template
-			tmpl := &models.MeetingTemplate{
-				ID:        uuid.New().String(),
-				HostID:    host.ID,
-				Slug:      "test-template-" + suffix,
-				Name:      "Test Template",
-				CreatedAt: models.Now(),
-				UpdatedAt: models.Now(),
-			}
-			if err := repos.Template.Create(ctx, tmpl); err != nil {
+			// Create template (use raw SQL to set calendar_id to NULL, avoiding FK constraint)
+			templateID := uuid.New().String()
+			_, err := db.Exec(`
+				INSERT INTO meeting_templates (id, host_id, slug, name, durations, location_type, calendar_id, is_active, is_private, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, NULL, 1, 0, ?, ?)
+			`, templateID, host.ID, "test-template-"+suffix, "Test Template", `[30]`, "google_meet", models.Now(), models.Now())
+			if err != nil {
 				t.Fatalf("failed to create template: %v", err)
 			}
 
@@ -86,7 +83,7 @@ func TestBookingRepository_Update_PersistsTimeFields(t *testing.T) {
 
 			booking := &models.Booking{
 				ID:           uuid.New().String(),
-				TemplateID:   tmpl.ID,
+				TemplateID:   templateID,
 				HostID:       host.ID,
 				Token:        "test-token-" + suffix,
 				Status:       models.BookingStatusPending,
@@ -112,7 +109,7 @@ func TestBookingRepository_Update_PersistsTimeFields(t *testing.T) {
 			booking.Duration = newDuration
 			booking.UpdatedAt = models.Now()
 
-			err := repos.Booking.Update(ctx, booking)
+			err = repos.Booking.Update(ctx, booking)
 			if err != nil {
 				t.Fatalf("Update failed: %v", err)
 			}
