@@ -914,13 +914,15 @@ func (r *BookingRepository) Update(ctx context.Context, booking *models.Booking)
 	query := q(r.driver, `
 		UPDATE bookings
 		SET status = $1, conference_link = $2, calendar_event_id = $3,
-		    cancelled_by = $4, cancel_reason = $5, reminder_sent = $6, is_archived = $7
-		WHERE id = $8
+		    cancelled_by = $4, cancel_reason = $5, reminder_sent = $6, is_archived = $7,
+		    start_time = $8, end_time = $9, duration = $10, updated_at = $11
+		WHERE id = $12
 	`)
 	_, err := r.db.ExecContext(ctx, query,
 		booking.Status, booking.ConferenceLink, booking.CalendarEventID,
 		booking.CancelledBy, booking.CancelReason, booking.ReminderSent,
-		booking.IsArchived, booking.ID)
+		booking.IsArchived, booking.StartTime, booking.EndTime, booking.Duration,
+		booking.UpdatedAt, booking.ID)
 	return err
 }
 
