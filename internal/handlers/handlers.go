@@ -28,6 +28,7 @@ type Handlers struct {
 	Dashboard  *DashboardHandler
 	Onboarding *OnboardingHandler
 	API        *APIHandler
+	APIV1      *APIV1Handler
 }
 
 // New creates all handlers
@@ -47,6 +48,7 @@ func New(cfg *config.Config, svc *services.Services, repos *repository.Repositor
 	h.Dashboard = &DashboardHandler{handlers: h}
 	h.Onboarding = &OnboardingHandler{handlers: h}
 	h.API = &APIHandler{handlers: h}
+	h.APIV1 = &APIV1Handler{handlers: h}
 
 	return h
 }

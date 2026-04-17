@@ -396,7 +396,13 @@ func (h *AuthHandler) GoogleAuthCallback(w http.ResponseWriter, r *http.Request)
 	code := r.URL.Query().Get("code")
 	state := r.URL.Query().Get("state")
 
+	isNative := isNativeFlow(state)
+
 	if code == "" {
+		if isNative {
+			nativeFlowErrorRedirect(w, r, "Google authentication was cancelled or failed.", h.handlers.cfg.Server.BaseURL)
+			return
+		}
 		h.handlers.render(w, "login.html", PageData{
 			Title: "Login",
 			Flash: &FlashMessage{Type: "error", Message: "Google authentication was cancelled or failed."},
@@ -407,6 +413,10 @@ func (h *AuthHandler) GoogleAuthCallback(w http.ResponseWriter, r *http.Request)
 	// Retrieve CSRF nonce from cookie
 	nonceCookie, err := r.Cookie("google_auth_nonce")
 	if err != nil || nonceCookie.Value == "" {
+		if isNative {
+			nativeFlowErrorRedirect(w, r, "Authentication session expired. Please try again.", h.handlers.cfg.Server.BaseURL)
+			return
+		}
 		h.handlers.render(w, "login.html", PageData{
 			Title: "Login",
 			Flash: &FlashMessage{Type: "error", Message: "Authentication session expired. Please try again."},
@@ -427,6 +437,10 @@ func (h *AuthHandler) GoogleAuthCallback(w http.ResponseWriter, r *http.Request)
 	userInfo, flow, err := h.handlers.services.Auth.HandleGoogleCallback(code, state, nonceCookie.Value)
 	if err != nil {
 		log.Printf("Google auth callback error: %v", err)
+		if isNative {
+			nativeFlowErrorRedirect(w, r, "Google authentication failed. Please try again.", h.handlers.cfg.Server.BaseURL)
+			return
+		}
 		redirectPage := "login.html"
 		title := "Login"
 		if strings.Contains(state, ":signup:") {
@@ -440,7 +454,9 @@ func (h *AuthHandler) GoogleAuthCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if flow == "signup" {
+	if flow == "native" {
+		h.handlers.APIV1.GoogleCallback(w, r, userInfo)
+	} else if flow == "signup" {
 		h.handleGoogleSignupCallback(w, r, userInfo)
 	} else {
 		h.handleGoogleLoginCallback(w, r, userInfo)
