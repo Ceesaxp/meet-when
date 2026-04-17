@@ -1,0 +1,463 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AA000001 /* MeetWhenBarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100001; };
+		AA000002 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100002; };
+		AA000003 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100003; };
+		AA000004 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100004; };
+		AA000005 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100005; };
+		AA000006 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100006; };
+		AA000007 /* OrgSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100007; };
+		AA000008 /* MainMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100008; };
+		AA000009 /* BookingRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100009; };
+		AA00000A /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000A; };
+		AA00000B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA10000B; };
+		AA000020 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA100020; };
+		AA000030 /* ModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100030; };
+		AA000031 /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100031; };
+		AA000032 /* KeychainServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100032; };
+		AA000033 /* AppViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100033; };
+		AA000034 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100034; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		AA400001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA500001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA300001;
+			remoteInfo = MeetWhenBar;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		AA100001 /* MeetWhenBarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetWhenBarApp.swift; sourceTree = "<group>"; };
+		AA100002 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		AA100003 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+		AA100004 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		AA100005 /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
+		AA100006 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		AA100007 /* OrgSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrgSelectionView.swift; sourceTree = "<group>"; };
+		AA100008 /* MainMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMenuView.swift; sourceTree = "<group>"; };
+		AA100009 /* BookingRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookingRowView.swift; sourceTree = "<group>"; };
+		AA10000A /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		AA10000B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		AA100010 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AA100020 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AA100030 /* ModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelsTests.swift; sourceTree = "<group>"; };
+		AA100031 /* APIClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
+		AA100032 /* KeychainServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainServiceTests.swift; sourceTree = "<group>"; };
+		AA100033 /* AppViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModelTests.swift; sourceTree = "<group>"; };
+		AA100034 /* NotificationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationServiceTests.swift; sourceTree = "<group>"; };
+		AA200001 /* MeetWhenBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MeetWhenBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA200002 /* MeetWhenBarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MeetWhenBarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AA600001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA600002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		AA700001 = {
+			isa = PBXGroup;
+			children = (
+				AA700002 /* MeetWhenBar */,
+				AA700006 /* MeetWhenBarTests */,
+				AA700007 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		AA700002 /* MeetWhenBar */ = {
+			isa = PBXGroup;
+			children = (
+				AA100001 /* MeetWhenBarApp.swift */,
+				AA100010 /* Info.plist */,
+				AA100020 /* Assets.xcassets */,
+				AA700003 /* Models */,
+				AA700004 /* Services */,
+				AA700005 /* ViewModels */,
+				AA700008 /* Views */,
+			);
+			path = MeetWhenBar;
+			sourceTree = "<group>";
+		};
+		AA700003 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				AA100002 /* Models.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		AA700004 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				AA100003 /* KeychainService.swift */,
+				AA100004 /* APIClient.swift */,
+				AA10000A /* NotificationService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		AA700005 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				AA100005 /* AppViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		AA700006 /* MeetWhenBarTests */ = {
+			isa = PBXGroup;
+			children = (
+				AA100030 /* ModelsTests.swift */,
+				AA100031 /* APIClientTests.swift */,
+				AA100032 /* KeychainServiceTests.swift */,
+				AA100033 /* AppViewModelTests.swift */,
+				AA100034 /* NotificationServiceTests.swift */,
+			);
+			path = MeetWhenBarTests;
+			sourceTree = "<group>";
+		};
+		AA700007 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA200001 /* MeetWhenBar.app */,
+				AA200002 /* MeetWhenBarTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA700008 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				AA100006 /* LoginView.swift */,
+				AA100007 /* OrgSelectionView.swift */,
+				AA100008 /* MainMenuView.swift */,
+				AA100009 /* BookingRowView.swift */,
+				AA10000B /* SettingsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AA300001 /* MeetWhenBar */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA800003 /* Build configuration list for PBXNativeTarget "MeetWhenBar" */;
+			buildPhases = (
+				AA900001 /* Sources */,
+				AA600001 /* Frameworks */,
+				AAA00001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MeetWhenBar;
+			productName = MeetWhenBar;
+			productReference = AA200001 /* MeetWhenBar.app */;
+			productType = "com.apple.product-type.application";
+		};
+		AA300002 /* MeetWhenBarTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA800004 /* Build configuration list for PBXNativeTarget "MeetWhenBarTests" */;
+			buildPhases = (
+				AA900002 /* Sources */,
+				AA600002 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA400002 /* PBXTargetDependency */,
+			);
+			name = MeetWhenBarTests;
+			productName = MeetWhenBarTests;
+			productReference = AA200002 /* MeetWhenBarTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AA500001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1540;
+				LastUpgradeCheck = 1540;
+				TargetAttributes = {
+					AA300001 = {
+						CreatedOnToolsVersion = 15.4;
+					};
+					AA300002 = {
+						CreatedOnToolsVersion = 15.4;
+						TestTargetID = AA300001;
+					};
+				};
+			};
+			buildConfigurationList = AA800001 /* Build configuration list for PBXProject "MeetWhenBar" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = AA700001;
+			productRefGroup = AA700007 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AA300001 /* MeetWhenBar */,
+				AA300002 /* MeetWhenBarTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AAA00001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000020 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AA900001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000001 /* MeetWhenBarApp.swift in Sources */,
+				AA000002 /* Models.swift in Sources */,
+				AA000003 /* KeychainService.swift in Sources */,
+				AA000004 /* APIClient.swift in Sources */,
+				AA000005 /* AppViewModel.swift in Sources */,
+				AA000006 /* LoginView.swift in Sources */,
+				AA000007 /* OrgSelectionView.swift in Sources */,
+				AA000008 /* MainMenuView.swift in Sources */,
+				AA000009 /* BookingRowView.swift in Sources */,
+				AA00000A /* NotificationService.swift in Sources */,
+				AA00000B /* SettingsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA900002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000030 /* ModelsTests.swift in Sources */,
+				AA000031 /* APIClientTests.swift in Sources */,
+				AA000032 /* KeychainServiceTests.swift in Sources */,
+				AA000033 /* AppViewModelTests.swift in Sources */,
+				AA000034 /* NotificationServiceTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AA400002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA300001 /* MeetWhenBar */;
+			targetProxy = AA400001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		AAB00001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		AAB00002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		AAB00003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MeetWhenBar/Info.plist;
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright 2026 Meet When. All rights reserved.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.meetwhen.menubar;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		AAB00004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MeetWhenBar/Info.plist;
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright 2026 Meet When. All rights reserved.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.meetwhen.menubar;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		AAB00005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.meetwhen.menubar.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MeetWhenBar.app/Contents/MacOS/MeetWhenBar";
+			};
+			name = Debug;
+		};
+		AAB00006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.meetwhen.menubar.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MeetWhenBar.app/Contents/MacOS/MeetWhenBar";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AA800001 /* Build configuration list for PBXProject "MeetWhenBar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AAB00001 /* Debug */,
+				AAB00002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA800003 /* Build configuration list for PBXNativeTarget "MeetWhenBar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AAB00003 /* Debug */,
+				AAB00004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA800004 /* Build configuration list for PBXNativeTarget "MeetWhenBarTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AAB00005 /* Debug */,
+				AAB00006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = AA500001 /* Project object */;
+}

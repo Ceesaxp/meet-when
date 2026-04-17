@@ -173,8 +173,28 @@ func main() {
 	mux.Handle("/dashboard/", middleware.RequireAuth(svc.Session)(dashboard))
 	mux.Handle("/onboarding/", middleware.RequireAuth(svc.Session)(dashboard))
 
-	// API routes
+	// API routes (legacy)
 	mux.HandleFunc("GET /api/timezones", h.API.GetTimezones)
+
+	// API v1 routes (JSON, for native clients)
+	// Public auth endpoints (no session required)
+	mux.HandleFunc("POST /api/v1/auth/login", h.APIV1.Login)
+	mux.HandleFunc("POST /api/v1/auth/login/select-org", h.APIV1.SelectOrg)
+	mux.HandleFunc("GET /api/v1/auth/google", h.APIV1.GoogleLogin)
+
+	// Protected API v1 endpoints (require Bearer token or session cookie)
+	apiv1 := http.NewServeMux()
+	apiv1.HandleFunc("POST /api/v1/auth/logout", h.APIV1.Logout)
+	apiv1.HandleFunc("GET /api/v1/me", h.APIV1.Me)
+	apiv1.HandleFunc("GET /api/v1/bookings", h.APIV1.ListBookings)
+	apiv1.HandleFunc("GET /api/v1/bookings/today", h.APIV1.TodayBookings)
+	apiv1.HandleFunc("GET /api/v1/bookings/pending", h.APIV1.PendingBookings)
+	apiv1.HandleFunc("GET /api/v1/bookings/{id}", h.APIV1.GetBooking)
+	apiv1.HandleFunc("POST /api/v1/bookings/{id}/approve", h.APIV1.ApproveBooking)
+	apiv1.HandleFunc("POST /api/v1/bookings/{id}/reject", h.APIV1.RejectBooking)
+	apiv1.HandleFunc("POST /api/v1/bookings/{id}/cancel", h.APIV1.CancelBooking)
+
+	mux.Handle("/api/v1/", middleware.RequireAuth(svc.Session)(apiv1))
 
 	// Health check
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {

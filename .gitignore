@@ -63,3 +63,9 @@ prompt.md
 scripts/ralph.sh
 tasks/
 plans/
+
+# Xcode build artifacts
+MeetWhenBar/build/
+MeetWhenBar/*.zip
+MeetWhenBar/**/*.xcuserstate
+MeetWhenBar/**/xcuserdata/
