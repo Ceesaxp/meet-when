@@ -257,7 +257,7 @@ final class AppViewModel {
         }
 
         self.serverURL = serverURL
-        let googleURL = baseURL.appendingPathComponent("/api/v1/auth/google")
+        let googleURL = baseURL.appendingPathComponent("api/v1/auth/google")
         NSWorkspace.shared.open(googleURL)
     }
 
@@ -320,7 +320,7 @@ final class AppViewModel {
     // MARK: - Dashboard
 
     func openDashboard() {
-        guard let url = URL(string: serverURL)?.appendingPathComponent("/dashboard") else { return }
+        guard let url = URL(string: serverURL)?.appendingPathComponent("dashboard") else { return }
         NSWorkspace.shared.open(url)
     }
 

@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct MeetWhenBarApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var viewModel = AppViewModel()
 
     var body: some Scene {
@@ -10,10 +11,8 @@ struct MeetWhenBarApp: App {
                 .task {
                     await viewModel.restoreSession()
                 }
-                .onOpenURL { url in
-                    Task {
-                        await viewModel.handleOAuthCallback(url)
-                    }
+                .onAppear {
+                    appDelegate.viewModel = viewModel
                 }
         } label: {
             menuBarLabel
@@ -49,6 +48,19 @@ struct MeetWhenBarApp: App {
             OrgSelectionView(viewModel: viewModel, orgs: orgs)
         case .authenticated:
             MainMenuView(viewModel: viewModel)
+        }
+    }
+}
+
+// MARK: - AppDelegate for URL scheme handling
+
+class AppDelegate: NSObject, NSApplicationDelegate {
+    var viewModel: AppViewModel?
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard let url = urls.first, let viewModel else { return }
+        Task { @MainActor in
+            await viewModel.handleOAuthCallback(url)
         }
     }
 }
