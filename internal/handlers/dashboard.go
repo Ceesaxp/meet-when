@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -1183,6 +1184,90 @@ type AgendaDayGroup struct {
 	Events []services.AgendaEvent
 }
 
+// Timeline constants
+const (
+	timelineStartHour = 7  // 7 AM
+	timelineEndHour   = 22 // 10 PM (last marker shown at 10pm)
+	pxPerMinute       = 1  // 1 pixel per minute
+	minEventHeightPx  = 30 // minimum event block height in pixels
+)
+
+// TimelineHour is an hour marker on the visual timeline
+type TimelineHour struct {
+	Label string
+	TopPx int
+}
+
+// AgendaEventWithPosition is an agenda event with computed pixel position for timeline display
+type AgendaEventWithPosition struct {
+	services.AgendaEvent
+	TopPx    int
+	HeightPx int
+}
+
+// generateTimelineHours creates the hour markers for the visual timeline grid
+func generateTimelineHours() []TimelineHour {
+	hours := make([]TimelineHour, 0, timelineEndHour-timelineStartHour+1)
+	for h := timelineStartHour; h <= timelineEndHour; h++ {
+		var label string
+		switch {
+		case h == 0:
+			label = "12am"
+		case h < 12:
+			label = fmt.Sprintf("%dam", h)
+		case h == 12:
+			label = "12pm"
+		default:
+			label = fmt.Sprintf("%dpm", h-12)
+		}
+		hours = append(hours, TimelineHour{
+			Label: label,
+			TopPx: (h - timelineStartHour) * 60 * pxPerMinute,
+		})
+	}
+	return hours
+}
+
+// positionEventsForTimeline computes pixel positions for timed events in the visual timeline
+func positionEventsForTimeline(events []services.AgendaEvent, loc *time.Location) []AgendaEventWithPosition {
+	timelineStartMin := timelineStartHour * 60
+	positioned := make([]AgendaEventWithPosition, 0, len(events))
+	for _, event := range events {
+		if event.IsAllDay {
+			continue
+		}
+		startInLoc := event.Start.In(loc)
+		endInLoc := event.End.In(loc)
+		startMin := startInLoc.Hour()*60 + startInLoc.Minute()
+		endMin := endInLoc.Hour()*60 + endInLoc.Minute()
+		topPx := (startMin - timelineStartMin) * pxPerMinute
+		heightPx := (endMin - startMin) * pxPerMinute
+		if topPx < 0 {
+			topPx = 0
+		}
+		if heightPx < minEventHeightPx {
+			heightPx = minEventHeightPx
+		}
+		positioned = append(positioned, AgendaEventWithPosition{
+			AgendaEvent: event,
+			TopPx:       topPx,
+			HeightPx:    heightPx,
+		})
+	}
+	return positioned
+}
+
+// filterAllDayEvents returns only all-day events from the slice
+func filterAllDayEvents(events []services.AgendaEvent) []services.AgendaEvent {
+	var allDay []services.AgendaEvent
+	for _, e := range events {
+		if e.IsAllDay {
+			allDay = append(allDay, e)
+		}
+	}
+	return allDay
+}
+
 // Agenda renders the agenda view with today's or this week's events
 func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())
@@ -1247,6 +1332,14 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 		events = []services.AgendaEvent{}
 	}
 
+	// Compute timeline positioning for today view
+	var positionedEvents []AgendaEventWithPosition
+	var allDayEvents []services.AgendaEvent
+	if view == "today" {
+		positionedEvents = positionEventsForTimeline(events, loc)
+		allDayEvents = filterAllDayEvents(events)
+	}
+
 	h.handlers.render(w, "dashboard_agenda.html", PageData{
 		Title:        "Agenda",
 		Host:         host.Host,
@@ -1254,11 +1347,14 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 		ActiveNav:    "agenda",
 		PendingCount: h.getPendingCount(r, host.Host.ID),
 		Data: map[string]interface{}{
-			"Events":    events,
-			"DayGroups": dayGroups,
-			"View":      view,
-			"Today":     now,
-			"Timezone":  host.Host.Timezone,
+			"Events":          events,
+			"PositionedEvents": positionedEvents,
+			"AllDayEvents":    allDayEvents,
+			"TimelineHours":   generateTimelineHours(),
+			"DayGroups":       dayGroups,
+			"View":            view,
+			"Today":           now,
+			"Timezone":        host.Host.Timezone,
 		},
 	})
 }
