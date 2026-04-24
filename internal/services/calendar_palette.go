@@ -61,25 +61,38 @@ func AssignColors(calendars []*models.CalendarConnection) {
 			assignQueue = append(assignQueue, c)
 		}
 	}
+
+	// paletteSet is a quick-lookup set of all canonical palette entries.
+	// Used in the wrap region to count how many calendars already carry a
+	// palette color so that the wrap index advances correctly whether calendars
+	// are added in one batch or one at a time, and regardless of how many
+	// non-palette custom colors exist in the list.
+	paletteSet := make(map[string]bool, len(CalendarPalette))
+	for _, c := range CalendarPalette {
+		paletteSet[c] = true
+	}
+
 	// Walk sorted calendars assigning the next queue slot to each unset one.
-	// Once the queue is exhausted (all palette colors now in use), wrap back
-	// through the full palette using the calendar's absolute sorted position (i)
-	// rather than a batch-local idx so that sequential single-calendar additions
-	// continue the rotation correctly (e.g. 11th calendar gets palette[1], not
-	// palette[0] again).
+	// Once the queue is exhausted, wrap back through the full palette using
+	// paletteColoredSoFar as the index.  Counting only palette-colored entries
+	// (not custom colors) means non-palette overrides never shift the wrap
+	// offset, while sequential single-calendar additions still advance it.
 	idx := 0
-	for i, cal := range calendars {
+	paletteColoredSoFar := 0
+	for _, cal := range calendars {
 		if cal.Color != "" {
+			if paletteSet[strings.ToUpper(cal.Color)] {
+				paletteColoredSoFar++
+			}
 			continue
 		}
 		if idx < len(assignQueue) {
 			cal.Color = assignQueue[idx]
 		} else {
-			// All available (non-preassigned) slots used; cycle the full palette
-			// by absolute position so that each new Connect* call advances the
-			// cursor rather than restarting at index 0.
-			cal.Color = CalendarPalette[i%len(CalendarPalette)]
+			// All available (non-preassigned) slots used; cycle the full palette.
+			cal.Color = CalendarPalette[paletteColoredSoFar%len(CalendarPalette)]
 		}
+		paletteColoredSoFar++ // every freshly assigned color is a palette color
 		idx++
 	}
 }

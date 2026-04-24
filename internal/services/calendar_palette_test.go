@@ -277,6 +277,38 @@ func TestAssignColors_EmptyInput(t *testing.T) {
 	AssignColors([]*models.CalendarConnection{})
 }
 
+// TestAssignColors_CustomColorDoesNotShiftWrapIndex verifies that a
+// pre-existing calendar with a custom (non-palette) color does not shift the
+// wrap index.  After all 9 palette slots are consumed the next uncolored
+// calendar must receive CalendarPalette[0], not CalendarPalette[1].
+func TestAssignColors_CustomColorDoesNotShiftWrapIndex(t *testing.T) {
+	customColor := "#ABCDEF" // not in CalendarPalette
+
+	// 1 custom-colored + 10 uncolored: first 9 uncolored fill palette[0..8],
+	// the 10th must wrap to palette[0].
+	cals := make([]*models.CalendarConnection, 11)
+	cals[0] = makeCalendar(0, customColor)
+	for i := 1; i <= 10; i++ {
+		cals[i] = makeCalendar(i, "")
+	}
+
+	AssignColors(cals)
+
+	if cals[0].Color != customColor {
+		t.Errorf("custom color was changed: want %s, got %s", customColor, cals[0].Color)
+	}
+	for i := 1; i <= 9; i++ {
+		want := CalendarPalette[i-1]
+		if cals[i].Color != want {
+			t.Errorf("calendar %d: want %s, got %s", i, want, cals[i].Color)
+		}
+	}
+	// 10th uncolored calendar must wrap to palette[0], not palette[1].
+	if cals[10].Color != CalendarPalette[0] {
+		t.Errorf("10th uncolored (after custom): want wrap to %s (palette[0]), got %s", CalendarPalette[0], cals[10].Color)
+	}
+}
+
 // TestAssignColors_SequentialAdditionsContinueRotation verifies that when
 // calendars are connected one at a time (each Connect* call adds a single new
 // calendar to an already-colored list), the palette rotation continues past the
