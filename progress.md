@@ -1747,3 +1747,12 @@ The following features from the requirements document are already fully implemen
   - `static/css/style.css`
 
 ----
+
+## 2026-04-24 - US-012 (visual-agenda-pr1) - Add strip visualization and event row CSS
+- What was implemented:
+  - Added `.strip-container`, `.strip-lane`, `.strip-lane--empty`, `.strip-block`, `.strip-header`, `.event-row` classes
+  - Added `.color-swatches`, `.color-swatch`, `.swatch-circle`, `.swatch-name` classes
+- Files changed:
+  - `static/css/style.css`
+
+----

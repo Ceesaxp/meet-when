@@ -4925,3 +4925,66 @@ body.modal-open {
     padding: 0;
     margin: 0;
 }
+
+/* ============================================
+   Day Strip Visualization
+   ============================================ */
+
+.strip-container {
+    overflow-x: auto;
+}
+
+.strip-lane {
+    position: relative;
+    border-radius: 4px;
+    background: var(--gray-100);
+    height: 22px;
+    margin-bottom: 2px;
+}
+
+.strip-lane--empty {
+    height: 8px;
+}
+
+.strip-block {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    border-radius: 3px;
+    min-width: 4px;
+    overflow: hidden;
+}
+
+.strip-header {
+    display: grid;
+}
+
+.event-row {
+    border-left: 3px solid var(--cal-color, var(--gray-300));
+    padding-left: 12px;
+}
+
+/* ============================================
+   Color Swatch Picker
+   ============================================ */
+
+.color-swatches {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.color-swatch {
+    cursor: pointer;
+}
+
+.swatch-circle {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+}
+
+.swatch-name {
+    font-size: 0.75rem;
+}
