@@ -1767,3 +1767,17 @@ The following features from the requirements document are already fully implemen
   - `templates/partials/color_swatch_fieldset.html` (new file)
 
 ----
+
+## 2026-04-24 - US-014 (visual-agenda-pr1) - Add POST color picker route and handler
+- What was implemented:
+  - Added `UpdateCalendarColor` handler to `internal/handlers/dashboard.go`
+  - Validates submitted color is in `services.CalendarPalette`; returns 400 for arbitrary hex
+  - Calls `h.handlers.repos.Calendar.UpdateColor` with tenant isolation (host.ID)
+  - Returns `color_swatch_fieldset.html` partial with updated color via `renderPartial`
+  - Registered `POST /dashboard/calendars/{id}/color` in `cmd/server/main.go`
+  - Added `paletteData` package-level var with `{Hex, Name}` maps for the 9 palette entries
+- Files changed:
+  - `internal/handlers/dashboard.go`
+  - `cmd/server/main.go`
+
+----

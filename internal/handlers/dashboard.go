@@ -206,6 +206,58 @@ func (h *DashboardHandler) SetDefaultCalendar(w http.ResponseWriter, r *http.Req
 	h.handlers.redirect(w, r, "/dashboard/calendars")
 }
 
+// paletteData returns the ordered palette slice used by color picker templates.
+var paletteData = []map[string]string{
+	{"Hex": "#378ADD", "Name": "Blue"},
+	{"Hex": "#1D9E75", "Name": "Teal"},
+	{"Hex": "#D85A30", "Name": "Coral"},
+	{"Hex": "#7F77DD", "Name": "Purple"},
+	{"Hex": "#639922", "Name": "Green"},
+	{"Hex": "#BA7517", "Name": "Amber"},
+	{"Hex": "#D4537E", "Name": "Pink"},
+	{"Hex": "#E24B4A", "Name": "Red"},
+	{"Hex": "#5F5E5A", "Name": "Gray"},
+}
+
+// UpdateCalendarColor handles POST /dashboard/calendars/{id}/color.
+// It validates the submitted color is a CalendarPalette value, persists it,
+// and returns the updated color swatch fieldset partial for HTMX swap.
+func (h *DashboardHandler) UpdateCalendarColor(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	calendarID := r.PathValue("id")
+	color := r.FormValue("color")
+
+	// Validate that color is one of the 9 palette values.
+	valid := false
+	for _, c := range services.CalendarPalette {
+		if c == color {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		http.Error(w, "invalid color", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.handlers.repos.Calendar.UpdateColor(r.Context(), host.Host.ID, calendarID, color); err != nil {
+		log.Printf("[CALENDAR] UpdateCalendarColor failed for %s: %v", calendarID, err)
+		http.Error(w, "failed to update color", http.StatusInternalServerError)
+		return
+	}
+
+	h.handlers.renderPartial(w, "color_swatch_fieldset.html", map[string]interface{}{
+		"CalendarID":   calendarID,
+		"CurrentColor": color,
+		"Palette":      paletteData,
+	})
+}
+
 // Templates renders the meeting templates list
 func (h *DashboardHandler) Templates(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())

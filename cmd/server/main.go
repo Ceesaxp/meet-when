@@ -115,6 +115,7 @@ func main() {
 	dashboard.HandleFunc("POST /dashboard/calendars/{id}/disconnect", h.Dashboard.DisconnectCalendar)
 	dashboard.HandleFunc("POST /dashboard/calendars/{id}/default", h.Dashboard.SetDefaultCalendar)
 	dashboard.HandleFunc("POST /dashboard/calendars/{id}/refresh", h.Dashboard.RefreshCalendarSync)
+	dashboard.HandleFunc("POST /dashboard/calendars/{id}/color", h.Dashboard.UpdateCalendarColor)
 
 	// Meeting templates
 	dashboard.HandleFunc("GET /dashboard/templates", h.Dashboard.Templates)
