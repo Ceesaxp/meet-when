@@ -1198,11 +1198,14 @@ type TimelineHour struct {
 	TopPx int
 }
 
-// AgendaEventWithPosition is an agenda event with computed pixel position for timeline display
+// AgendaEventWithPosition is an agenda event with computed pixel position for timeline display.
+// LeftPct and WidthPct are CSS percentage strings used for overlap column layout.
 type AgendaEventWithPosition struct {
 	services.AgendaEvent
 	TopPx    int
 	HeightPx int
+	LeftPct  string // e.g. "0%" or "50%"
+	WidthPct string // e.g. "100%" or "50%"
 }
 
 // generateTimelineHours creates the hour markers for the visual timeline grid
@@ -1228,10 +1231,73 @@ func generateTimelineHours() []TimelineHour {
 	return hours
 }
 
-// positionEventsForTimeline computes pixel positions for timed events in the visual timeline
-func positionEventsForTimeline(events []services.AgendaEvent, loc *time.Location) []AgendaEventWithPosition {
+// assignOverlapColumns assigns left/width CSS percentages so that overlapping events
+// are rendered side-by-side in columns instead of painting on top of each other.
+func assignOverlapColumns(events []AgendaEventWithPosition) {
+	if len(events) == 0 {
+		return
+	}
+
+	// Greedily assign each event to the lowest-index column whose last occupant has ended.
+	type colState struct{ endPx int }
+	cols := []colState{}
+	colIdx := make([]int, len(events))
+
+	for i := range events {
+		assigned := false
+		for c := range cols {
+			if events[i].TopPx >= cols[c].endPx {
+				colIdx[i] = c
+				cols[c].endPx = events[i].TopPx + events[i].HeightPx
+				assigned = true
+				break
+			}
+		}
+		if !assigned {
+			colIdx[i] = len(cols)
+			cols = append(cols, colState{endPx: events[i].TopPx + events[i].HeightPx})
+		}
+	}
+
+	// For each event, NumColumns = 1 + max column index among all events that overlap it.
+	numCols := make([]int, len(events))
+	for i := range events {
+		maxCol := colIdx[i]
+		iTop, iBot := events[i].TopPx, events[i].TopPx+events[i].HeightPx
+		for j := range events {
+			if i == j {
+				continue
+			}
+			jTop, jBot := events[j].TopPx, events[j].TopPx+events[j].HeightPx
+			if jTop < iBot && iTop < jBot {
+				if colIdx[j] > maxCol {
+					maxCol = colIdx[j]
+				}
+			}
+		}
+		numCols[i] = maxCol + 1
+	}
+
+	// Write CSS percentage strings back onto each event.
+	for i := range events {
+		n := numCols[i]
+		if n < 1 {
+			n = 1
+		}
+		events[i].LeftPct = fmt.Sprintf("%.4f%%", float64(colIdx[i])/float64(n)*100)
+		events[i].WidthPct = fmt.Sprintf("%.4f%%", 100.0/float64(n))
+	}
+}
+
+// positionEventsForTimeline computes pixel positions for timed events in the visual timeline.
+// Events completely outside the 7am-10pm window are returned as outOfRange so the template
+// can list them separately (preserving visibility for early/late meetings).
+// Events that span the boundary are clamped so they appear at the edge of the grid.
+func positionEventsForTimeline(events []services.AgendaEvent, loc *time.Location) (positioned []AgendaEventWithPosition, outOfRange []services.AgendaEvent) {
 	timelineStartMin := timelineStartHour * 60
-	positioned := make([]AgendaEventWithPosition, 0, len(events))
+	timelineEndMin := timelineEndHour * 60
+	timelineHeight := (timelineEndMin - timelineStartMin) * pxPerMinute
+
 	for _, event := range events {
 		if event.IsAllDay {
 			continue
@@ -1240,21 +1306,45 @@ func positionEventsForTimeline(events []services.AgendaEvent, loc *time.Location
 		endInLoc := event.End.In(loc)
 		startMin := startInLoc.Hour()*60 + startInLoc.Minute()
 		endMin := endInLoc.Hour()*60 + endInLoc.Minute()
-		topPx := (startMin - timelineStartMin) * pxPerMinute
-		heightPx := (endMin - startMin) * pxPerMinute
-		if topPx < 0 {
-			topPx = 0
+
+		// Events that don't touch the 7am-10pm window at all go to the out-of-range list.
+		if endMin <= timelineStartMin || startMin >= timelineEndMin {
+			outOfRange = append(outOfRange, event)
+			continue
 		}
+
+		// Clamp to timeline bounds for events that partially overlap the window.
+		clampedStart := startMin
+		if clampedStart < timelineStartMin {
+			clampedStart = timelineStartMin
+		}
+		clampedEnd := endMin
+		if clampedEnd > timelineEndMin {
+			clampedEnd = timelineEndMin
+		}
+
+		topPx := (clampedStart - timelineStartMin) * pxPerMinute
+		heightPx := (clampedEnd - clampedStart) * pxPerMinute
 		if heightPx < minEventHeightPx {
 			heightPx = minEventHeightPx
 		}
+		// Guard: event block must not overflow the grid.
+		if topPx+heightPx > timelineHeight {
+			heightPx = timelineHeight - topPx
+		}
+
 		positioned = append(positioned, AgendaEventWithPosition{
 			AgendaEvent: event,
 			TopPx:       topPx,
 			HeightPx:    heightPx,
+			LeftPct:     "0%",
+			WidthPct:    "100%",
 		})
 	}
-	return positioned
+
+	// Assign side-by-side columns to overlapping events (fixes P1).
+	assignOverlapColumns(positioned)
+	return positioned, outOfRange
 }
 
 // filterAllDayEvents returns only all-day events from the slice
@@ -1335,8 +1425,9 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 	// Compute timeline positioning for today view
 	var positionedEvents []AgendaEventWithPosition
 	var allDayEvents []services.AgendaEvent
+	var outOfRangeEvents []services.AgendaEvent
 	if view == "today" {
-		positionedEvents = positionEventsForTimeline(events, loc)
+		positionedEvents, outOfRangeEvents = positionEventsForTimeline(events, loc)
 		allDayEvents = filterAllDayEvents(events)
 	}
 
@@ -1347,14 +1438,15 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 		ActiveNav:    "agenda",
 		PendingCount: h.getPendingCount(r, host.Host.ID),
 		Data: map[string]interface{}{
-			"Events":          events,
+			"Events":           events,
 			"PositionedEvents": positionedEvents,
-			"AllDayEvents":    allDayEvents,
-			"TimelineHours":   generateTimelineHours(),
-			"DayGroups":       dayGroups,
-			"View":            view,
-			"Today":           now,
-			"Timezone":        host.Host.Timezone,
+			"AllDayEvents":     allDayEvents,
+			"OutOfRangeEvents": outOfRangeEvents,
+			"TimelineHours":    generateTimelineHours(),
+			"DayGroups":        dayGroups,
+			"View":             view,
+			"Today":            now,
+			"Timezone":         host.Host.Timezone,
 		},
 	})
 }
