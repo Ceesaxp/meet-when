@@ -36,6 +36,17 @@
     --radius-md: 10px;
     --radius-lg: 16px;
     --radius-full: 100px;
+
+    /* Calendar Palette Colors */
+    --cal-blue:   #378ADD;
+    --cal-teal:   #1D9E75;
+    --cal-coral:  #D85A30;
+    --cal-purple: #7F77DD;
+    --cal-green:  #639922;
+    --cal-amber:  #BA7517;
+    --cal-pink:   #D4537E;
+    --cal-red:    #E24B4A;
+    --cal-gray:   #5F5E5A;
 }
 
 /* Reset */
@@ -4892,4 +4903,25 @@ body.modal-open {
         width: 40px;
         height: 40px;
     }
+}
+
+/* ============================================
+   Calendar Legend Components
+   ============================================ */
+
+.calendar-dot {
+    display: inline-flex;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.calendar-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
 }

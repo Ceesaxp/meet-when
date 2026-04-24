@@ -1738,3 +1738,12 @@ The following features from the requirements document are already fully implemen
   - LeftPct+WidthPct clamp is applied AFTER percentage calculation, not before — calculate then clamp.
 
 ----
+
+## 2026-04-24 - US-011 (visual-agenda-pr1) - Add calendar color CSS custom properties
+- What was implemented:
+  - Added 9 `--cal-*` CSS custom properties to `:root` in `static/css/style.css`
+  - Added `.calendar-dot` (8px circle) and `.calendar-legend` (flex wrap list) component classes
+- Files changed:
+  - `static/css/style.css`
+
+----
