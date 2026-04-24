@@ -1593,3 +1593,84 @@ The following features from the requirements document are already fully implemen
   - The `plans/` directory is gitignored — `git add plans/prd.json` will silently do nothing; PRD is local only
 
 ----
+
+## 2026-04-24 - US-001 (visual-agenda-pr1 PRD) - Add color column to calendar_connections table and model
+- What was implemented:
+  - Migration `010_add_calendar_color.up.sql`: `ALTER TABLE calendar_connections ADD COLUMN color VARCHAR(7) NOT NULL DEFAULT ''`
+  - Migration `010_add_calendar_color.down.sql`: `ALTER TABLE calendar_connections DROP COLUMN color`
+  - Added `Color string` field with `json:"color" db:"color"` tags to `CalendarConnection` struct in `internal/models/models.go`
+  - Updated `CalendarRepository.Create` INSERT to include `color` column (17→18 positional params)
+  - Updated `CalendarRepository.GetByID`, `GetByHostID`, and `GetAll` SELECT+Scan to include `color`
+- Files changed:
+  - `migrations/010_add_calendar_color.up.sql` — new file
+  - `migrations/010_add_calendar_color.down.sql` — new file
+  - `internal/models/models.go` — added Color field after IsDefault
+  - `internal/repository/repository.go` — Create, GetByID, GetByHostID, GetAll updated
+- **Learnings for future iterations:**
+  - The next migration number was 010 (existing highest was 009_add_google_identity.up.sql)
+  - Color field placed after IsDefault and before the sync-status block — matches logical grouping
+  - All four repo methods (Create + 3 SELECTs) must be kept in sync; missing one causes scan mismatch panics at runtime
+
+----
+
+## 2026-04-24 - US-002 (visual-agenda-pr1) - Add dedicated UpdateColor repository method
+- What was implemented:
+  - Added `UpdateColor(ctx context.Context, hostID string, calendarID string, color string) error` method to `CalendarRepository` in `internal/repository/repository.go`
+  - SQL updates only `color` and `updated_at` columns with `WHERE id = $3 AND host_id = $4` for tenant isolation
+  - Returns `fmt.Errorf(...)` if `RowsAffected() == 0` (calendar not found or not owned by host)
+  - Build passes, all tests pass
+- Files changed:
+  - `internal/repository/repository.go` — added `UpdateColor` method (~21 lines) after `UpdateSyncStatus`
+- **Learnings for future iterations:**
+  - Pattern mirrors `UpdateSyncStatus`: use `ExecContext`, check `RowsAffected()` for a no-op guard
+  - `fmt` and `time` were already imported — no import changes needed
+  - The `WHERE id AND host_id` pattern is the standard tenant-isolation guard used throughout this repo
+
+----
+
+## 2026-04-24 - US-003 (visual-agenda-pr1) - Implement color palette and AssignColors function with tests
+- What was implemented:
+  - Created `internal/services/calendar_palette.go` with `CalendarPalette` (9 hex strings) and `AssignColors` function
+  - `AssignColors` sorts input by `CreatedAt` ASC via `slices.SortFunc` for stable order, builds a queue of unused palette colors, assigns them in order, and wraps to index 0 when all 9 are exhausted
+  - Calendars with non-empty `Color` are preserved; their colors are excluded from the assignment queue
+  - Created `internal/services/calendar_palette_test.go` with 5 test cases covering all acceptance criteria
+- Files changed:
+  - `internal/services/calendar_palette.go` — new file
+  - `internal/services/calendar_palette_test.go` — new file
+- **Learnings for future iterations:**
+  - `slices.SortFunc` requires `cmp` package for comparison helpers — both `slices` and `cmp` are in stdlib (Go 1.21+)
+  - `models.NewSQLiteTime(t)` is the correct constructor for `SQLiteTime` in tests (do not assign `time.Time` directly)
+  - The assignment queue excludes pre-existing colors so user overrides prevent those colors from being reused until the queue wraps
+  - After `AssignColors`, the input slice is sorted in-place (by `CreatedAt` ASC) — callers should be aware of this side effect
+
+----
+
+## 2026-04-24 - US-004 (visual-agenda-pr1) - Persist color when connecting Google and CalDAV calendars
+- What was implemented:
+  - Added color assignment block to `ConnectGoogleCalendar` and `ConnectCalDAV` in `internal/services/calendar.go`
+  - After `Create`, load all host calendars via `GetByHostID`, call `AssignColors` on the full list, find the new calendar by ID, persist via `UpdateColor`, and set the `Color` field on the returned object
+  - The pattern is identical in both methods: reuses the already-fetched `calendars` slice (loaded for the "set as default" check) rather than issuing a second `GetByHostID` query
+- Files changed:
+  - `internal/services/calendar.go` — two identical blocks added (one per connect method)
+- **Learnings for future iterations:**
+  - `GetByHostID` is already called right after `Create` for the default-calendar check; the color assignment block slots in immediately after and reuses the same slice — no extra DB round-trip needed
+  - `AssignColors` sorts the slice in-place so the iteration to find the new calendar by ID works on the already-sorted list; ID matching is stable and safe
+  - `UpdateColor` takes `(ctx, hostID, calendarID, color)` — hostID is the tenant-isolation guard required by the repo layer
+
+----
+
+## 2026-04-24 - US-005 (visual-agenda-pr1) - Add CalendarID and CalendarColor fields to AgendaEvent
+- What was implemented:
+  - Added `ID string`, `CalendarID string`, and `CalendarColor string` fields to `AgendaEvent` struct in `internal/services/calendar.go`
+  - In `getGoogleAgendaEvents`: added `ID string` to the anonymous result struct for Google API JSON decoding; populated `ID`, `CalendarID`, `CalendarColor` (with `#5F5E5A` fallback) on each event
+  - In `getCalDAVAgendaEvents`: computed `calColor` with `#5F5E5A` fallback and threaded `cal.ID` + `calColor` through `parseCalDAVAgendaResponse` → `parseVEventsForAgenda`
+  - In `parseVEventsForAgenda`: added UID parsing (`UID:` line → `eventUID`); populated `ID`, `CalendarID`, `CalendarColor` on the appended `AgendaEvent`
+- Files changed:
+  - `internal/services/calendar.go` — `AgendaEvent` struct, Google event append, CalDAV parse chain
+- **Learnings for future iterations:**
+  - The Google Calendar API returns event IDs in the `id` field at the top-level item — not inside `start`/`end` — so the anonymous struct needed a new `ID string` field
+  - CalDAV events carry their unique identifier as `UID:` (not `UID;...:`), so a simple `HasPrefix("UID:")` + `line[4:]` slice is sufficient
+  - `parseVEventsForAgenda` is a pure function with no access to `*models.CalendarConnection`; the clean approach is to accept `calendarID` and `calendarColor` as parameters and pass them down from `getCalDAVAgendaEvents`
+  - The `#5F5E5A` gray fallback is applied at the service boundary (before calling the parse chain), so the deeper parse functions always receive a non-empty color
+
+----
