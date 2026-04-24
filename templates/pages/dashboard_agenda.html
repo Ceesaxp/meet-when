@@ -96,6 +96,9 @@
             {{end}}
 
             <div class="timeline-events-area">
+                {{if ge .Data.CurrentTimePx 0}}
+                <div class="timeline-current-time" style="top: {{.Data.CurrentTimePx}}px;"></div>
+                {{end}}
                 {{range .Data.PositionedEvents}}
                 <div class="timeline-event" style="top: {{.TopPx}}px; height: {{.HeightPx}}px; left: {{.LeftPct}}; width: {{.WidthPct}};">
                     <div class="timeline-event-title">{{if .Title}}{{.Title}}{{else}}(No title){{end}}</div>

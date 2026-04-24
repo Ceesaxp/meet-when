@@ -1403,6 +1403,16 @@ func filterAllDayEvents(events []services.AgendaEvent) []services.AgendaEvent {
 	return allDay
 }
 
+// currentTimePixel returns the pixel offset from the top of the timeline for the
+// current time, or -1 when the current time falls outside the displayed range.
+func currentTimePixel(now time.Time) int {
+	h, m, _ := now.Clock()
+	if h < timelineStartHour || h >= timelineEndHour {
+		return -1
+	}
+	return (h-timelineStartHour)*60*pxPerMinute + m*pxPerMinute
+}
+
 // Agenda renders the agenda view with today's or this week's events
 func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())
@@ -1471,9 +1481,11 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 	var positionedEvents []AgendaEventWithPosition
 	var allDayEvents []services.AgendaEvent
 	var outOfRangeEvents []AgendaEventWithPosition
+	currentTimePx := -1 // -1 means "don't show"
 	if view == "today" {
 		positionedEvents, outOfRangeEvents = positionEventsForTimeline(events, loc, now)
 		allDayEvents = filterAllDayEvents(events)
+		currentTimePx = currentTimePixel(now)
 	}
 
 	h.handlers.render(w, "dashboard_agenda.html", PageData{
@@ -1492,6 +1504,7 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 			"View":             view,
 			"Today":            now,
 			"Timezone":         host.Host.Timezone,
+			"CurrentTimePx":    currentTimePx,
 		},
 	})
 }
