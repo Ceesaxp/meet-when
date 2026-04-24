@@ -1549,3 +1549,47 @@ The following features from the requirements document are already fully implemen
 - Out-of-range events showed wrong timezone — return type changed from `[]services.AgendaEvent` to `[]AgendaEventWithPosition` so `StartLocal`/`EndLocal` are available; template updated accordingly
 
 ----
+
+## 2026-04-24 - US-003 - Current time indicator on timeline
+- What was implemented:
+  - Added `currentTimePixel(now time.Time) int` helper in `dashboard.go` that computes the pixel offset (1px-per-minute scale) from the top of the 7am–10pm grid; returns -1 when the current time is outside the displayed range
+  - Added `CurrentTimePx` key to the template data map in the `Agenda` handler (set only for today view)
+  - Added `<div class="timeline-current-time">` inside `timeline-events-area` in `dashboard_agenda.html`, rendered only when `CurrentTimePx >= 0`; uses `{{ge .Data.CurrentTimePx 0}}` so it is entirely server-side — no JavaScript needed
+  - Added `.timeline-current-time` and `.timeline-current-time::before` CSS rules: 2px red line spanning the full event area width, with a 10px red circle on the left edge for visibility; `z-index: 10` so it renders above event blocks
+  - Also updated `plans/prd.json` to mark US-004 (overlapping events) as `passes: true` — that feature was already fully implemented in prior US-001 code-review fix rounds
+- Files changed:
+  - `internal/handlers/dashboard.go` — added `currentTimePixel()` helper (~10 lines), added `CurrentTimePx` to template data
+  - `templates/pages/dashboard_agenda.html` — added current-time indicator div
+  - `static/css/style.css` — added ~22 lines for `.timeline-current-time` and `::before` styles
+- **Learnings for future iterations:**
+  - `time.Time.Clock()` returns `(hour, min, sec)` in the time's own location — call `now.In(loc)` before passing `now` to `currentTimePixel` to get host-local hour/minute
+  - `{{ge .Data.CurrentTimePx 0}}` is the correct Go template comparison for "integer ≥ 0"; `{{if ...}}` alone would require a truthy non-zero check that fails for px=0 (midnight edge case, though outside range here)
+  - The `plans/` directory is gitignored in this repo — do not try to `git add plans/prd.json`
+  - The red-dot-plus-line pattern (circle on left, 2px line across) is a widely-recognised "current time" UI metaphor used by Google Calendar
+
+----
+
+## 2026-04-24 - US-002 - Color-code events by calendar
+- What was implemented:
+  - Added `calendarColorPalette` (8 distinct hex colors) and `buildCalendarColorMap` function in `dashboard.go`
+  - `buildCalendarColorMap` iterates all events and assigns a palette color to each unique `CalendarName` in order
+  - Added `Color string` field to `AgendaEventWithPosition` struct
+  - Updated `positionEventsForTimeline` signature to accept `colorMap map[string]string` and set Color on each event
+  - Updated `Agenda` handler to build colorMap and pass it as `CalendarColors` to the template
+  - Updated `dashboard_agenda.html` to:
+    - Show a calendar legend (colored dot + name) above the content in both views
+    - Apply `border-left: 3px solid <color>` to timeline event blocks, all-day events, out-of-range events
+    - Apply `border-left` to week-view event-item rows
+    - Color the `event-calendar` badge text to match the calendar color
+  - Added CSS for `.calendar-legend`, `.calendar-legend-item`, `.calendar-legend-dot`, `.calendar-legend-name`
+- Files changed:
+  - `internal/handlers/dashboard.go` — added palette, buildCalendarColorMap, Color field, updated positionEventsForTimeline signature and Agenda handler
+  - `templates/pages/dashboard_agenda.html` — legend, color borders, and colored calendar name badges in both views
+  - `static/css/style.css` — ~34 lines for calendar legend styles
+- **Learnings for future iterations:**
+  - Go templates support `{{index .Data.CalendarColors .CalendarName}}` to look up map values — no helper function needed
+  - When accessing a map in range inside a nested template scope, use `$.Data.CalendarColors` (root context) instead of `.Data.CalendarColors`
+  - `buildCalendarColorMap` on the week-view `events` slice covers all calendars since the outer fetch uses the same week range as the inner (pre-existing double-fetch pattern)
+  - The `plans/` directory is gitignored — `git add plans/prd.json` will silently do nothing; PRD is local only
+
+----
