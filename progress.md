@@ -1674,3 +1674,16 @@ The following features from the requirements document are already fully implemen
   - The `#5F5E5A` gray fallback is applied at the service boundary (before calling the parse chain), so the deeper parse functions always receive a non-empty color
 
 ----
+
+## 2026-04-24 - US-006 (visual-agenda-pr1) - Add GetAgendaEventsWithCalendars method
+- What was implemented:
+  - Extracted the provider iteration loop from `GetAgendaEvents` into a new `GetAgendaEventsWithCalendars(ctx, calendars, host, start, end)` method on `CalendarService`
+  - `GetAgendaEvents` is now a thin wrapper: loads calendars from DB, delegates to `GetAgendaEventsWithCalendars` with `host=nil`
+  - `host *models.Host` parameter accepted for future timezone use; nil-safe for existing callers
+- Files changed:
+  - `internal/services/calendar.go` — refactored `GetAgendaEvents`, added `GetAgendaEventsWithCalendars`
+- **Learnings for future iterations:**
+  - The existing `GetAgendaEvents` callers pass only `hostID`; the new method signature accepts preloaded `[]*models.CalendarConnection` so `AgendaService.GetDay` can avoid a second DB round-trip
+  - Passing `nil` for `host` in the thin wrapper keeps the existing call signature unchanged while the new method is ready for the AgendaService consumer
+
+----

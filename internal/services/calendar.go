@@ -1177,7 +1177,12 @@ func (s *CalendarService) GetAgendaEvents(ctx context.Context, hostID string, st
 	if err != nil {
 		return nil, err
 	}
+	return s.GetAgendaEventsWithCalendars(ctx, calendars, nil, startDate, endDate)
+}
 
+// GetAgendaEventsWithCalendars fetches events for the provided calendars without reloading from DB.
+// host is accepted for future use (e.g. timezone) and may be nil.
+func (s *CalendarService) GetAgendaEventsWithCalendars(ctx context.Context, calendars []*models.CalendarConnection, host *models.Host, start, end time.Time) ([]AgendaEvent, error) {
 	var allEvents []AgendaEvent
 
 	for _, cal := range calendars {
@@ -1186,9 +1191,9 @@ func (s *CalendarService) GetAgendaEvents(ctx context.Context, hostID string, st
 
 		switch cal.Provider {
 		case models.CalendarProviderGoogle:
-			events, fetchErr = s.getGoogleAgendaEvents(ctx, cal, startDate, endDate)
+			events, fetchErr = s.getGoogleAgendaEvents(ctx, cal, start, end)
 		case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
-			events, fetchErr = s.getCalDAVAgendaEvents(ctx, cal, startDate, endDate)
+			events, fetchErr = s.getCalDAVAgendaEvents(ctx, cal, start, end)
 		}
 
 		if fetchErr != nil {
