@@ -21,6 +21,17 @@
     <a href="/dashboard/agenda?view=week" class="view-tab {{if eq .Data.View "week"}}active{{end}}">This Week</a>
 </div>
 
+{{if .Data.CalendarColors}}
+<div class="calendar-legend">
+    {{range $name, $color := .Data.CalendarColors}}
+    <div class="calendar-legend-item">
+        <span class="calendar-legend-dot" style="background: {{$color}};"></span>
+        <span class="calendar-legend-name">{{$name}}</span>
+    </div>
+    {{end}}
+</div>
+{{end}}
+
 {{if eq .Data.View "week"}}
 <!-- Week view - events grouped by day -->
 <div class="agenda-week">
@@ -33,7 +44,8 @@
         {{if .Events}}
         <div class="events-list">
             {{range .Events}}
-            <div class="event-item {{if .IsAllDay}}all-day{{end}}">
+            {{$color := index $.Data.CalendarColors .CalendarName}}
+            <div class="event-item {{if .IsAllDay}}all-day{{end}}" style="{{if $color}}border-left: 3px solid {{$color}};{{end}}">
                 <div class="event-time">
                     {{if .IsAllDay}}
                     <span class="all-day-badge">All Day</span>
@@ -45,7 +57,7 @@
                 <div class="event-content">
                     <div class="event-title">{{if .Title}}{{.Title}}{{else}}(No title){{end}}</div>
                     <div class="event-details">
-                        <span class="event-calendar">{{.CalendarName}}</span>
+                        <span class="event-calendar" {{if $color}}style="color: {{$color}};"{{end}}>{{.CalendarName}}</span>
                     </div>
                 </div>
             </div>
@@ -64,9 +76,10 @@
     <div class="timeline-allday">
         <div class="timeline-allday-label">All Day</div>
         {{range .Data.AllDayEvents}}
-        <div class="timeline-allday-event">
+        {{$color := index $.Data.CalendarColors .CalendarName}}
+        <div class="timeline-allday-event" {{if $color}}style="border-left: 3px solid {{$color}};"{{end}}>
             <span class="timeline-allday-title">{{if .Title}}{{.Title}}{{else}}(No title){{end}}</span>
-            <span class="calendar-badge">{{.CalendarName}}</span>
+            <span class="calendar-badge" {{if $color}}style="color: {{$color}};"{{end}}>{{.CalendarName}}</span>
         </div>
         {{end}}
     </div>
@@ -76,10 +89,10 @@
     <div class="timeline-outofrange">
         <div class="timeline-outofrange-label">Outside displayed hours</div>
         {{range .Data.OutOfRangeEvents}}
-        <div class="timeline-allday-event">
+        <div class="timeline-allday-event" {{if .Color}}style="border-left: 3px solid {{.Color}};"{{end}}>
             <span class="timeline-allday-title">{{if .Title}}{{.Title}}{{else}}(No title){{end}}</span>
             <span class="timeline-outofrange-time">{{formatTime .StartLocal}} &ndash; {{formatTime .EndLocal}}</span>
-            <span class="calendar-badge">{{.CalendarName}}</span>
+            <span class="calendar-badge" {{if .Color}}style="color: {{.Color}};"{{end}}>{{.CalendarName}}</span>
         </div>
         {{end}}
     </div>
@@ -100,7 +113,7 @@
                 <div class="timeline-current-time" style="top: {{.Data.CurrentTimePx}}px;"></div>
                 {{end}}
                 {{range .Data.PositionedEvents}}
-                <div class="timeline-event" style="top: {{.TopPx}}px; height: {{.HeightPx}}px; left: {{.LeftPct}}; width: {{.WidthPct}};">
+                <div class="timeline-event" style="top: {{.TopPx}}px; height: {{.HeightPx}}px; left: {{.LeftPct}}; width: {{.WidthPct}};{{if .Color}} border-left: 3px solid {{.Color}};{{end}}">
                     <div class="timeline-event-title">{{if .Title}}{{.Title}}{{else}}(No title){{end}}</div>
                     {{if gt .HeightPx 44}}
                     <div class="timeline-event-time">{{formatTime .StartLocal}} &ndash; {{formatTime .EndLocal}}</div>

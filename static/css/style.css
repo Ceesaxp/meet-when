@@ -3034,6 +3034,40 @@ body.modal-open {
 }
 
 /* ============================================
+   Calendar Legend
+   ============================================ */
+.calendar-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+}
+
+.calendar-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.825rem;
+    color: var(--gray-700);
+}
+
+.calendar-legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.calendar-legend-name {
+    font-weight: 500;
+}
+
+/* ============================================
    Agenda / Day Groups
    ============================================ */
 .day-group {

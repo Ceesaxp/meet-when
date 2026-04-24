@@ -1198,6 +1198,31 @@ type TimelineHour struct {
 	TopPx int
 }
 
+// calendarColorPalette is the ordered list of accent colors assigned to calendars.
+var calendarColorPalette = []string{
+	"#4285F4", // Google blue
+	"#EA4335", // Google red
+	"#34A853", // Google green
+	"#FBBC05", // Google yellow
+	"#9C27B0", // purple
+	"#00ACC1", // cyan
+	"#FF7043", // deep orange
+	"#5C6BC0", // indigo
+}
+
+// buildCalendarColorMap assigns a color from the palette to each unique calendar name.
+func buildCalendarColorMap(events []services.AgendaEvent) map[string]string {
+	colorMap := make(map[string]string)
+	idx := 0
+	for _, e := range events {
+		if _, seen := colorMap[e.CalendarName]; !seen {
+			colorMap[e.CalendarName] = calendarColorPalette[idx%len(calendarColorPalette)]
+			idx++
+		}
+	}
+	return colorMap
+}
+
 // AgendaEventWithPosition is an agenda event with computed pixel position for timeline display.
 // LeftPct and WidthPct are CSS percentage strings used for overlap column layout.
 // EndPx is the actual end position before min-height expansion, used for overlap detection.
@@ -1211,6 +1236,7 @@ type AgendaEventWithPosition struct {
 	EndLocal   time.Time // end in host timezone
 	LeftPct    string    // e.g. "0%" or "50%"
 	WidthPct   string    // e.g. "100%" or "50%"
+	Color      string    // hex color assigned to the calendar
 }
 
 // generateTimelineHours creates the hour markers for the visual timeline grid
@@ -1333,7 +1359,7 @@ func assignOverlapColumns(events []AgendaEventWithPosition) {
 //
 // Events completely outside the grid are returned in outOfRange so the template
 // can list them separately.
-func positionEventsForTimeline(events []services.AgendaEvent, loc *time.Location, today time.Time) (positioned []AgendaEventWithPosition, outOfRange []AgendaEventWithPosition) {
+func positionEventsForTimeline(events []services.AgendaEvent, loc *time.Location, today time.Time, colorMap map[string]string) (positioned []AgendaEventWithPosition, outOfRange []AgendaEventWithPosition) {
 	gridStart := time.Date(today.Year(), today.Month(), today.Day(), timelineStartHour, 0, 0, 0, loc)
 	gridEnd := time.Date(today.Year(), today.Month(), today.Day(), timelineEndHour, 0, 0, 0, loc)
 	gridHeightPx := (timelineEndHour-timelineStartHour) * 60 * pxPerMinute
@@ -1343,6 +1369,8 @@ func positionEventsForTimeline(events []services.AgendaEvent, loc *time.Location
 			continue
 		}
 
+		color := colorMap[event.CalendarName]
+
 		// Events that don't touch the grid window at all go to out-of-range.
 		if !event.End.After(gridStart) || !event.Start.Before(gridEnd) {
 			outOfRange = append(outOfRange, AgendaEventWithPosition{
@@ -1351,6 +1379,7 @@ func positionEventsForTimeline(events []services.AgendaEvent, loc *time.Location
 				EndLocal:    event.End.In(loc),
 				LeftPct:     "0%",
 				WidthPct:    "100%",
+				Color:       color,
 			})
 			continue
 		}
@@ -1385,6 +1414,7 @@ func positionEventsForTimeline(events []services.AgendaEvent, loc *time.Location
 			EndLocal:    event.End.In(loc),
 			LeftPct:     "0%",
 			WidthPct:    "100%",
+			Color:       color,
 		})
 	}
 
@@ -1477,13 +1507,26 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 		events = []services.AgendaEvent{}
 	}
 
+	// Build calendar color map from all fetched events (covers both views)
+	colorMap := buildCalendarColorMap(events)
+	// For week view, also include events in day groups
+	if view == "week" {
+		for _, g := range dayGroups {
+			for name, color := range buildCalendarColorMap(g.Events) {
+				if _, exists := colorMap[name]; !exists {
+					colorMap[name] = color
+				}
+			}
+		}
+	}
+
 	// Compute timeline positioning for today view
 	var positionedEvents []AgendaEventWithPosition
 	var allDayEvents []services.AgendaEvent
 	var outOfRangeEvents []AgendaEventWithPosition
 	currentTimePx := -1 // -1 means "don't show"
 	if view == "today" {
-		positionedEvents, outOfRangeEvents = positionEventsForTimeline(events, loc, now)
+		positionedEvents, outOfRangeEvents = positionEventsForTimeline(events, loc, now, colorMap)
 		allDayEvents = filterAllDayEvents(events)
 		currentTimePx = currentTimePixel(now)
 	}
@@ -1505,6 +1548,7 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 			"Today":            now,
 			"Timezone":         host.Host.Timezone,
 			"CurrentTimePx":    currentTimePx,
+			"CalendarColors":   colorMap,
 		},
 	})
 }
