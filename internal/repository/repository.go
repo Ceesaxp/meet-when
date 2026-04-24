@@ -447,7 +447,7 @@ func (r *CalendarRepository) UpdateColor(ctx context.Context, hostID string, cal
 		SET color = $1, updated_at = $2
 		WHERE id = $3 AND host_id = $4
 	`)
-	result, err := r.db.ExecContext(ctx, query, color, time.Now(), calendarID, hostID)
+	result, err := r.db.ExecContext(ctx, query, color, models.Now(), calendarID, hostID)
 	if err != nil {
 		return err
 	}
