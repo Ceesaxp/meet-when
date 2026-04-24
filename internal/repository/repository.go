@@ -440,6 +440,27 @@ func (r *CalendarRepository) UpdateSyncStatus(ctx context.Context, calendarID st
 	return err
 }
 
+// UpdateColor updates only the color field for a calendar owned by the given host
+func (r *CalendarRepository) UpdateColor(ctx context.Context, hostID string, calendarID string, color string) error {
+	query := q(r.driver, `
+		UPDATE calendar_connections
+		SET color = $1, updated_at = $2
+		WHERE id = $3 AND host_id = $4
+	`)
+	result, err := r.db.ExecContext(ctx, query, color, time.Now(), calendarID, hostID)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("calendar %s not found or not owned by host %s", calendarID, hostID)
+	}
+	return nil
+}
+
 // GetAll returns all calendar connections across all hosts (for background sync)
 func (r *CalendarRepository) GetAll(ctx context.Context) ([]*models.CalendarConnection, error) {
 	query := q(r.driver, `
