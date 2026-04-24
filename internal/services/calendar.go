@@ -85,6 +85,16 @@ func (s *CalendarService) ConnectGoogleCalendar(ctx context.Context, input Googl
 		calendar.IsDefault = true
 	}
 
+	// Assign a palette color to the new calendar and persist it.
+	AssignColors(calendars)
+	for _, cal := range calendars {
+		if cal.ID == calendar.ID {
+			calendar.Color = cal.Color
+			_ = s.repos.Calendar.UpdateColor(ctx, input.HostID, calendar.ID, calendar.Color)
+			break
+		}
+	}
+
 	return calendar, nil
 }
 
@@ -133,6 +143,16 @@ func (s *CalendarService) ConnectCalDAV(ctx context.Context, input CalDAVConnect
 	if len(calendars) == 1 {
 		_ = s.repos.Calendar.SetDefault(ctx, input.HostID, calendar.ID)
 		calendar.IsDefault = true
+	}
+
+	// Assign a palette color to the new calendar and persist it.
+	AssignColors(calendars)
+	for _, cal := range calendars {
+		if cal.ID == calendar.ID {
+			calendar.Color = cal.Color
+			_ = s.repos.Calendar.UpdateColor(ctx, input.HostID, calendar.ID, calendar.Color)
+			break
+		}
 	}
 
 	return calendar, nil
