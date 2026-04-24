@@ -159,6 +159,86 @@ func TestAssignColors_PreserveOverride(t *testing.T) {
 	}
 }
 
+// TestAssignColors_WrapsThroughFullPaletteAfterOverrides verifies that once all
+// 9 palette colors are in use (some via override, the rest newly assigned), the
+// next unset calendar wraps back to CalendarPalette[0] — not to the first entry
+// of the reduced assignQueue.
+func TestAssignColors_WrapsThroughFullPaletteAfterOverrides(t *testing.T) {
+	// Calendar at offset 0 has palette[0] pre-assigned.
+	// 9 uncolored calendars follow (offsets 1-9).
+	// The 9 uncolored ones fill palette[1]..palette[8] then need to wrap.
+	// The 9th uncolored calendar (10th total) should get CalendarPalette[0].
+	cals := make([]*models.CalendarConnection, 10)
+	cals[0] = makeCalendar(0, CalendarPalette[0]) // pre-assigned
+	for i := 1; i <= 9; i++ {
+		cals[i] = makeCalendar(i, "")
+	}
+
+	AssignColors(cals)
+
+	// cals[0] keeps its override.
+	if cals[0].Color != CalendarPalette[0] {
+		t.Errorf("pre-assigned calendar color changed: want %s, got %s", CalendarPalette[0], cals[0].Color)
+	}
+
+	// After sort cals is in CreatedAt order (offsets 0..9).
+	// Uncolored calendars are at index 1..9 after the sort.
+	// The first 8 uncolored get palette[1]..palette[8].
+	for i := 1; i <= 8; i++ {
+		want := CalendarPalette[i]
+		if cals[i].Color != want {
+			t.Errorf("calendar %d: want %s, got %s", i, want, cals[i].Color)
+		}
+	}
+	// The 9th uncolored (cals[9]) must wrap to CalendarPalette[0].
+	if cals[9].Color != CalendarPalette[0] {
+		t.Errorf("9th uncolored calendar: want wrap to %s, got %s", CalendarPalette[0], cals[9].Color)
+	}
+}
+
+// TestAssignColors_TieBreakByID verifies that calendars with identical CreatedAt
+// timestamps are still ordered deterministically (by ID) so colors are stable
+// regardless of the incoming slice order.
+func TestAssignColors_TieBreakByID(t *testing.T) {
+	base := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC) // same second for both
+
+	// Two calendars with identical CreatedAt; IDs chosen so "aaa" < "zzz".
+	calA := &models.CalendarConnection{ID: "aaa", CreatedAt: models.NewSQLiteTime(base)}
+	calZ := &models.CalendarConnection{ID: "zzz", CreatedAt: models.NewSQLiteTime(base)}
+
+	// Call 1: [Z, A]
+	cals1 := []*models.CalendarConnection{calZ, calA}
+	// Reset colors before each call.
+	for _, c := range cals1 {
+		c.Color = ""
+	}
+	AssignColors(cals1)
+	colorA1 := calA.Color
+	colorZ1 := calZ.Color
+
+	// Call 2: [A, Z]
+	calA.Color = ""
+	calZ.Color = ""
+	cals2 := []*models.CalendarConnection{calA, calZ}
+	AssignColors(cals2)
+	colorA2 := calA.Color
+	colorZ2 := calZ.Color
+
+	if colorA1 != colorA2 {
+		t.Errorf("calA color not stable across input orders: %s vs %s", colorA1, colorA2)
+	}
+	if colorZ1 != colorZ2 {
+		t.Errorf("calZ color not stable across input orders: %s vs %s", colorZ1, colorZ2)
+	}
+	// "aaa" sorts before "zzz" so calA should get palette[0].
+	if colorA1 != CalendarPalette[0] {
+		t.Errorf("calA (ID=aaa): want %s, got %s", CalendarPalette[0], colorA1)
+	}
+	if colorZ1 != CalendarPalette[1] {
+		t.Errorf("calZ (ID=zzz): want %s, got %s", CalendarPalette[1], colorZ1)
+	}
+}
+
 // TestAssignColors_EmptyInput verifies that calling AssignColors with a nil or
 // empty slice does not panic and is a no-op.
 func TestAssignColors_EmptyInput(t *testing.T) {

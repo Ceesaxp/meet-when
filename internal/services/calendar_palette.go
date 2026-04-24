@@ -32,9 +32,14 @@ func AssignColors(calendars []*models.CalendarConnection) {
 		return
 	}
 
-	// Sort by CreatedAt ascending (stable identity across call orders).
+	// Sort by CreatedAt ascending; break ties with ID so the order is fully
+	// deterministic even when two calendars were persisted within the same
+	// second (SQLiteTime stores whole-second precision after a DB round-trip).
 	slices.SortFunc(calendars, func(a, b *models.CalendarConnection) int {
-		return cmp.Compare(a.CreatedAt.Time.UnixNano(), b.CreatedAt.Time.UnixNano())
+		if c := cmp.Compare(a.CreatedAt.Time.Unix(), b.CreatedAt.Time.Unix()); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.ID, b.ID)
 	})
 
 	// Collect colors already in use (pre-assigned by the user or a prior call).
@@ -52,18 +57,20 @@ func AssignColors(calendars []*models.CalendarConnection) {
 			assignQueue = append(assignQueue, c)
 		}
 	}
-	// If every palette color is already taken, fall back to the full palette.
-	if len(assignQueue) == 0 {
-		assignQueue = CalendarPalette
-	}
-
-	// Walk sorted calendars, assigning the next queue slot to each unset one.
+	// Walk sorted calendars assigning the next queue slot to each unset one.
+	// Once the queue is exhausted (all palette colors now in use), wrap back
+	// through the full palette starting at index 0.
 	idx := 0
 	for _, cal := range calendars {
 		if cal.Color != "" {
 			continue
 		}
-		cal.Color = assignQueue[idx%len(assignQueue)]
+		if idx < len(assignQueue) {
+			cal.Color = assignQueue[idx]
+		} else {
+			// All available (non-preassigned) slots used; cycle the full palette.
+			cal.Color = CalendarPalette[(idx-len(assignQueue))%len(CalendarPalette)]
+		}
 		idx++
 	}
 }
