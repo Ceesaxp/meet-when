@@ -210,6 +210,41 @@ func (h *DashboardHandler) SetDefaultCalendar(w http.ResponseWriter, r *http.Req
 	h.handlers.redirect(w, r, "/dashboard/calendars")
 }
 
+// AgendaDayPartial handles GET /dashboard/agenda/day-detail and returns the
+// day_detail.html partial as an HTML fragment for HTMX innerHTML swap.
+func (h *DashboardHandler) AgendaDayPartial(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Parse optional date query param; default to today.
+	dateStr := r.URL.Query().Get("date")
+	var date time.Time
+	if dateStr != "" {
+		var parseErr error
+		date, parseErr = time.Parse("2006-01-02", dateStr)
+		if parseErr != nil {
+			http.Error(w, "invalid date", http.StatusBadRequest)
+			return
+		}
+	} else {
+		date = time.Now()
+	}
+
+	view, err := h.handlers.services.Agenda.GetDay(r.Context(), host.Host.ID, date)
+	if err != nil {
+		log.Printf("[AGENDA] AgendaDayPartial error: %v", err)
+		http.Error(w, "failed to load agenda", http.StatusInternalServerError)
+		return
+	}
+
+	h.handlers.renderPartial(w, "day_detail.html", map[string]interface{}{
+		"Events": view.Events,
+	})
+}
+
 // paletteData returns the ordered palette slice used by color picker templates.
 var paletteData = []map[string]string{
 	{"Hex": "#378ADD", "Name": "Blue"},

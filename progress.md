@@ -1782,6 +1782,25 @@ The following features from the requirements document are already fully implemen
 
 ----
 
+## 2026-04-24 - US-018 (visual-agenda-pr1) - Wire Agenda handler to AgendaService
+- What was implemented:
+  - Updated `Agenda` handler to call `AgendaService.GetDay` for the today branch
+  - Added Calendars, Lanes, WindowStart, WindowEnd to Data map
+  - Updated `dashboard_agenda.html` today section to use legend + strip + detail partials
+  - Week view left unchanged
+
+----
+
+## 2026-04-24 - US-019 (visual-agenda-pr1) - Add GET day-detail HTMX partial endpoint
+- What was implemented:
+  - Added `AgendaDayPartial` handler: parses optional `date` query param, calls `AgendaService.GetDay`, returns `day_detail.html` partial
+  - Registered `GET /dashboard/agenda/day-detail` route
+- Files changed:
+  - `internal/handlers/dashboard.go`
+  - `cmd/server/main.go`
+
+----
+
 ## 2026-04-24 - US-014b (visual-agenda-pr1) - Add color picker UI to calendar settings page
 - What was implemented:
   - Updated `Calendars` handler to call `AssignColors` before rendering and pass `Palette` in Data map
