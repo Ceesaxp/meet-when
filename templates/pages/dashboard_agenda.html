@@ -78,7 +78,7 @@
         {{range .Data.OutOfRangeEvents}}
         <div class="timeline-allday-event">
             <span class="timeline-allday-title">{{if .Title}}{{.Title}}{{else}}(No title){{end}}</span>
-            <span class="timeline-outofrange-time">{{formatTime .Start}} &ndash; {{formatTime .End}}</span>
+            <span class="timeline-outofrange-time">{{formatTime .StartLocal}} &ndash; {{formatTime .EndLocal}}</span>
             <span class="calendar-badge">{{.CalendarName}}</span>
         </div>
         {{end}}

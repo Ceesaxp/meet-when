@@ -1243,39 +1243,50 @@ func assignOverlapColumns(events []AgendaEventWithPosition) {
 		return
 	}
 
-	// Greedily assign each event to the lowest-index column whose last occupant has ended.
-	// Use EndPx (actual end, not min-height-expanded) so adjacent short events aren't
-	// falsely treated as overlapping.
-	type colState struct{ endPx int }
+	// paintedEndPx returns the visual bottom edge of an event, accounting for
+	// the minimum painted height so that two events sharing a column don't
+	// visually overlap even when their actual durations are very short.
+	paintedEndPx := func(e AgendaEventWithPosition) int {
+		end := e.EndPx
+		if e.TopPx+minEventHeightPx > end {
+			end = e.TopPx + minEventHeightPx
+		}
+		return end
+	}
+
+	// Greedily assign each event to the lowest-index column whose last occupant's
+	// painted bottom edge is at or above the new event's top.
+	type colState struct{ paintedEnd int }
 	cols := []colState{}
 	colIdx := make([]int, len(events))
 
 	for i := range events {
 		assigned := false
 		for c := range cols {
-			if events[i].TopPx >= cols[c].endPx {
+			if events[i].TopPx >= cols[c].paintedEnd {
 				colIdx[i] = c
-				cols[c].endPx = events[i].EndPx
+				cols[c].paintedEnd = paintedEndPx(events[i])
 				assigned = true
 				break
 			}
 		}
 		if !assigned {
 			colIdx[i] = len(cols)
-			cols = append(cols, colState{endPx: events[i].EndPx})
+			cols = append(cols, colState{paintedEnd: paintedEndPx(events[i])})
 		}
 	}
 
-	// For each event, NumColumns = 1 + max column index among all events that overlap it.
+	// For each event, NumColumns = 1 + max column index among all events that
+	// visually overlap it (using painted extents).
 	numCols := make([]int, len(events))
 	for i := range events {
 		maxCol := colIdx[i]
-		iTop, iBot := events[i].TopPx, events[i].EndPx
+		iTop, iBot := events[i].TopPx, paintedEndPx(events[i])
 		for j := range events {
 			if i == j {
 				continue
 			}
-			jTop, jBot := events[j].TopPx, events[j].EndPx
+			jTop, jBot := events[j].TopPx, paintedEndPx(events[j])
 			if jTop < iBot && iTop < jBot {
 				if colIdx[j] > maxCol {
 					maxCol = colIdx[j]
@@ -1305,7 +1316,7 @@ func assignOverlapColumns(events []AgendaEventWithPosition) {
 //
 // Events completely outside the grid are returned in outOfRange so the template
 // can list them separately.
-func positionEventsForTimeline(events []services.AgendaEvent, loc *time.Location, today time.Time) (positioned []AgendaEventWithPosition, outOfRange []services.AgendaEvent) {
+func positionEventsForTimeline(events []services.AgendaEvent, loc *time.Location, today time.Time) (positioned []AgendaEventWithPosition, outOfRange []AgendaEventWithPosition) {
 	gridStart := time.Date(today.Year(), today.Month(), today.Day(), timelineStartHour, 0, 0, 0, loc)
 	gridEnd := time.Date(today.Year(), today.Month(), today.Day(), timelineEndHour, 0, 0, 0, loc)
 	gridHeightPx := (timelineEndHour-timelineStartHour) * 60 * pxPerMinute
@@ -1317,7 +1328,13 @@ func positionEventsForTimeline(events []services.AgendaEvent, loc *time.Location
 
 		// Events that don't touch the grid window at all go to out-of-range.
 		if !event.End.After(gridStart) || !event.Start.Before(gridEnd) {
-			outOfRange = append(outOfRange, event)
+			outOfRange = append(outOfRange, AgendaEventWithPosition{
+				AgendaEvent: event,
+				StartLocal:  event.Start.In(loc),
+				EndLocal:    event.End.In(loc),
+				LeftPct:     "0%",
+				WidthPct:    "100%",
+			})
 			continue
 		}
 
@@ -1436,7 +1453,7 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 	// Compute timeline positioning for today view
 	var positionedEvents []AgendaEventWithPosition
 	var allDayEvents []services.AgendaEvent
-	var outOfRangeEvents []services.AgendaEvent
+	var outOfRangeEvents []AgendaEventWithPosition
 	if view == "today" {
 		positionedEvents, outOfRangeEvents = positionEventsForTimeline(events, loc, now)
 		allDayEvents = filterAllDayEvents(events)
