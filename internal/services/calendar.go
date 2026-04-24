@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -1211,15 +1212,11 @@ func (s *CalendarService) GetAgendaEventsWithCalendars(ctx context.Context, cale
 	return allEvents, nil
 }
 
-// sortAgendaEvents sorts events by start time
+// sortAgendaEvents sorts events by start time ascending.
 func sortAgendaEvents(events []AgendaEvent) {
-	for i := 0; i < len(events); i++ {
-		for j := i + 1; j < len(events); j++ {
-			if events[j].Start.Before(events[i].Start) {
-				events[i], events[j] = events[j], events[i]
-			}
-		}
-	}
+	slices.SortFunc(events, func(a, b AgendaEvent) int {
+		return a.Start.Compare(b.Start)
+	})
 }
 
 // getGoogleAgendaEvents fetches events from Google Calendar for the agenda view

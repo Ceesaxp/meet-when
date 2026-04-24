@@ -1687,3 +1687,12 @@ The following features from the requirements document are already fully implemen
   - Passing `nil` for `host` in the thin wrapper keeps the existing call signature unchanged while the new method is ready for the AgendaService consumer
 
 ----
+
+## 2026-04-24 - US-007 (visual-agenda-pr1) - Replace sortAgendaEvents bubble sort with slices.SortFunc
+- What was implemented:
+  - Replaced O(n²) bubble sort in `sortAgendaEvents` with `slices.SortFunc` using `time.Time.Compare`
+  - Added `"slices"` to imports in `internal/services/calendar.go`
+- Files changed:
+  - `internal/services/calendar.go`
+
+----
