@@ -1724,3 +1724,17 @@ The following features from the requirements document are already fully implemen
   - Color fallback chain: `e.CalendarColor` → `cal.Color` → `#5F5E5A`
 
 ----
+
+## 2026-04-24 - US-010 (visual-agenda-pr1) - Unit tests for strip rendering helpers
+- What was implemented:
+  - Created `internal/services/agenda_strip_test.go` with 12 test functions covering `ComputeVisibleWindow` and `LanesByCalendar`
+  - `ComputeVisibleWindow` tests: no-events baseline, early event extension, late event extension, contraction when events end early, all-day events ignored
+  - `LanesByCalendar` tests: single calendar/event LeftPct/WidthPct calculation, two calendars → two lanes, empty lane Empty=true, all-day events excluded, overnight event clipping, DST spring-forward, LeftPct+WidthPct<=100
+- Files changed:
+  - `internal/services/agenda_strip_test.go` (new file)
+- **Learnings for future iterations:**
+  - `winStart` only extends BELOW the 09:00 baseline when an event starts BEFORE 08:30 (i.e., start - 30min < 09:00). Events starting after 08:30 don't push the start before 09:00.
+  - An overnight event's start (22:00) does NOT push winStart below 09:00 (22:00 - 30min = 21:30 > 09:00), so the window for overnight events spans 09:00-dayEnd.
+  - LeftPct+WidthPct clamp is applied AFTER percentage calculation, not before — calculate then clamp.
+
+----
