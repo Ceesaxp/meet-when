@@ -1200,12 +1200,17 @@ type TimelineHour struct {
 
 // AgendaEventWithPosition is an agenda event with computed pixel position for timeline display.
 // LeftPct and WidthPct are CSS percentage strings used for overlap column layout.
+// EndPx is the actual end position before min-height expansion, used for overlap detection.
+// StartLocal/EndLocal are the times normalised to the host timezone for display.
 type AgendaEventWithPosition struct {
 	services.AgendaEvent
-	TopPx    int
-	HeightPx int
-	LeftPct  string // e.g. "0%" or "50%"
-	WidthPct string // e.g. "100%" or "50%"
+	TopPx      int
+	HeightPx   int       // painted height (min-clamped)
+	EndPx      int       // actual end px (not clamped), for overlap detection
+	StartLocal time.Time // start in host timezone
+	EndLocal   time.Time // end in host timezone
+	LeftPct    string    // e.g. "0%" or "50%"
+	WidthPct   string    // e.g. "100%" or "50%"
 }
 
 // generateTimelineHours creates the hour markers for the visual timeline grid
@@ -1239,6 +1244,8 @@ func assignOverlapColumns(events []AgendaEventWithPosition) {
 	}
 
 	// Greedily assign each event to the lowest-index column whose last occupant has ended.
+	// Use EndPx (actual end, not min-height-expanded) so adjacent short events aren't
+	// falsely treated as overlapping.
 	type colState struct{ endPx int }
 	cols := []colState{}
 	colIdx := make([]int, len(events))
@@ -1248,14 +1255,14 @@ func assignOverlapColumns(events []AgendaEventWithPosition) {
 		for c := range cols {
 			if events[i].TopPx >= cols[c].endPx {
 				colIdx[i] = c
-				cols[c].endPx = events[i].TopPx + events[i].HeightPx
+				cols[c].endPx = events[i].EndPx
 				assigned = true
 				break
 			}
 		}
 		if !assigned {
 			colIdx[i] = len(cols)
-			cols = append(cols, colState{endPx: events[i].TopPx + events[i].HeightPx})
+			cols = append(cols, colState{endPx: events[i].EndPx})
 		}
 	}
 
@@ -1263,12 +1270,12 @@ func assignOverlapColumns(events []AgendaEventWithPosition) {
 	numCols := make([]int, len(events))
 	for i := range events {
 		maxCol := colIdx[i]
-		iTop, iBot := events[i].TopPx, events[i].TopPx+events[i].HeightPx
+		iTop, iBot := events[i].TopPx, events[i].EndPx
 		for j := range events {
 			if i == j {
 				continue
 			}
-			jTop, jBot := events[j].TopPx, events[j].TopPx+events[j].HeightPx
+			jTop, jBot := events[j].TopPx, events[j].EndPx
 			if jTop < iBot && iTop < jBot {
 				if colIdx[j] > maxCol {
 					maxCol = colIdx[j]
@@ -1290,59 +1297,63 @@ func assignOverlapColumns(events []AgendaEventWithPosition) {
 }
 
 // positionEventsForTimeline computes pixel positions for timed events in the visual timeline.
-// Events completely outside the 7am-10pm window are returned as outOfRange so the template
-// can list them separately (preserving visibility for early/late meetings).
-// Events that span the boundary are clamped so they appear at the edge of the grid.
-func positionEventsForTimeline(events []services.AgendaEvent, loc *time.Location) (positioned []AgendaEventWithPosition, outOfRange []services.AgendaEvent) {
-	timelineStartMin := timelineStartHour * 60
-	timelineEndMin := timelineEndHour * 60
-	timelineHeight := (timelineEndMin - timelineStartMin) * pxPerMinute
+// today must be in loc (use time.Now().In(loc)).
+//
+// Grid boundaries are expressed as concrete timestamps so that overnight events
+// (e.g. 23:00-09:00) are correctly clamped rather than misclassified by
+// comparing bare clock-minutes (which wrap around midnight).
+//
+// Events completely outside the grid are returned in outOfRange so the template
+// can list them separately.
+func positionEventsForTimeline(events []services.AgendaEvent, loc *time.Location, today time.Time) (positioned []AgendaEventWithPosition, outOfRange []services.AgendaEvent) {
+	gridStart := time.Date(today.Year(), today.Month(), today.Day(), timelineStartHour, 0, 0, 0, loc)
+	gridEnd := time.Date(today.Year(), today.Month(), today.Day(), timelineEndHour, 0, 0, 0, loc)
+	gridHeightPx := (timelineEndHour-timelineStartHour) * 60 * pxPerMinute
 
 	for _, event := range events {
 		if event.IsAllDay {
 			continue
 		}
-		startInLoc := event.Start.In(loc)
-		endInLoc := event.End.In(loc)
-		startMin := startInLoc.Hour()*60 + startInLoc.Minute()
-		endMin := endInLoc.Hour()*60 + endInLoc.Minute()
 
-		// Events that don't touch the 7am-10pm window at all go to the out-of-range list.
-		if endMin <= timelineStartMin || startMin >= timelineEndMin {
+		// Events that don't touch the grid window at all go to out-of-range.
+		if !event.End.After(gridStart) || !event.Start.Before(gridEnd) {
 			outOfRange = append(outOfRange, event)
 			continue
 		}
 
-		// Clamp to timeline bounds for events that partially overlap the window.
-		clampedStart := startMin
-		if clampedStart < timelineStartMin {
-			clampedStart = timelineStartMin
+		// Clamp to grid boundaries for events that partially overlap the window.
+		clampedStart := event.Start
+		if clampedStart.Before(gridStart) {
+			clampedStart = gridStart
 		}
-		clampedEnd := endMin
-		if clampedEnd > timelineEndMin {
-			clampedEnd = timelineEndMin
+		clampedEnd := event.End
+		if clampedEnd.After(gridEnd) {
+			clampedEnd = gridEnd
 		}
 
-		topPx := (clampedStart - timelineStartMin) * pxPerMinute
-		heightPx := (clampedEnd - clampedStart) * pxPerMinute
-		if heightPx < minEventHeightPx {
-			heightPx = minEventHeightPx
+		topPx := int(clampedStart.Sub(gridStart).Minutes()) * pxPerMinute
+		realHeightPx := int(clampedEnd.Sub(clampedStart).Minutes()) * pxPerMinute
+		paintedHeightPx := realHeightPx
+		if paintedHeightPx < minEventHeightPx {
+			paintedHeightPx = minEventHeightPx
 		}
-		// Guard: event block must not overflow the grid.
-		if topPx+heightPx > timelineHeight {
-			heightPx = timelineHeight - topPx
+		// Guard: painted block must not overflow the grid.
+		if topPx+paintedHeightPx > gridHeightPx {
+			paintedHeightPx = gridHeightPx - topPx
 		}
 
 		positioned = append(positioned, AgendaEventWithPosition{
 			AgendaEvent: event,
 			TopPx:       topPx,
-			HeightPx:    heightPx,
+			HeightPx:    paintedHeightPx,
+			EndPx:       topPx + realHeightPx, // actual end for overlap detection
+			StartLocal:  event.Start.In(loc),
+			EndLocal:    event.End.In(loc),
 			LeftPct:     "0%",
 			WidthPct:    "100%",
 		})
 	}
 
-	// Assign side-by-side columns to overlapping events (fixes P1).
 	assignOverlapColumns(positioned)
 	return positioned, outOfRange
 }
@@ -1427,7 +1438,7 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 	var allDayEvents []services.AgendaEvent
 	var outOfRangeEvents []services.AgendaEvent
 	if view == "today" {
-		positionedEvents, outOfRangeEvents = positionEventsForTimeline(events, loc)
+		positionedEvents, outOfRangeEvents = positionEventsForTimeline(events, loc, now)
 		allDayEvents = filterAllDayEvents(events)
 	}
 

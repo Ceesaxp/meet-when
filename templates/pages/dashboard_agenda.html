@@ -100,7 +100,7 @@
                 <div class="timeline-event" style="top: {{.TopPx}}px; height: {{.HeightPx}}px; left: {{.LeftPct}}; width: {{.WidthPct}};">
                     <div class="timeline-event-title">{{if .Title}}{{.Title}}{{else}}(No title){{end}}</div>
                     {{if gt .HeightPx 44}}
-                    <div class="timeline-event-time">{{formatTime .Start}} &ndash; {{formatTime .End}}</div>
+                    <div class="timeline-event-time">{{formatTime .StartLocal}} &ndash; {{formatTime .EndLocal}}</div>
                     {{end}}
                 </div>
                 {{end}}
