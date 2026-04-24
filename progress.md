@@ -1696,3 +1696,17 @@ The following features from the requirements document are already fully implemen
   - `internal/services/calendar.go`
 
 ----
+
+## 2026-04-24 - US-008 (visual-agenda-pr1) - Create AgendaService with GetDay method
+- What was implemented:
+  - Created `internal/services/agenda.go` with `AgendaService` struct and `AgendaView` struct
+  - `GetDay(ctx, hostID, date)` loads host (for timezone), loads calendars, calls `AssignColors`, computes day window (00:00–24:00 in host TZ), fetches events via `GetAgendaEventsWithCalendars`, sorts events
+  - Wired `AgendaService` into `Services` struct and constructor in `internal/services/services.go`
+- Files changed:
+  - `internal/services/agenda.go` (new file)
+  - `internal/services/services.go`
+- **Learnings for future iterations:**
+  - `time.LoadLocation` may fail for an empty or invalid timezone string — fall back to `time.UTC` rather than returning an error, since the host timezone is user-supplied and not guaranteed
+  - `dayEnd = dayStart.Add(24 * time.Hour)` is correct for most days; DST transitions in some timezones produce 23h or 25h days, but this is a known acceptable simplification at this stage
+
+----
