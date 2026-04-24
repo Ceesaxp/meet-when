@@ -1710,3 +1710,17 @@ The following features from the requirements document are already fully implemen
   - `dayEnd = dayStart.Add(24 * time.Hour)` is correct for most days; DST transitions in some timezones produce 23h or 25h days, but this is a known acceptable simplification at this stage
 
 ----
+
+## 2026-04-24 - US-009 (visual-agenda-pr1) - Implement StripBlock, CalendarLane, ComputeVisibleWindow, LanesByCalendar
+- What was implemented:
+  - Created `internal/services/agenda_strip.go` with `StripBlock`, `CalendarLane`, `ComputeVisibleWindow`, `LanesByCalendar`
+  - `ComputeVisibleWindow`: baseline 09:00-18:00; with timed events, winStart=min(09:00, earliest-30min), winEnd=latest+30min (contract or extend); clamped to [dayStart, dayEnd]
+  - `LanesByCalendar`: groups events by CalendarID, clips to day+visible window, computes LeftPct/WidthPct as percentages within the visible window, clamps so LeftPct+WidthPct<=100, all-day events excluded, empty lanes have Empty=true
+- Files changed:
+  - `internal/services/agenda_strip.go` (new file)
+- **Learnings for future iterations:**
+  - When all events are before 18:00, `winEnd = maxEventEnd + 30min` naturally contracts the window (baseline 18:00 is only used as default when no timed events are present)
+  - Events must be clipped to `[dayStart, dayEnd]` before percentage conversion to handle overnight events correctly
+  - Color fallback chain: `e.CalendarColor` → `cal.Color` → `#5F5E5A`
+
+----
