@@ -1526,6 +1526,11 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 	var startDate, endDate time.Time
 	var dayGroups []AgendaDayGroup
 
+	// today-view fields populated by AgendaService.GetDay
+	var agendaCalendars []*models.CalendarConnection
+	var lanes []services.CalendarLane
+	var windowStart, windowEnd time.Time
+
 	if view == "week" {
 		// This Week: Monday to Sunday of current week
 		// Go's time.Weekday: Sunday=0, Monday=1, ..., Saturday=6
@@ -1542,21 +1547,29 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 		endDate = sunday
 
 		// Fetch events for the week
-		events, fetchErr := h.handlers.services.Calendar.GetAgendaEvents(r.Context(), host.Host.ID, startDate, endDate)
+		weekEvents, fetchErr := h.handlers.services.Calendar.GetAgendaEvents(r.Context(), host.Host.ID, startDate, endDate)
 		if fetchErr != nil {
 			log.Printf("Error fetching agenda events: %v", fetchErr)
-			events = []services.AgendaEvent{}
+			weekEvents = []services.AgendaEvent{}
 		}
 
 		// Group events by day
-		dayGroups = groupEventsByDay(events, monday, loc)
+		dayGroups = groupEventsByDay(weekEvents, monday, loc)
 	} else {
-		// Today: 00:00 to 23:59:59 in host's timezone
-		startDate = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-		endDate = startDate.AddDate(0, 0, 1)
+		// Today: use AgendaService for palette-aware view composition.
+		agendaView, agendaErr := h.handlers.services.Agenda.GetDay(r.Context(), host.Host.ID, now)
+		if agendaErr != nil {
+			log.Printf("Error fetching today agenda: %v", agendaErr)
+		} else {
+			startDate = agendaView.DayStart
+			endDate = agendaView.DayEnd
+			agendaCalendars = agendaView.Calendars
+			lanes = services.LanesByCalendar(agendaView)
+			windowStart, windowEnd = services.ComputeVisibleWindow(agendaView.Events, agendaView.DayStart, agendaView.DayEnd)
+		}
 	}
 
-	// Fetch events (for today view or as fallback)
+	// Fetch events for the current window (week or today fallback).
 	events, err := h.handlers.services.Calendar.GetAgendaEvents(r.Context(), host.Host.ID, startDate, endDate)
 	if err != nil {
 		log.Printf("Error fetching agenda events: %v", err)
@@ -1576,7 +1589,7 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Compute timeline positioning for today view
+	// Compute timeline positioning for today view (kept for existing template compat).
 	var positionedEvents []AgendaEventWithPosition
 	var allDayEvents []services.AgendaEvent
 	var outOfRangeEvents []AgendaEventWithPosition
@@ -1587,6 +1600,16 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 		currentTimePx = currentTimePixel(now)
 	}
 
+	// For the today strip, prefer events from AgendaView (palette-colored).
+	todayEvents := events
+	if view == "today" && len(agendaCalendars) > 0 {
+		todayCalEvents := make([]services.AgendaEvent, 0, len(events))
+		for _, e := range events {
+			todayCalEvents = append(todayCalEvents, e)
+		}
+		todayEvents = todayCalEvents
+	}
+
 	h.handlers.render(w, "dashboard_agenda.html", PageData{
 		Title:        "Agenda",
 		Host:         host.Host,
@@ -1594,7 +1617,7 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 		ActiveNav:    "agenda",
 		PendingCount: h.getPendingCount(r, host.Host.ID),
 		Data: map[string]interface{}{
-			"Events":           events,
+			"Events":           todayEvents,
 			"PositionedEvents": positionedEvents,
 			"AllDayEvents":     allDayEvents,
 			"OutOfRangeEvents": outOfRangeEvents,
@@ -1605,6 +1628,10 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 			"Timezone":         host.Host.Timezone,
 			"CurrentTimePx":    currentTimePx,
 			"CalendarColors":   colorMap,
+			"Calendars":        agendaCalendars,
+			"Lanes":            lanes,
+			"WindowStart":      windowStart,
+			"WindowEnd":        windowEnd,
 		},
 	})
 }
