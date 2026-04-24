@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -236,6 +237,35 @@ func TestAssignColors_TieBreakByID(t *testing.T) {
 	}
 	if colorZ1 != CalendarPalette[1] {
 		t.Errorf("calZ (ID=zzz): want %s, got %s", CalendarPalette[1], colorZ1)
+	}
+}
+
+// TestAssignColors_CaseInsensitiveOverride verifies that a stored color using
+// lowercase hex (e.g. "#378add") is treated as equivalent to the uppercase
+// palette entry ("#378ADD") and is not handed to another calendar.
+func TestAssignColors_CaseInsensitiveOverride(t *testing.T) {
+	lowercaseColor := "#378add" // same as CalendarPalette[0] but lowercase
+
+	cals := []*models.CalendarConnection{
+		makeCalendar(0, lowercaseColor), // pre-assigned, oldest
+		makeCalendar(1, ""),
+	}
+
+	AssignColors(cals)
+
+	// Pre-assigned calendar keeps its original casing.
+	if cals[0].Color != lowercaseColor {
+		t.Errorf("override color casing was changed: want %s, got %s", lowercaseColor, cals[0].Color)
+	}
+
+	// Unset calendar must not receive the same color (regardless of case).
+	if strings.EqualFold(cals[1].Color, lowercaseColor) {
+		t.Errorf("unset calendar received the same color as the override: %s", cals[1].Color)
+	}
+
+	// Unset calendar should get palette[1] (the next available slot).
+	if cals[1].Color != CalendarPalette[1] {
+		t.Errorf("second calendar: want %s, got %s", CalendarPalette[1], cals[1].Color)
 	}
 }
 

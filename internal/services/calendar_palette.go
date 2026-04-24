@@ -3,6 +3,7 @@ package services
 import (
 	"cmp"
 	"slices"
+	"strings"
 
 	"github.com/meet-when/meet-when/internal/models"
 )
@@ -43,14 +44,17 @@ func AssignColors(calendars []*models.CalendarConnection) {
 	})
 
 	// Collect colors already in use (pre-assigned by the user or a prior call).
+	// Normalize to uppercase so that stored values like "#378add" are treated the
+	// same as the palette canonical form "#378ADD".
 	usedColors := make(map[string]bool, len(CalendarPalette))
 	for _, cal := range calendars {
 		if cal.Color != "" {
-			usedColors[cal.Color] = true
+			usedColors[strings.ToUpper(cal.Color)] = true
 		}
 	}
 
 	// Build the assignment queue: palette entries not yet in use, in index order.
+	// CalendarPalette is already uppercase, so direct lookup against usedColors works.
 	assignQueue := make([]string, 0, len(CalendarPalette))
 	for _, c := range CalendarPalette {
 		if !usedColors[c] {
