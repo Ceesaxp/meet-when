@@ -86,11 +86,16 @@ func (s *CalendarService) ConnectGoogleCalendar(ctx context.Context, input Googl
 	}
 
 	// Assign a palette color to the new calendar and persist it.
+	// Only update calendar.Color in memory after the DB write succeeds so that
+	// the returned struct stays consistent with the persisted state.
 	AssignColors(calendars)
 	for _, cal := range calendars {
 		if cal.ID == calendar.ID {
-			calendar.Color = cal.Color
-			_ = s.repos.Calendar.UpdateColor(ctx, input.HostID, calendar.ID, calendar.Color)
+			if err := s.repos.Calendar.UpdateColor(ctx, input.HostID, calendar.ID, cal.Color); err != nil {
+				log.Printf("[CALENDAR] failed to persist color for calendar %s: %v", calendar.ID, err)
+			} else {
+				calendar.Color = cal.Color
+			}
 			break
 		}
 	}
@@ -146,11 +151,16 @@ func (s *CalendarService) ConnectCalDAV(ctx context.Context, input CalDAVConnect
 	}
 
 	// Assign a palette color to the new calendar and persist it.
+	// Only update calendar.Color in memory after the DB write succeeds so that
+	// the returned struct stays consistent with the persisted state.
 	AssignColors(calendars)
 	for _, cal := range calendars {
 		if cal.ID == calendar.ID {
-			calendar.Color = cal.Color
-			_ = s.repos.Calendar.UpdateColor(ctx, input.HostID, calendar.ID, calendar.Color)
+			if err := s.repos.Calendar.UpdateColor(ctx, input.HostID, calendar.ID, cal.Color); err != nil {
+				log.Printf("[CALENDAR] failed to persist color for calendar %s: %v", calendar.ID, err)
+			} else {
+				calendar.Color = cal.Color
+			}
 			break
 		}
 	}

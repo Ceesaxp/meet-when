@@ -63,17 +63,22 @@ func AssignColors(calendars []*models.CalendarConnection) {
 	}
 	// Walk sorted calendars assigning the next queue slot to each unset one.
 	// Once the queue is exhausted (all palette colors now in use), wrap back
-	// through the full palette starting at index 0.
+	// through the full palette using the calendar's absolute sorted position (i)
+	// rather than a batch-local idx so that sequential single-calendar additions
+	// continue the rotation correctly (e.g. 11th calendar gets palette[1], not
+	// palette[0] again).
 	idx := 0
-	for _, cal := range calendars {
+	for i, cal := range calendars {
 		if cal.Color != "" {
 			continue
 		}
 		if idx < len(assignQueue) {
 			cal.Color = assignQueue[idx]
 		} else {
-			// All available (non-preassigned) slots used; cycle the full palette.
-			cal.Color = CalendarPalette[(idx-len(assignQueue))%len(CalendarPalette)]
+			// All available (non-preassigned) slots used; cycle the full palette
+			// by absolute position so that each new Connect* call advances the
+			// cursor rather than restarting at index 0.
+			cal.Color = CalendarPalette[i%len(CalendarPalette)]
 		}
 		idx++
 	}

@@ -276,3 +276,41 @@ func TestAssignColors_EmptyInput(t *testing.T) {
 	AssignColors(nil)
 	AssignColors([]*models.CalendarConnection{})
 }
+
+// TestAssignColors_SequentialAdditionsContinueRotation verifies that when
+// calendars are connected one at a time (each Connect* call adds a single new
+// calendar to an already-colored list), the palette rotation continues past the
+// 9th slot rather than restarting at index 0 on every wrap.
+func TestAssignColors_SequentialAdditionsContinueRotation(t *testing.T) {
+	// Simulate the real Connect* flow: a growing slice where all existing
+	// calendars already have colors and each call adds exactly one new entry.
+	var cals []*models.CalendarConnection
+	assigned := make([]string, 12)
+
+	for i := 0; i < 12; i++ {
+		cal := makeCalendar(i, "")
+		cals = append(cals, cal)
+		// AssignColors skips already-colored entries and assigns the new one.
+		AssignColors(cals)
+		assigned[i] = cal.Color
+	}
+
+	// Calendars 0-8 should each receive a distinct palette entry in order.
+	for i := 0; i < 9; i++ {
+		if assigned[i] != CalendarPalette[i] {
+			t.Errorf("calendar %d: want %s, got %s", i, CalendarPalette[i], assigned[i])
+		}
+	}
+	// Calendar 9 wraps to palette[0].
+	if assigned[9] != CalendarPalette[0] {
+		t.Errorf("10th calendar: want wrap to %s (palette[0]), got %s", CalendarPalette[0], assigned[9])
+	}
+	// Calendar 10 must continue the rotation to palette[1], not restart at palette[0].
+	if assigned[10] != CalendarPalette[1] {
+		t.Errorf("11th calendar: want %s (palette[1]), got %s — wrap restarted instead of continuing", CalendarPalette[1], assigned[10])
+	}
+	// Calendar 11 continues to palette[2].
+	if assigned[11] != CalendarPalette[2] {
+		t.Errorf("12th calendar: want %s (palette[2]), got %s", CalendarPalette[2], assigned[11])
+	}
+}
