@@ -1501,3 +1501,51 @@ The following features from the requirements document are already fully implemen
   - Pre-existing lint issues in the codebase (errcheck on db.Close, bcrypt.CompareHashAndPassword, rows.Close) are not related to this change
 
 ---
+
+**ralph run 202604241430 — Visual Agenda PR1**
+
+---
+
+## 2026-04-24 - US-001 - Visual timeline view for Today
+- What was implemented:
+  - Added `TimelineHour` struct with Label and TopPx fields for hour grid markers
+  - Added `AgendaEventWithPosition` struct embedding `services.AgendaEvent` with TopPx and HeightPx pixel positions
+  - Added timeline constants: `timelineStartHour=7`, `timelineEndHour=22`, `pxPerMinute=1`, `minEventHeightPx=30`
+  - Added `generateTimelineHours()` to create hour markers from 7am to 10pm
+  - Added `positionEventsForTimeline()` to compute absolute pixel positions for timed events
+  - Added `filterAllDayEvents()` to separate all-day events from timed events
+  - Updated `Agenda` handler to compute and pass `PositionedEvents`, `AllDayEvents`, and `TimelineHours` to template
+  - Rewrote today view in `dashboard_agenda.html`: visual timeline with hour grid and absolute-positioned event blocks
+  - All-day events shown in a distinct section above the timeline
+  - Event blocks show title always; time range shown only when block height > 44px
+  - Empty state preserved when no events exist
+  - Added CSS: `.timeline-container`, `.timeline-allday`, `.timeline-scroll`, `.timeline-grid`, `.timeline-hour`, `.timeline-hour-label`, `.timeline-hour-line`, `.timeline-events-area`, `.timeline-event`, `.timeline-event-title`, `.timeline-event-time`
+  - Week view unchanged
+- Files changed:
+  - `internal/handlers/dashboard.go` - Added types, constants, helper functions, updated Agenda handler (~90 lines added)
+  - `templates/pages/dashboard_agenda.html` - Replaced today table view with visual timeline (~60 lines rewritten)
+  - `static/css/style.css` - Added ~100 lines of timeline CSS
+- **Learnings for future iterations:**
+  - `prd.json` lives in `plans/` (gitignored), must be created fresh in each worktree
+  - The `Agenda` handler already had week/today branching — today view additions slot cleanly into the `else` branch
+  - Go templates can access embedded struct fields directly: `{{.TopPx}}` works on `AgendaEventWithPosition` for both the embedded `AgendaEvent` fields and the new fields
+  - Timeline height = (endHour - startHour) × 60px = 15 × 60 = 900px; the `max-height: 640px` on the scroll container makes it comfortably scrollable
+  - Use `{{if gt .HeightPx 44}}` for conditional time label (avoids clutter on <30min blocks)
+  - `fmt` must be explicitly imported in `dashboard.go` (it wasn't imported before this change)
+
+### Code-review fixes (iterative)
+
+**Round 1** (commits f454047, d5b0f6c):
+- Events painted on top of each other — fixed by adding `assignOverlapColumns()`, `LeftPct`/`WidthPct` fields, and inline CSS in template
+- Out-of-range events misplaced — fixed by splitting `positionEventsForTimeline` to return two slices; filter/clamp boundary events
+
+**Round 2** (commit f792df3):
+- Overnight events classified wrong — clock-minute comparison breaks for events spanning midnight; fixed by using concrete `gridStart`/`gridEnd` timestamps
+- False overlaps for short events — `assignOverlapColumns` used `HeightPx` (min-clamped) for overlap detection; fixed by adding `EndPx` (actual end) field and using it throughout
+- Timezone mismatch in labels — `formatTime .Start` showed event's own tz; fixed by adding `StartLocal`/`EndLocal time.Time` fields and using them in template
+
+**Round 3** (commit 14c18ba):
+- Min-height blocks still visually overlapping in same column — column reuse check used `EndPx` (actual) but painted extent is `max(EndPx, TopPx+minEventHeightPx)`; fixed `assignOverlapColumns` to track and compare `paintedEndPx` in both column assignment and overlap width calculation
+- Out-of-range events showed wrong timezone — return type changed from `[]services.AgendaEvent` to `[]AgendaEventWithPosition` so `StartLocal`/`EndLocal` are available; template updated accordingly
+
+----
