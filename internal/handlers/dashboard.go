@@ -1276,32 +1276,49 @@ func assignOverlapColumns(events []AgendaEventWithPosition) {
 		}
 	}
 
-	// For each event, NumColumns = 1 + max column index among all events that
-	// visually overlap it (using painted extents).
+	// For each event, numCols is the maximum number of concurrently painted events
+	// at any instant during the event's own painted range.
+	//
+	// We check at event i's own start and at the start of every overlapping event
+	// that begins after i (the only moments the count can increase).
+	// The floor is colIdx[i]+1 so the event's own column always fits on-screen.
 	numCols := make([]int, len(events))
 	for i := range events {
-		maxCol := colIdx[i]
-		iTop, iBot := events[i].TopPx, paintedEndPx(events[i])
+		iTop := events[i].TopPx
+		iBot := paintedEndPx(events[i])
+
+		checkPoints := []int{iTop}
 		for j := range events {
 			if i == j {
 				continue
 			}
-			jTop, jBot := events[j].TopPx, paintedEndPx(events[j])
-			if jTop < iBot && iTop < jBot {
-				if colIdx[j] > maxCol {
-					maxCol = colIdx[j]
-				}
+			jTop := events[j].TopPx
+			jBot := paintedEndPx(events[j])
+			if jTop > iTop && jTop < iBot && jBot > iTop {
+				checkPoints = append(checkPoints, jTop)
 			}
 		}
-		numCols[i] = maxCol + 1
+
+		maxConcurrent := colIdx[i] + 1 // must fit at least event i's own column
+		for _, t := range checkPoints {
+			count := 0
+			for j := range events {
+				jTop := events[j].TopPx
+				jBot := paintedEndPx(events[j])
+				if jTop <= t && jBot > t {
+					count++
+				}
+			}
+			if count > maxConcurrent {
+				maxConcurrent = count
+			}
+		}
+		numCols[i] = maxConcurrent
 	}
 
 	// Write CSS percentage strings back onto each event.
 	for i := range events {
 		n := numCols[i]
-		if n < 1 {
-			n = 1
-		}
 		events[i].LeftPct = fmt.Sprintf("%.4f%%", float64(colIdx[i])/float64(n)*100)
 		events[i].WidthPct = fmt.Sprintf("%.4f%%", 100.0/float64(n))
 	}
