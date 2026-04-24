@@ -67,6 +67,9 @@
         </div>
         {{end}}
 
+        <div class="calendar-color-picker">
+            {{template "color_swatch_fieldset.html" (dict "CalendarID" .ID "CurrentColor" .Color "Palette" $.Data.Palette)}}
+        </div>
         <div class="calendar-actions">
             <button type="button" class="btn-sm"
                     hx-post="/dashboard/calendars/{{.ID}}/refresh"

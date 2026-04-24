@@ -74,6 +74,9 @@ func (h *DashboardHandler) Calendars(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error fetching conferences: %v", err)
 	}
 
+	// Assign palette colors so legacy calendars without a stored color get one.
+	services.AssignColors(calendars)
+
 	// Build OAuth URLs
 	googleAuthURL := h.handlers.services.Calendar.GetGoogleAuthURL(host.Host.ID)
 	zoomAuthURL := h.handlers.services.Conferencing.GetZoomAuthURL(host.Host.ID)
@@ -89,6 +92,7 @@ func (h *DashboardHandler) Calendars(w http.ResponseWriter, r *http.Request) {
 			"Conferencing":  conferencing,
 			"GoogleAuthURL": googleAuthURL,
 			"ZoomAuthURL":   zoomAuthURL,
+			"Palette":       paletteData,
 		},
 	})
 }

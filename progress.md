@@ -1781,3 +1781,18 @@ The following features from the requirements document are already fully implemen
   - `cmd/server/main.go`
 
 ----
+
+## 2026-04-24 - US-014b (visual-agenda-pr1) - Add color picker UI to calendar settings page
+- What was implemented:
+  - Updated `Calendars` handler to call `AssignColors` before rendering and pass `Palette` in Data map
+  - Added `dict` template function to `templateFuncs()` in `handlers.go` for building maps inside templates
+  - Added `{{template "color_swatch_fieldset.html" (dict ...)}}` call inside the calendars range loop
+- Files changed:
+  - `internal/handlers/dashboard.go`
+  - `internal/handlers/handlers.go`
+  - `templates/pages/dashboard_calendars.html`
+- **Learnings for future iterations:**
+  - `dict` template func takes variadic key-value pairs: `(dict "Key1" val1 "Key2" val2)` → `map[string]interface{}`
+  - Inside a `range` loop, `.` is the loop value, so `$.Data.Palette` is needed to access outer scope data
+
+----

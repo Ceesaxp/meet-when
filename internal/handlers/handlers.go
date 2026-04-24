@@ -269,5 +269,14 @@ func templateFuncs() template.FuncMap {
 			}
 			return nil
 		},
+		"dict": func(kvs ...interface{}) map[string]interface{} {
+			m := make(map[string]interface{}, len(kvs)/2)
+			for i := 0; i+1 < len(kvs); i += 2 {
+				if key, ok := kvs[i].(string); ok {
+					m[key] = kvs[i+1]
+				}
+			}
+			return m
+		},
 	}
 }
