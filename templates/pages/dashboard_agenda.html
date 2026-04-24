@@ -85,7 +85,7 @@
     </div>
     {{end}}
 
-    {{if .Data.PositionedEvents}}
+    {{if or .Data.PositionedEvents (ge .Data.CurrentTimePx 0)}}
     <div class="timeline-scroll">
         <div class="timeline-grid">
             {{range .Data.TimelineHours}}
