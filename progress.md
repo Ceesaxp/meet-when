@@ -1756,3 +1756,14 @@ The following features from the requirements document are already fully implemen
   - `static/css/style.css`
 
 ----
+
+## 2026-04-24 - US-013 (visual-agenda-pr1) - Create color swatch fieldset partial template
+- What was implemented:
+  - Created `templates/partials/color_swatch_fieldset.html` using `{{define "color_swatch_fieldset.html"}}`
+  - Renders HTMX form posting to `/dashboard/calendars/CalendarID/color` with `hx-swap="outerHTML"`
+  - 9 label.color-swatch elements with radio inputs, `.swatch-circle`, and `.swatch-name` spans
+  - Checked state on radio matching CurrentColor; `onchange` auto-submit via `requestSubmit()`
+- Files changed:
+  - `templates/partials/color_swatch_fieldset.html` (new file)
+
+----
