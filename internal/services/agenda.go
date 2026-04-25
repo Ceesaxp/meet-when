@@ -145,9 +145,24 @@ func (s *AgendaService) GetWeek(ctx context.Context, hostID string, weekStart ti
 	}
 
 	for _, e := range events {
+		// For bucket assignment, all-day events must be interpreted in the host
+		// timezone. Calendar providers store all-day Start/End as UTC midnight
+		// values representing calendar dates (e.g. "2024-03-12" → 2024-03-12
+		// 00:00:00 UTC). For hosts west of UTC, UTC midnight falls on the
+		// previous calendar day locally, causing a Tuesday all-day event to
+		// overlap Monday's bucket. Re-interpret the UTC date as a local date
+		// before comparing. The original event (with UTC times) is stored
+		// unchanged so downstream detail views are unaffected.
+		eStart, eEnd := e.Start, e.End
+		if e.IsAllDay {
+			y, m, d := e.Start.UTC().Date()
+			eStart = time.Date(y, m, d, 0, 0, 0, 0, loc)
+			yE, mE, dE := e.End.UTC().Date()
+			eEnd = time.Date(yE, mE, dE, 0, 0, 0, 0, loc)
+		}
 		for i := range days {
 			// Event touches this day if it starts before dayEnd AND ends after dayStart.
-			if e.Start.Before(days[i].DayEnd) && e.End.After(days[i].DayStart) {
+			if eStart.Before(days[i].DayEnd) && eEnd.After(days[i].DayStart) {
 				days[i].Events = append(days[i].Events, e)
 			}
 		}
