@@ -602,6 +602,14 @@ func (s *CalendarService) createGoogleEvent(ctx context.Context, cal *models.Cal
 		}
 	}
 
+	// Add reschedule link
+	rescheduleURL := fmt.Sprintf("%s/m/%s/%s/%s/reschedule/%s",
+		s.cfg.Server.BaseURL, details.Tenant.Slug, details.Host.Slug, details.Template.Slug, details.Booking.ID)
+	if description != "" {
+		description += "\n\n"
+	}
+	description += "Reschedule this meeting:\n" + rescheduleURL
+
 	event := map[string]interface{}{
 		"summary":     details.Template.Name + " with " + details.Booking.InviteeName,
 		"description": description,
@@ -1094,6 +1102,14 @@ func (s *CalendarService) createCalDAVEvent(ctx context.Context, cal *models.Cal
 			description += "Agenda:\\n" + strings.ReplaceAll(agenda, "\n", "\\n")
 		}
 	}
+
+	// Add reschedule link
+	rescheduleURL := fmt.Sprintf("%s/m/%s/%s/%s/reschedule/%s",
+		s.cfg.Server.BaseURL, details.Tenant.Slug, details.Host.Slug, details.Template.Slug, details.Booking.ID)
+	if description != "" {
+		description += "\\n\\n"
+	}
+	description += "Reschedule this meeting:\\n" + rescheduleURL
 
 	// Build iCalendar event
 	ics := fmt.Sprintf(`BEGIN:VCALENDAR

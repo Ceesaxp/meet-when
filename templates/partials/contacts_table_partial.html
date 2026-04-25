@@ -1,0 +1,57 @@
+{{define "contacts_table_partial.html"}}
+{{if .Contacts}}
+<div class="table-container">
+<table class="table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Meetings</th>
+            <th>Last Met</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Contacts}}
+        <tr class="contact-row"
+            style="cursor: pointer;"
+            hx-get="/dashboard/contacts/{{urlEncode .Email}}/bookings"
+            hx-target="next .contact-bookings-container"
+            hx-swap="innerHTML"
+            hx-trigger="click once"
+            onclick="this.classList.toggle('expanded')">
+            <td>
+                <span style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                    <svg class="contact-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="transition: transform 0.2s;">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                    {{if .Name}}{{.Name}}{{else}}<span style="color: var(--text-muted);">-</span>{{end}}
+                </span>
+            </td>
+            <td>{{.Email}}</td>
+            <td>{{.MeetingCount}}</td>
+            <td>{{if .LastMet}}{{timeAgo .LastMet}}{{else}}<span style="color: var(--text-muted);">Never</span>{{end}}</td>
+        </tr>
+        <tr class="contact-bookings-container" style="display: none;">
+            <td colspan="4" style="padding: 0;"></td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+</div>
+<style>
+    .contact-row:hover { background: var(--bg-secondary); }
+    .contact-row.expanded + .contact-bookings-container { display: table-row !important; }
+    .contact-row.expanded .contact-chevron { transform: rotate(90deg); }
+</style>
+{{else}}
+<div class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48" style="opacity: 0.4; margin-bottom: 1rem;">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </svg>
+    <p style="color: var(--text-muted);">{{if .Search}}No contacts match your search.{{else}}No contacts yet. They'll appear here after your first confirmed booking.{{end}}</p>
+</div>
+{{end}}
+{{end}}

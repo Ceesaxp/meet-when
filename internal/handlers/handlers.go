@@ -5,11 +5,13 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/meet-when/meet-when/internal/config"
+	"github.com/meet-when/meet-when/internal/models"
 	"github.com/meet-when/meet-when/internal/repository"
 	"github.com/meet-when/meet-when/internal/services"
 )
@@ -26,6 +28,7 @@ type Handlers struct {
 	Dashboard  *DashboardHandler
 	Onboarding *OnboardingHandler
 	API        *APIHandler
+	APIV1      *APIV1Handler
 }
 
 // New creates all handlers
@@ -45,6 +48,7 @@ func New(cfg *config.Config, svc *services.Services, repos *repository.Repositor
 	h.Dashboard = &DashboardHandler{handlers: h}
 	h.Onboarding = &OnboardingHandler{handlers: h}
 	h.API = &APIHandler{handlers: h}
+	h.APIV1 = &APIV1Handler{handlers: h}
 
 	return h
 }
@@ -280,6 +284,12 @@ func templateFuncs() template.FuncMap {
 				}
 			}
 			return m
+		},
+		"isPast": func(t models.SQLiteTime) bool {
+			return t.Before(time.Now())
+		},
+		"urlEncode": func(s string) string {
+			return url.PathEscape(s)
 		},
 	}
 }

@@ -1502,316 +1502,311 @@ The following features from the requirements document are already fully implemen
 
 ---
 
-**ralph run 202604241430 — Visual Agenda PR1**
-
----
-
-## 2026-04-24 - US-001 - Visual timeline view for Today
+## 2026-03-06 - US-001 - Change session duration default to 7 days and use config value
 - What was implemented:
-  - Added `TimelineHour` struct with Label and TopPx fields for hour grid markers
-  - Added `AgendaEventWithPosition` struct embedding `services.AgendaEvent` with TopPx and HeightPx pixel positions
-  - Added timeline constants: `timelineStartHour=7`, `timelineEndHour=22`, `pxPerMinute=1`, `minEventHeightPx=30`
-  - Added `generateTimelineHours()` to create hour markers from 7am to 10pm
-  - Added `positionEventsForTimeline()` to compute absolute pixel positions for timed events
-  - Added `filterAllDayEvents()` to separate all-day events from timed events
-  - Updated `Agenda` handler to compute and pass `PositionedEvents`, `AllDayEvents`, and `TimelineHours` to template
-  - Rewrote today view in `dashboard_agenda.html`: visual timeline with hour grid and absolute-positioned event blocks
-  - All-day events shown in a distinct section above the timeline
-  - Event blocks show title always; time range shown only when block height > 44px
-  - Empty state preserved when no events exist
-  - Added CSS: `.timeline-container`, `.timeline-allday`, `.timeline-scroll`, `.timeline-grid`, `.timeline-hour`, `.timeline-hour-label`, `.timeline-hour-line`, `.timeline-events-area`, `.timeline-event`, `.timeline-event-title`, `.timeline-event-time`
-  - Week view unchanged
+  - Changed SESSION_DURATION_HOURS default from 24 to 168 (7 days) in internal/config/config.go
+  - Replaced all 5 hardcoded `int(24 * time.Hour / time.Second)` MaxAge values in internal/handlers/auth.go with `int(h.handlers.cfg.App.SessionDuration / time.Second)`
+  - Session DB TTL was already using `s.cfg.App.SessionDuration` in internal/services/session.go — no change needed there
 - Files changed:
-  - `internal/handlers/dashboard.go` - Added types, constants, helper functions, updated Agenda handler (~90 lines added)
-  - `templates/pages/dashboard_agenda.html` - Replaced today table view with visual timeline (~60 lines rewritten)
-  - `static/css/style.css` - Added ~100 lines of timeline CSS
+  - `internal/config/config.go` - Changed default from 24 to 168
+  - `internal/handlers/auth.go` - 5 cookie MaxAge values now use config
 - **Learnings for future iterations:**
-  - `prd.json` lives in `plans/` (gitignored), must be created fresh in each worktree
-  - The `Agenda` handler already had week/today branching — today view additions slot cleanly into the `else` branch
-  - Go templates can access embedded struct fields directly: `{{.TopPx}}` works on `AgendaEventWithPosition` for both the embedded `AgendaEvent` fields and the new fields
-  - Timeline height = (endHour - startHour) × 60px = 15 × 60 = 900px; the `max-height: 640px` on the scroll container makes it comfortably scrollable
-  - Use `{{if gt .HeightPx 44}}` for conditional time label (avoids clutter on <30min blocks)
-  - `fmt` must be explicitly imported in `dashboard.go` (it wasn't imported before this change)
-
-### Code-review fixes (iterative)
-
-**Round 1** (commits f454047, d5b0f6c):
-- Events painted on top of each other — fixed by adding `assignOverlapColumns()`, `LeftPct`/`WidthPct` fields, and inline CSS in template
-- Out-of-range events misplaced — fixed by splitting `positionEventsForTimeline` to return two slices; filter/clamp boundary events
-
-**Round 2** (commit f792df3):
-- Overnight events classified wrong — clock-minute comparison breaks for events spanning midnight; fixed by using concrete `gridStart`/`gridEnd` timestamps
-- False overlaps for short events — `assignOverlapColumns` used `HeightPx` (min-clamped) for overlap detection; fixed by adding `EndPx` (actual end) field and using it throughout
-- Timezone mismatch in labels — `formatTime .Start` showed event's own tz; fixed by adding `StartLocal`/`EndLocal time.Time` fields and using them in template
-
-**Round 3** (commit 14c18ba):
-- Min-height blocks still visually overlapping in same column — column reuse check used `EndPx` (actual) but painted extent is `max(EndPx, TopPx+minEventHeightPx)`; fixed `assignOverlapColumns` to track and compare `paintedEndPx` in both column assignment and overlap width calculation
-- Out-of-range events showed wrong timezone — return type changed from `[]services.AgendaEvent` to `[]AgendaEventWithPosition` so `StartLocal`/`EndLocal` are available; template updated accordingly
-
+  - The session service (session.go:44) already used cfg.App.SessionDuration for DB expiry — only cookie MaxAge was hardcoded
+  - AuthHandler accesses config via `h.handlers.cfg` (AuthHandler -> Handlers -> cfg)
+  - There are also google_auth_nonce and google_profile cookies with MaxAge=600 (10 min) and logout/clear cookies with MaxAge=-1 — these are intentionally different and should NOT use SessionDuration
 ----
 
-## 2026-04-24 - US-003 - Current time indicator on timeline
-- What was implemented:
-  - Added `currentTimePixel(now time.Time) int` helper in `dashboard.go` that computes the pixel offset (1px-per-minute scale) from the top of the 7am–10pm grid; returns -1 when the current time is outside the displayed range
-  - Added `CurrentTimePx` key to the template data map in the `Agenda` handler (set only for today view)
-  - Added `<div class="timeline-current-time">` inside `timeline-events-area` in `dashboard_agenda.html`, rendered only when `CurrentTimePx >= 0`; uses `{{ge .Data.CurrentTimePx 0}}` so it is entirely server-side — no JavaScript needed
-  - Added `.timeline-current-time` and `.timeline-current-time::before` CSS rules: 2px red line spanning the full event area width, with a 10px red circle on the left edge for visibility; `z-index: 10` so it renders above event blocks
-  - Also updated `plans/prd.json` to mark US-004 (overlapping events) as `passes: true` — that feature was already fully implemented in prior US-001 code-review fix rounds
+## 2026-03-06 - US-002 - Add reschedule link to confirmation email body
+- Updated reschedule link format from `{BASE_URL}/booking/{token}/reschedule` to `{BASE_URL}/m/{tenant_slug}/{host_slug}/{template_slug}/reschedule/{booking_id}`
+- Changed label from "Reschedule:" to "Reschedule this meeting:" with link on its own line
+- Updated in 3 places: defaultInviteeConfirmationBody, sendInviteeRescheduleNotification, defaultReminderBody
+- Also updated buildEmailTemplateData which generates the RescheduleLink for custom templates
 - Files changed:
-  - `internal/handlers/dashboard.go` — added `currentTimePixel()` helper (~10 lines), added `CurrentTimePx` to template data
-  - `templates/pages/dashboard_agenda.html` — added current-time indicator div
-  - `static/css/style.css` — added ~22 lines for `.timeline-current-time` and `::before` styles
+  - `internal/services/email.go` - Updated reschedule link format and label in all email templates
 - **Learnings for future iterations:**
-  - `time.Time.Clock()` returns `(hour, min, sec)` in the time's own location — call `now.In(loc)` before passing `now` to `currentTimePixel` to get host-local hour/minute
-  - `{{ge .Data.CurrentTimePx 0}}` is the correct Go template comparison for "integer ≥ 0"; `{{if ...}}` alone would require a truthy non-zero check that fails for px=0 (midnight edge case, though outside range here)
-  - The `plans/` directory is gitignored in this repo — do not try to `git add plans/prd.json`
-  - The red-dot-plus-line pattern (circle on left, 2px line across) is a widely-recognised "current time" UI metaphor used by Google Calendar
-
+  - BookingWithDetails has Tenant, Host, Template, and Booking — all slug fields available for URL construction
+  - buildEmailTemplateData (email.go:78) builds template data used by both default and custom email templates — updating RescheduleLink there covers both paths
+  - There are 3 default email bodies with reschedule links: confirmation (line ~106), reminder (line ~488), and reschedule notification (line ~446)
+  - The reschedule notification email uses inline fmt.Sprintf rather than buildEmailTemplateData — so it needs separate URL construction
+  - When adding new URL formats in emails, always verify a matching route handler exists in cmd/server/main.go
+  - Added RescheduleByID handler that redirects /m/{tenant}/{host}/{template}/reschedule/{booking_id} to /booking/{token}/reschedule — avoids duplicating reschedule page logic
 ----
 
-## 2026-04-24 - US-002 - Color-code events by calendar
-- What was implemented:
-  - Added `calendarColorPalette` (8 distinct hex colors) and `buildCalendarColorMap` function in `dashboard.go`
-  - `buildCalendarColorMap` iterates all events and assigns a palette color to each unique `CalendarName` in order
-  - Added `Color string` field to `AgendaEventWithPosition` struct
-  - Updated `positionEventsForTimeline` signature to accept `colorMap map[string]string` and set Color on each event
-  - Updated `Agenda` handler to build colorMap and pass it as `CalendarColors` to the template
-  - Updated `dashboard_agenda.html` to:
-    - Show a calendar legend (colored dot + name) above the content in both views
-    - Apply `border-left: 3px solid <color>` to timeline event blocks, all-day events, out-of-range events
-    - Apply `border-left` to week-view event-item rows
-    - Color the `event-calendar` badge text to match the calendar color
-  - Added CSS for `.calendar-legend`, `.calendar-legend-item`, `.calendar-legend-dot`, `.calendar-legend-name`
-- Files changed:
-  - `internal/handlers/dashboard.go` — added palette, buildCalendarColorMap, Color field, updated positionEventsForTimeline signature and Agenda handler
-  - `templates/pages/dashboard_agenda.html` — legend, color borders, and colored calendar name badges in both views
-  - `static/css/style.css` — ~34 lines for calendar legend styles
+## 2026-03-06, 10:00 AM - US-003 - Add reschedule link to ICS calendar event descriptions
+- Added reschedule URL to ICS DESCRIPTION field in generateICS() (email.go) — used by confirmation, reminder, and reschedule notification emails
+- Added reschedule URL to Google Calendar event description in createGoogleEvent() (calendar.go)
+- Added reschedule URL to CalDAV event description in createCalDAVEvent() (calendar.go) — uses escaped newlines (\\n) for ICS format
+- Verified reschedule page handles cancelled/rejected bookings gracefully (existing checks at public.go:528-536)
+- Files changed: internal/services/email.go, internal/services/calendar.go
 - **Learnings for future iterations:**
-  - Go templates support `{{index .Data.CalendarColors .CalendarName}}` to look up map values — no helper function needed
-  - When accessing a map in range inside a nested template scope, use `$.Data.CalendarColors` (root context) instead of `.Data.CalendarColors`
-  - `buildCalendarColorMap` on the week-view `events` slice covers all calendars since the outer fetch uses the same week range as the inner (pre-existing double-fetch pattern)
-  - The `plans/` directory is gitignored — `git add plans/prd.json` will silently do nothing; PRD is local only
-
+  - The ICS generateICS() in email.go uses real newlines in description, then escapeICS() handles them — just append normally
+  - CalDAV createCalDAVEvent() in calendar.go uses literal \\n strings in the description (not real newlines) — must match this pattern
+  - Google Calendar createGoogleEvent() uses real newlines like email.go
+  - All three description-building blocks follow the same pattern: template description + agenda + reschedule link
+  - The generateICS() function is shared by confirmation, reminder, and reschedule notification emails — one change covers all three
+  - BookingWithDetails has Tenant, Host, Template with Slug fields, and CalendarService has s.cfg for BaseURL access
 ----
 
-## 2026-04-24 - US-001 (visual-agenda-pr1 PRD) - Add color column to calendar_connections table and model
-- What was implemented:
-  - Migration `010_add_calendar_color.up.sql`: `ALTER TABLE calendar_connections ADD COLUMN color VARCHAR(7) NOT NULL DEFAULT ''`
-  - Migration `010_add_calendar_color.down.sql`: `ALTER TABLE calendar_connections DROP COLUMN color`
-  - Added `Color string` field with `json:"color" db:"color"` tags to `CalendarConnection` struct in `internal/models/models.go`
-  - Updated `CalendarRepository.Create` INSERT to include `color` column (17→18 positional params)
-  - Updated `CalendarRepository.GetByID`, `GetByHostID`, and `GetAll` SELECT+Scan to include `color`
-- Files changed:
-  - `migrations/010_add_calendar_color.up.sql` — new file
-  - `migrations/010_add_calendar_color.down.sql` — new file
-  - `internal/models/models.go` — added Color field after IsDefault
-  - `internal/repository/repository.go` — Create, GetByID, GetByHostID, GetAll updated
+## 2026-03-06 - US-004 - Add reschedule link to reminder email
+- Already completed by prior work in US-002 and US-003:
+  - US-002 updated defaultReminderBody() to include "Reschedule this meeting:" link (email.go:509-510)
+  - US-003 updated generateICS() to include reschedule URL in ICS DESCRIPTION — generateICS() is called for reminders at email.go:559
+- No code changes needed — all acceptance criteria already passing
+- Build succeeds
+- Files changed: None (only prd.json updated)
 - **Learnings for future iterations:**
-  - The next migration number was 010 (existing highest was 009_add_google_identity.up.sql)
-  - Color field placed after IsDefault and before the sync-status block — matches logical grouping
-  - All four repo methods (Create + 3 SELECTs) must be kept in sync; missing one causes scan mismatch panics at runtime
-
+  - Always check if prior stories already covered the acceptance criteria before implementing — US-002/US-003 covered all three email types (confirmation, reminder, reschedule notification) in a single pass
+  - The generateICS() function is shared across all email types, so ICS changes in US-003 automatically apply to reminders
 ----
 
-## 2026-04-24 - US-002 (visual-agenda-pr1) - Add dedicated UpdateColor repository method
+## 2026-03-06 - US-005 - Add backend validation for custom durations
 - What was implemented:
-  - Added `UpdateColor(ctx context.Context, hostID string, calendarID string, color string) error` method to `CalendarRepository` in `internal/repository/repository.go`
-  - SQL updates only `color` and `updated_at` columns with `WHERE id = $3 AND host_id = $4` for tenant isolation
-  - Returns `fmt.Errorf(...)` if `RowsAffected() == 0` (calendar not found or not owned by host)
-  - Build passes, all tests pass
+  - Added `validateDurations()` helper function in template service that validates, deduplicates, and sorts duration values
+  - Rejects durations outside 5-480 minute range with clear error message using `fmt.Errorf` wrapping `ErrInvalidDuration`
+  - Deduplicates using a map-based seen set
+  - Sorts ascending using `sort.Ints()`
+  - Integrated validation into both `CreateTemplate` and `UpdateTemplate` methods (called after defaults, before persisting)
+  - Added `ErrInvalidDuration` sentinel error
 - Files changed:
-  - `internal/repository/repository.go` — added `UpdateColor` method (~21 lines) after `UpdateSyncStatus`
+  - `internal/services/template.go` - Added validateDurations(), ErrInvalidDuration, and calls in Create/Update
+  - `plans/prd.json` - Marked US-005 as passing
 - **Learnings for future iterations:**
-  - Pattern mirrors `UpdateSyncStatus`: use `ExecContext`, check `RowsAffected()` for a no-op guard
-  - `fmt` and `time` were already imported — no import changes needed
-  - The `WHERE id AND host_id` pattern is the standard tenant-isolation guard used throughout this repo
-
+  - Template service already had no tests file — validation logic is straightforward enough to verify via build
+  - Both CreateTemplate and UpdateTemplate share the same input struct pattern with `Durations []int`
+  - The validation runs after defaults are set (so the default `[]int{30}` also gets validated, which is fine since 30 is in range)
 ----
 
-## 2026-04-24 - US-003 (visual-agenda-pr1) - Implement color palette and AssignColors function with tests
+## 2026-03-06 - US-006 - Expand preset duration chips in template form
 - What was implemented:
-  - Created `internal/services/calendar_palette.go` with `CalendarPalette` (9 hex strings) and `AssignColors` function
-  - `AssignColors` sorts input by `CreatedAt` ASC via `slices.SortFunc` for stable order, builds a queue of unused palette colors, assigns them in order, and wraps to index 0 when all 9 are exhausted
-  - Calendars with non-empty `Color` are preserved; their colors are excluded from the assignment queue
-  - Created `internal/services/calendar_palette_test.go` with 5 test cases covering all acceptance criteria
+  - Expanded duration chip options from [15, 30, 45, 60, 90] to [15, 20, 25, 30, 45, 50, 60, 75, 90, 120]
+  - All chips in ascending order
+  - 30 min remains the default selected chip for new templates
+  - Existing templates with current durations continue to work (template editing uses `contains` helper to check each value)
 - Files changed:
-  - `internal/services/calendar_palette.go` — new file
-  - `internal/services/calendar_palette_test.go` — new file
+  - `templates/pages/dashboard_template_form.html` - Updated duration chips section with 5 new options (20, 25, 50, 75, 120)
+  - `plans/prd.json` - Marked US-006 as passing
 - **Learnings for future iterations:**
-  - `slices.SortFunc` requires `cmp` package for comparison helpers — both `slices` and `cmp` are in stdlib (Go 1.21+)
-  - `models.NewSQLiteTime(t)` is the correct constructor for `SQLiteTime` in tests (do not assign `time.Time` directly)
-  - The assignment queue excludes pre-existing colors so user overrides prevent those colors from being reused until the queue wraps
-  - After `AssignColors`, the input slice is sorted in-place (by `CreatedAt` ASC) — callers should be aware of this side effect
-
+  - The onboarding page (`templates/pages/onboarding.html`) also has duration chips but with a simpler subset — may want to update separately if consistency is desired
+  - Duration chips use a `contains` template function to check if a value exists in the template's Durations slice
+  - The 30 min chip has special default-selected logic: `{{else}}selected{{end}}` for when no template exists yet
 ----
 
-## 2026-04-24 - US-004 (visual-agenda-pr1) - Persist color when connecting Google and CalDAV calendars
+## 2026-03-06 - US-007 - Add custom duration free-form input to template form
 - What was implemented:
-  - Added color assignment block to `ConnectGoogleCalendar` and `ConnectCalDAV` in `internal/services/calendar.go`
-  - After `Create`, load all host calendars via `GetByHostID`, call `AssignColors` on the full list, find the new calendar by ID, persist via `UpdateColor`, and set the `Color` field on the returned object
-  - The pattern is identical in both methods: reuses the already-fetched `calendars` slice (loaded for the "set as default" check) rather than issuing a second `GetByHostID` query
+  - Added a "Custom" input field (number input, 5-480 range) with "Add" button below the preset duration chips
+  - Custom values are added as removable chip tags (with × remove button)
+  - If custom value matches a preset chip, the preset chip is selected instead of creating a duplicate
+  - Duplicate custom values are silently ignored
+  - Invalid values show inline error message
+  - Enter key in the input triggers the Add button
+  - When editing a template with non-preset durations, those are rendered as custom chips on page load using Go template range + JavaScript
+  - Custom duration chips include hidden checkbox inputs with name="durations" so they submit with the form
+  - CSS styles added for custom duration row, remove button, and custom durations container
 - Files changed:
-  - `internal/services/calendar.go` — two identical blocks added (one per connect method)
+  - `templates/pages/dashboard_template_form.html` - Added custom duration HTML and JavaScript (~70 lines)
+  - `static/css/style.css` - Added custom duration styles (~26 lines)
+  - `plans/prd.json` - Marked US-007 as passing
 - **Learnings for future iterations:**
-  - `GetByHostID` is already called right after `Create` for the default-calendar check; the color assignment block slots in immediately after and reuses the same slice — no extra DB round-trip needed
-  - `AssignColors` sorts the slice in-place so the iteration to find the new calendar by ID works on the already-sorted list; ID matching is stable and safe
-  - `UpdateColor` takes `(ctx, hostID, calendarID, color)` — hostID is the tenant-isolation guard required by the repo layer
-
+  - Go template `{{range}}` can output JavaScript statements inline — useful for initializing JS state from server data
+  - Backend validation (US-005) already handles deduplication and range checking, so the frontend validation is for UX only
+  - The `contains` template function only works with `[]int` — for checking membership in a literal list, use JavaScript instead
+  - Custom chips are appended to a separate `#custom-durations` div to keep them visually distinct from presets
 ----
 
-## 2026-04-24 - US-005 (visual-agenda-pr1) - Add CalendarID and CalendarColor fields to AgendaEvent
-- What was implemented:
-  - Added `ID string`, `CalendarID string`, and `CalendarColor string` fields to `AgendaEvent` struct in `internal/services/calendar.go`
-  - In `getGoogleAgendaEvents`: added `ID string` to the anonymous result struct for Google API JSON decoding; populated `ID`, `CalendarID`, `CalendarColor` (with `#5F5E5A` fallback) on each event
-  - In `getCalDAVAgendaEvents`: computed `calColor` with `#5F5E5A` fallback and threaded `cal.ID` + `calColor` through `parseCalDAVAgendaResponse` → `parseVEventsForAgenda`
-  - In `parseVEventsForAgenda`: added UID parsing (`UID:` line → `eventUID`); populated `ID`, `CalendarID`, `CalendarColor` on the appended `AgendaEvent`
-- Files changed:
-  - `internal/services/calendar.go` — `AgendaEvent` struct, Google event append, CalDAV parse chain
+## 2026-03-06, 10:00 AM - US-008 - Add smart_durations column to hosts table
+- Added migration 010_add_smart_durations for both PostgreSQL (BOOLEAN NOT NULL DEFAULT false) and SQLite (INTEGER NOT NULL DEFAULT 0)
+- Added SmartDurations bool field to Host model struct in internal/models/models.go
+- Updated HostRepository: INSERT query (Create), all SELECT queries (GetByID, GetByEmail, GetAllByEmail, GetBySlug, GetByTenantID, GetByGoogleID) and their Scan calls
+- Used COALESCE(smart_durations, false) in SELECT queries for safety with existing rows
 - **Learnings for future iterations:**
-  - The Google Calendar API returns event IDs in the `id` field at the top-level item — not inside `start`/`end` — so the anonymous struct needed a new `ID string` field
-  - CalDAV events carry their unique identifier as `UID:` (not `UID;...:`), so a simple `HasPrefix("UID:")` + `line[4:]` slice is sufficient
-  - `parseVEventsForAgenda` is a pure function with no access to `*models.CalendarConnection`; the clean approach is to accept `calendarID` and `calendarColor` as parameters and pass them down from `getCalDAVAgendaEvents`
-  - The `#5F5E5A` gray fallback is applied at the service boundary (before calling the parse chain), so the deeper parse functions always receive a non-empty color
-
+  - Host queries use explicit column lists (not SELECT *), so every new column requires updating 7+ locations in repository.go
+  - SQLite uses INTEGER for booleans (0/1), PostgreSQL uses BOOLEAN — migration files differ
+  - COALESCE wrapping in SELECTs is the pattern used for newer boolean columns (see onboarding_completed)
 ----
 
-## 2026-04-24 - US-006 (visual-agenda-pr1) - Add GetAgendaEventsWithCalendars method
-- What was implemented:
-  - Extracted the provider iteration loop from `GetAgendaEvents` into a new `GetAgendaEventsWithCalendars(ctx, calendars, host, start, end)` method on `CalendarService`
-  - `GetAgendaEvents` is now a thin wrapper: loads calendars from DB, delegates to `GetAgendaEventsWithCalendars` with `host=nil`
-  - `host *models.Host` parameter accepted for future timezone use; nil-safe for existing callers
+## 2026-03-06 - US-009 - Add smart durations toggle to settings page
+- Added "Smart durations" toggle checkbox to the Profile section of dashboard_settings.html
+- Helper text: "End meetings 5-10 minutes early to give you buffer time"
+- Updated UpdateSettings handler in dashboard.go to read smart_durations checkbox value
+- Updated HostRepository.Update to include smart_durations in the UPDATE query (was missing)
 - Files changed:
-  - `internal/services/calendar.go` — refactored `GetAgendaEvents`, added `GetAgendaEventsWithCalendars`
+  - templates/pages/dashboard_settings.html (added toggle UI)
+  - internal/handlers/dashboard.go (read form value)
+  - internal/repository/repository.go (include smart_durations in UPDATE)
 - **Learnings for future iterations:**
-  - The existing `GetAgendaEvents` callers pass only `hostID`; the new method signature accepts preloaded `[]*models.CalendarConnection` so `AgendaService.GetDay` can avoid a second DB round-trip
-  - Passing `nil` for `host` in the thin wrapper keeps the existing call signature unchanged while the new method is ready for the AgendaService consumer
-
+  - HostRepository.Update only updates a subset of columns (name, slug, timezone, default_calendar_id) — new fields must be explicitly added
+  - Toggle CSS styles (toggle-container, toggle-switch, toggle-input, toggle-label) already exist in static/css/style.css
+  - Checkbox form values come as "on" when checked, absent when unchecked — use `r.FormValue("x") == "on"`
 ----
 
-## 2026-04-24 - US-007 (visual-agenda-pr1) - Replace sortAgendaEvents bubble sort with slices.SortFunc
+## 2026-03-06 - US-010 & US-011 - Apply smart duration logic at booking creation and rescheduling
 - What was implemented:
-  - Replaced O(n²) bubble sort in `sortAgendaEvents` with `slices.SortFunc` using `time.Time.Compare`
-  - Added `"slices"` to imports in `internal/services/calendar.go`
+  - Added `calculateSmartDuration` helper function: durations <= 30 min subtract 5, > 30 min subtract 10, minimum 5
+  - Modified `CreateBooking` to load host before end time calculation and apply smart duration adjustment
+  - Modified `RescheduleBooking` to load host before end time calculation and apply smart duration adjustment
+  - Original duration is preserved in `booking.Duration` for display; only `EndTime` is adjusted
+  - Calendar events (ICS, Google, CalDAV) already use `booking.EndTime` so no changes needed there
 - Files changed:
-  - `internal/services/calendar.go`
-
-----
-
-## 2026-04-24 - US-008 (visual-agenda-pr1) - Create AgendaService with GetDay method
-- What was implemented:
-  - Created `internal/services/agenda.go` with `AgendaService` struct and `AgendaView` struct
-  - `GetDay(ctx, hostID, date)` loads host (for timezone), loads calendars, calls `AssignColors`, computes day window (00:00–24:00 in host TZ), fetches events via `GetAgendaEventsWithCalendars`, sorts events
-  - Wired `AgendaService` into `Services` struct and constructor in `internal/services/services.go`
-- Files changed:
-  - `internal/services/agenda.go` (new file)
-  - `internal/services/services.go`
+  - `internal/services/booking.go` - Added calculateSmartDuration(), moved host loading earlier in CreateBooking and RescheduleBooking, applied smart duration to end time calculation
 - **Learnings for future iterations:**
-  - `time.LoadLocation` may fail for an empty or invalid timezone string — fall back to `time.UTC` rather than returning an error, since the host timezone is user-supplied and not guaranteed
-  - `dayEnd = dayStart.Add(24 * time.Hour)` is correct for most days; DST transitions in some timezones produce 23h or 25h days, but this is a known acceptable simplification at this stage
-
+  - Calendar event creation (ICS DTEND, Google Calendar end, CalDAV end) all use `booking.EndTime` — adjusting EndTime at booking creation propagates automatically
+  - Zoom `duration` field uses original `booking.Duration` which is correct (Zoom needs actual call length)
+  - Host was already loaded in both methods but after end time calc — moving it earlier was sufficient
+  - US-011 (reschedule) was trivially covered by the same change as US-010
 ----
 
-## 2026-04-24 - US-009 (visual-agenda-pr1) - Implement StripBlock, CalendarLane, ComputeVisibleWindow, LanesByCalendar
+## 2026-03-06 - US-012 - Remove status restriction on booking archival
 - What was implemented:
-  - Created `internal/services/agenda_strip.go` with `StripBlock`, `CalendarLane`, `ComputeVisibleWindow`, `LanesByCalendar`
-  - `ComputeVisibleWindow`: baseline 09:00-18:00; with timed events, winStart=min(09:00, earliest-30min), winEnd=latest+30min (contract or extend); clamped to [dayStart, dayEnd]
-  - `LanesByCalendar`: groups events by CalendarID, clips to day+visible window, computes LeftPct/WidthPct as percentages within the visible window, clamps so LeftPct+WidthPct<=100, all-day events excluded, empty lanes have Empty=true
+  - Changed `ArchiveBooking` service method to use time-based check instead of status-based check
+  - Any booking whose `end_time` is in the past can now be archived regardless of status
+  - Future bookings with confirmed or pending status are still protected from archival
+  - Added `isPast` template function to `templateFuncs()` for checking if a `SQLiteTime` is in the past
+  - Updated dashboard bookings template to show archive/unarchive button for past confirmed bookings
 - Files changed:
-  - `internal/services/agenda_strip.go` (new file)
+  - `internal/services/booking.go` - Changed ArchiveBooking from status check to time-based check
+  - `internal/handlers/handlers.go` - Added `isPast` template function, imported models package
+  - `templates/pages/dashboard_bookings.html` - Added archive button for past confirmed bookings
 - **Learnings for future iterations:**
-  - When all events are before 18:00, `winEnd = maxEventEnd + 30min` naturally contracts the window (baseline 18:00 is only used as default when no timed events are present)
-  - Events must be clipped to `[dayStart, dayEnd]` before percentage conversion to handle overnight events correctly
-  - Color fallback chain: `e.CalendarColor` → `cal.Color` → `#5F5E5A`
-
+  - `SQLiteTime` embeds `time.Time` so methods like `.Before()` are promoted and can be called directly
+  - Template functions need to be registered in `templateFuncs()` in handlers.go
+  - The bookings template uses nested `{{if}}/{{else if}}` blocks for status-based action buttons — adding archive to confirmed status requires nesting within that block
 ----
 
-## 2026-04-24 - US-010 (visual-agenda-pr1) - Unit tests for strip rendering helpers
-- What was implemented:
-  - Created `internal/services/agenda_strip_test.go` with 12 test functions covering `ComputeVisibleWindow` and `LanesByCalendar`
-  - `ComputeVisibleWindow` tests: no-events baseline, early event extension, late event extension, contraction when events end early, all-day events ignored
-  - `LanesByCalendar` tests: single calendar/event LeftPct/WidthPct calculation, two calendars → two lanes, empty lane Empty=true, all-day events excluded, overnight event clipping, DST spring-forward, LeftPct+WidthPct<=100
-- Files changed:
-  - `internal/services/agenda_strip_test.go` (new file)
+## 2026-03-06, 10:00 - US-013 - Add ArchiveOldBookings repository method
+- Added `ArchiveOldBookings(ctx, cutoffTime)` method to `BookingRepository`
+- Archives all unarchived bookings where `end_time < cutoffTime` across all tenants
+- Returns count of affected rows
+- Uses `q()` helper for SQLite/Postgres compatibility
+- Files changed: `internal/repository/repository.go`
 - **Learnings for future iterations:**
-  - `winStart` only extends BELOW the 09:00 baseline when an event starts BEFORE 08:30 (i.e., start - 30min < 09:00). Events starting after 08:30 don't push the start before 09:00.
-  - An overnight event's start (22:00) does NOT push winStart below 09:00 (22:00 - 30min = 21:30 > 09:00), so the window for overnight events spans 09:00-dayEnd.
-  - LeftPct+WidthPct clamp is applied AFTER percentage calculation, not before — calculate then clamp.
-
+  - BookingRepository methods follow a consistent pattern: `q(r.driver, query)` + `r.db.ExecContext`/`QueryContext`
+  - New repo methods go between existing BookingRepository methods and SessionRepository (line ~1028)
+  - The `is_archived` boolean field on bookings is used for soft-archive (not delete)
 ----
 
-## 2026-04-24 - US-011 (visual-agenda-pr1) - Add calendar color CSS custom properties
+## 2026-03-06 - US-014 - Add Archive all past button to bookings dashboard
 - What was implemented:
-  - Added 9 `--cal-*` CSS custom properties to `:root` in `static/css/style.css`
-  - Added `.calendar-dot` (8px circle) and `.calendar-legend` (flex wrap list) component classes
+  - Added ArchiveOldBookingsByHostID repository method (host-scoped version of ArchiveOldBookings)
+  - Added BulkArchivePastBookings service method calling repo with time.Now() cutoff
+  - Added BulkArchivePastBookings dashboard handler with HTMX support
+  - Registered route: POST /dashboard/bookings/archive-all-past
+  - Updated dashboard_bookings.html with Archive all past button and JS confirmation
+  - Added PastArchivableCount to handler data (counts non-archived bookings with end_time in the past)
 - Files changed:
-  - `static/css/style.css`
-
-----
-
-## 2026-04-24 - US-012 (visual-agenda-pr1) - Add strip visualization and event row CSS
-- What was implemented:
-  - Added `.strip-container`, `.strip-lane`, `.strip-lane--empty`, `.strip-block`, `.strip-header`, `.event-row` classes
-  - Added `.color-swatches`, `.color-swatch`, `.swatch-circle`, `.swatch-name` classes
-- Files changed:
-  - `static/css/style.css`
-
-----
-
-## 2026-04-24 - US-013 (visual-agenda-pr1) - Create color swatch fieldset partial template
-- What was implemented:
-  - Created `templates/partials/color_swatch_fieldset.html` using `{{define "color_swatch_fieldset.html"}}`
-  - Renders HTMX form posting to `/dashboard/calendars/CalendarID/color` with `hx-swap="outerHTML"`
-  - 9 label.color-swatch elements with radio inputs, `.swatch-circle`, and `.swatch-name` spans
-  - Checked state on radio matching CurrentColor; `onchange` auto-submit via `requestSubmit()`
-- Files changed:
-  - `templates/partials/color_swatch_fieldset.html` (new file)
-
-----
-
-## 2026-04-24 - US-014 (visual-agenda-pr1) - Add POST color picker route and handler
-- What was implemented:
-  - Added `UpdateCalendarColor` handler to `internal/handlers/dashboard.go`
-  - Validates submitted color is in `services.CalendarPalette`; returns 400 for arbitrary hex
-  - Calls `h.handlers.repos.Calendar.UpdateColor` with tenant isolation (host.ID)
-  - Returns `color_swatch_fieldset.html` partial with updated color via `renderPartial`
-  - Registered `POST /dashboard/calendars/{id}/color` in `cmd/server/main.go`
-  - Added `paletteData` package-level var with `{Hex, Name}` maps for the 9 palette entries
-- Files changed:
-  - `internal/handlers/dashboard.go`
-  - `cmd/server/main.go`
-
-----
-
-## 2026-04-24 - US-018 (visual-agenda-pr1) - Wire Agenda handler to AgendaService
-- What was implemented:
-  - Updated `Agenda` handler to call `AgendaService.GetDay` for the today branch
-  - Added Calendars, Lanes, WindowStart, WindowEnd to Data map
-  - Updated `dashboard_agenda.html` today section to use legend + strip + detail partials
-  - Week view left unchanged
-
-----
-
-## 2026-04-24 - US-019 (visual-agenda-pr1) - Add GET day-detail HTMX partial endpoint
-- What was implemented:
-  - Added `AgendaDayPartial` handler: parses optional `date` query param, calls `AgendaService.GetDay`, returns `day_detail.html` partial
-  - Registered `GET /dashboard/agenda/day-detail` route
-- Files changed:
-  - `internal/handlers/dashboard.go`
-  - `cmd/server/main.go`
-
-----
-
-## 2026-04-24 - US-014b (visual-agenda-pr1) - Add color picker UI to calendar settings page
-- What was implemented:
-  - Updated `Calendars` handler to call `AssignColors` before rendering and pass `Palette` in Data map
-  - Added `dict` template function to `templateFuncs()` in `handlers.go` for building maps inside templates
-  - Added `{{template "color_swatch_fieldset.html" (dict ...)}}` call inside the calendars range loop
-- Files changed:
-  - `internal/handlers/dashboard.go`
-  - `internal/handlers/handlers.go`
-  - `templates/pages/dashboard_calendars.html`
+  - internal/repository/repository.go - Added ArchiveOldBookingsByHostID method
+  - internal/services/booking.go - Added BulkArchivePastBookings method
+  - internal/handlers/dashboard.go - Added handler + PastArchivableCount calculation
+  - cmd/server/main.go - Added route
+  - templates/pages/dashboard_bookings.html - Added button and JS function
 - **Learnings for future iterations:**
-  - `dict` template func takes variadic key-value pairs: `(dict "Key1" val1 "Key2" val2)` → `map[string]interface{}`
-  - Inside a `range` loop, `.` is the loop value, so `$.Data.Palette` is needed to access outer scope data
+  - ArchiveOldBookings (US-013) is cross-tenant for background jobs; dashboard buttons need host-scoped variants
+  - SQLiteTime embeds time.Time, access via .Time field (not type conversion)
+  - Existing Archive all button only archives cancelled/rejected; Archive all past archives any past booking
+----
 
+## 2026-03-06, 11:00 - US-015 - Add automatic archival background worker
+- What was implemented:
+  - Background goroutine in cmd/server/main.go that runs on a 24-hour ticker
+  - Calls `repos.Booking.ArchiveOldBookings()` with `now - 14 days` as cutoff
+  - Logs count of archived bookings per run (only when count > 0)
+  - Graceful shutdown via context cancellation when app receives SIGINT/SIGTERM
+- Files changed:
+  - `cmd/server/main.go` - Added auto-archive goroutine with ticker, context cancellation on shutdown
+- **Learnings for future iterations:**
+  - The codebase already has background services (Reminder, CalendarSync) with Start/Stop patterns, but those are full service structs; a simple goroutine+ticker is sufficient for periodic tasks
+  - `ArchiveOldBookings` is the cross-tenant version (from US-013), perfect for background jobs; `ArchiveOldBookingsByHostID` is the host-scoped version for dashboard buttons
+  - Context cancellation is wired before server.Shutdown so the worker stops before the server fully shuts down
+----
+
+## 2026-03-06, 11:30 - US-016 - Create contacts table and model
+- What was implemented:
+  - Migration 011_add_contacts.up.sql for both Postgres and SQLite
+  - Postgres version uses UUID PK, TIMESTAMP WITH TIME ZONE, VARCHAR types
+  - SQLite version uses TEXT PK, TEXT timestamps with strftime default, TEXT types
+  - Both have UNIQUE(tenant_id, email) constraint and indexes on tenant_id and email
+  - Contact model struct in internal/models/models.go with all fields matching the schema
+  - Phone, Timezone, FirstMet, LastMet are nullable (pointer types)
+- Files changed:
+  - `migrations/011_add_contacts.up.sql` - Postgres contacts table
+  - `migrations/sqlite/011_add_contacts.up.sql` - SQLite contacts table
+  - `internal/models/models.go` - Added Contact struct
+- **Learnings for future iterations:**
+  - Migrations must be created in both `migrations/` (Postgres) and `migrations/sqlite/` directories
+  - Postgres uses UUID, TIMESTAMP WITH TIME ZONE, VARCHAR; SQLite uses TEXT for everything with strftime defaults
+  - Nullable time fields use *SQLiteTime (pointer) in the model struct
+----
+
+## 2026-03-06 - US-017 - Create contact repository with Upsert and List methods
+- Implemented ContactRepository with Upsert, List, GetByEmail, and GetBookings methods
+- Upsert uses ON CONFLICT (tenant_id, email) DO UPDATE for atomic create/update
+- List supports optional search filter (LIKE for SQLite, ILIKE for Postgres), offset, limit, sorted by last_met DESC
+- GetBookings joins bookings with hosts table to filter by tenant_id and invitee_email
+- Files changed:
+  - `internal/repository/contact.go` - New file with all 4 repository methods
+  - `internal/repository/repository.go` - Added Contact field to Repositories struct and NewRepositories
+- **Learnings for future iterations:**
+  - Search queries with LIKE vs ILIKE need driver-specific SQL (can't use q() helper for this)
+  - Use `any` instead of `interface{}` to satisfy the modernize linter
+  - GetBookings needs to join through hosts table to get tenant_id since bookings only have host_id
+----
+
+## 2026-03-06 - US-018 - Create contact service and hook into booking confirmation
+- Created `internal/services/contact.go` with ContactService: UpsertFromBooking, BackfillFromBookings, ListContacts, GetByEmail, GetBookings, HasContacts, EnsureBackfilled
+- Added `ListConfirmedByTenant` method to BookingRepository for backfill support
+- Wired ContactService into BookingService via constructor injection
+- Hooked `UpsertFromBooking` into `processConfirmedBooking` -- runs after confirmation emails, errors logged but don't block booking flow
+- Files changed: internal/services/contact.go (new), internal/services/booking.go, internal/services/services.go, internal/repository/repository.go
+- **Learnings for future iterations:**
+  - BookingService uses constructor injection for all dependencies -- add new services as constructor params, not as fields set later
+  - `processConfirmedBooking` is the single hook point for both auto-approved (CreateBooking) and manually approved (ApproveBooking) bookings
+  - Bookings don't have tenant_id directly -- join through hosts table to get tenant scope
+  - Contact upsert uses ON CONFLICT with separate SQLite/Postgres query paths (driver-specific syntax for EXCLUDED vs excluded and timestamp casting)
+  - BackfillFromBookings and EnsureBackfilled are ready for US-021 (backfill contacts from existing bookings)
+----
+
+## 2026-03-06 - US-019 - Add contacts list page to dashboard
+- Created `templates/pages/dashboard_contacts.html` with search input and contacts table
+- Created `templates/partials/contacts_table_partial.html` for HTMX search responses
+- Added `Contacts` handler in `internal/handlers/dashboard.go` with HTMX partial support
+- Added "Contacts" nav link in `templates/layouts/dashboard.html` (between Calendars and Settings)
+- Registered `GET /dashboard/contacts` route in `cmd/server/main.go`
+- Calls `EnsureBackfilled` on page load to auto-populate contacts from existing bookings
+- Files changed: internal/handlers/dashboard.go, cmd/server/main.go, templates/layouts/dashboard.html, templates/pages/dashboard_contacts.html (new), templates/partials/contacts_table_partial.html (new)
+- **Learnings for future iterations:**
+  - CSS uses `.table` and `.table-container` classes (not `data-table`) and `.form-input` (not `form-control`)
+  - HTMX partials are loaded separately via `loadTemplates()` -- just put them in templates/partials/ and they auto-register
+  - `renderPartial` is used for HTMX fragment responses; check `HX-Request` header to decide full page vs partial
+  - `timeAgo` template func accepts `*SQLiteTime` via the `toTime` helper
+  - `ActiveNav` field in PageData controls which sidebar link is highlighted
+----
+
+## 2026-03-06 - US-020 - Add contact meeting history drill-down
+- Clicking a contact row expands inline to show booking history (date, template name, status, duration)
+- Added `ContactBookingView` struct in `internal/models/models.go` pairing Booking with TemplateName
+- Modified `GetBookings` in `internal/repository/contact.go` to LEFT JOIN meeting_templates and return `ContactBookingView`
+- Updated `ContactService.GetBookings` return type in `internal/services/contact.go`
+- Added `ContactBookings` handler in `internal/handlers/dashboard.go` for HTMX partial endpoint
+- Registered `GET /dashboard/contacts/{email}/bookings` route in `cmd/server/main.go`
+- Created `templates/partials/contact_bookings_partial.html` for inline booking history table
+- Updated `templates/partials/contacts_table_partial.html` with expandable rows (HTMX hx-get + CSS toggle)
+- Added `urlEncode` template function in `internal/handlers/handlers.go` using `url.PathEscape`
+- Files changed: internal/models/models.go, internal/repository/contact.go, internal/services/contact.go, internal/handlers/dashboard.go, internal/handlers/handlers.go, cmd/server/main.go, templates/partials/contacts_table_partial.html, templates/partials/contact_bookings_partial.html (new)
+- **Learnings for future iterations:**
+  - HTMX `hx-trigger="click once"` prevents re-fetching on subsequent clicks (toggle is CSS-only via class)
+  - `hx-target="next .classname"` targets the next sibling with that class - useful for expand/collapse patterns
+  - Contact repo's `GetBookings` now returns `ContactBookingView` (breaking change from `[]*models.Booking`)
+  - Emails in URL paths need `url.PathEscape` encoding; added `urlEncode` template func for this
+----
+
+## 2026-03-06 - US-021 - Backfill contacts from existing bookings
+- Feature was already fully implemented in prior iterations (during US-017/US-018/US-019 work)
+- `ContactService.BackfillFromBookings()` processes all confirmed bookings via `ListConfirmedByTenant` and upserts contacts
+- `ContactService.EnsureBackfilled()` checks if contacts exist for tenant, triggers backfill if empty
+- Called from `DashboardHandler.Contacts()` on first access to contacts page (dashboard.go:1364)
+- Idempotent: uses ON CONFLICT upsert, safe to run multiple times
+- No code changes needed — only marked as passing in prd.json
+- Files changed: plans/prd.json
+- **Learnings for future iterations:**
+  - When features are built as part of earlier stories, check all acceptance criteria before assuming more work is needed
+  - The contact backfill pattern (check-then-populate on first access) is a lazy initialization approach
 ----

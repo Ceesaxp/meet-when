@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -499,6 +500,19 @@ func (h *PublicHandler) DownloadICS(w http.ResponseWriter, r *http.Request) {
 	if _, err := w.Write([]byte(ics)); err != nil {
 		log.Printf("Error writing ICS response: %v", err)
 	}
+}
+
+// RescheduleByID redirects from the public /m/.../{booking_id} URL to the token-based reschedule page
+func (h *PublicHandler) RescheduleByID(w http.ResponseWriter, r *http.Request) {
+	bookingID := r.PathValue("booking_id")
+
+	booking, err := h.handlers.repos.Booking.GetByID(r.Context(), bookingID)
+	if err != nil || booking == nil {
+		h.handlers.error(w, r, http.StatusNotFound, "Booking not found")
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/booking/%s/reschedule", booking.Token), http.StatusFound)
 }
 
 // ReschedulePage shows the reschedule page

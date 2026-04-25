@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -87,27 +88,57 @@ func MethodOverride(next http.Handler) http.Handler {
 	})
 }
 
-// RequireAuth ensures the user is authenticated
+// isAPIRequest returns true if the request targets the JSON API (Bearer token auth).
+func isAPIRequest(r *http.Request) bool {
+	return strings.HasPrefix(r.URL.Path, "/api/")
+}
+
+// ExtractSessionToken gets the session token from Bearer header or cookie.
+// Returns the token and whether it came from a Bearer header.
+func ExtractSessionToken(r *http.Request) (string, bool) {
+	if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
+		return strings.TrimPrefix(auth, "Bearer "), true
+	}
+	if cookie, err := r.Cookie("session"); err == nil {
+		return cookie.Value, false
+	}
+	return "", false
+}
+
+// RequireAuth ensures the user is authenticated.
+// Supports both cookie-based sessions (browser) and Bearer token (API clients).
 func RequireAuth(sessionService *services.SessionService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			cookie, err := r.Cookie("session")
-			if err != nil {
-				http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+			token, isBearer := ExtractSessionToken(r)
+			apiReq := isAPIRequest(r)
+
+			if token == "" {
+				if apiReq {
+					http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				} else {
+					http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+				}
 				return
 			}
 
-			host, err := sessionService.ValidateSession(r.Context(), cookie.Value)
+			host, err := sessionService.ValidateSession(r.Context(), token)
 			if err != nil {
-				// Clear invalid cookie
-				http.SetCookie(w, &http.Cookie{
-					Name:     "session",
-					Value:    "",
-					Path:     "/",
-					MaxAge:   -1,
-					HttpOnly: true,
-				})
-				http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+				if apiReq {
+					http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				} else {
+					// Clear invalid cookie (only relevant for cookie auth)
+					if !isBearer {
+						http.SetCookie(w, &http.Cookie{
+							Name:     "session",
+							Value:    "",
+							Path:     "/",
+							MaxAge:   -1,
+							HttpOnly: true,
+						})
+					}
+					http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+				}
 				return
 			}
 

@@ -101,7 +101,7 @@ All configuration is via environment variables:
 |----------|---------|-------------|
 | `APP_ENV` | `development` | Environment (`development` or `production`) |
 | `MAX_SCHEDULING_DAYS` | `90` | How far ahead guests can book |
-| `SESSION_DURATION_HOURS` | `24` | Session cookie lifetime |
+| `SESSION_DURATION_HOURS` | `168` | Session cookie lifetime (hours) |
 | `DEFAULT_TIMEZONE` | `UTC` | Default timezone for new users |
 | `ENCRYPTION_KEY` | | 32-byte key for encrypting OAuth tokens (required in production) |
 

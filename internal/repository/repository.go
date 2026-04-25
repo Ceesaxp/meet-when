@@ -25,6 +25,7 @@ type Repositories struct {
 	SignupConversion     *SignupConversionRepository
 	TemplateHost         *TemplateHostRepository
 	BookingCalendarEvent *BookingCalendarEventRepository
+	Contact              *ContactRepository
 }
 
 // NewRepositories creates all repositories
@@ -42,6 +43,7 @@ func NewRepositories(db *sql.DB, driver string) *Repositories {
 		SignupConversion:     &SignupConversionRepository{db: db, driver: driver},
 		TemplateHost:         &TemplateHostRepository{db: db, driver: driver},
 		BookingCalendarEvent: &BookingCalendarEventRepository{db: db, driver: driver},
+		Contact:              &ContactRepository{db: db, driver: driver},
 	}
 }
 
@@ -115,13 +117,13 @@ type HostRepository struct {
 
 func (r *HostRepository) Create(ctx context.Context, host *models.Host) error {
 	query := q(r.driver, `
-		INSERT INTO hosts (id, tenant_id, email, password_hash, name, slug, timezone, is_admin, onboarding_completed, google_id, google_email, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		INSERT INTO hosts (id, tenant_id, email, password_hash, name, slug, timezone, is_admin, onboarding_completed, google_id, google_email, smart_durations, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	`)
 	_, err := r.db.ExecContext(ctx, query,
 		host.ID, host.TenantID, host.Email, host.PasswordHash, host.Name,
 		host.Slug, host.Timezone, host.IsAdmin, host.OnboardingCompleted,
-		host.GoogleID, host.GoogleEmail, host.CreatedAt, host.UpdatedAt)
+		host.GoogleID, host.GoogleEmail, host.SmartDurations, host.CreatedAt, host.UpdatedAt)
 	return err
 }
 
@@ -130,14 +132,14 @@ func (r *HostRepository) GetByID(ctx context.Context, id string) (*models.Host, 
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
 		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false),
-		       google_id, google_email, created_at, updated_at
+		       google_id, google_email, COALESCE(smart_durations, false), created_at, updated_at
 		FROM hosts WHERE id = $1
 	`)
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
 		&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
 		&host.OnboardingCompleted, &host.GoogleID, &host.GoogleEmail,
-		&host.CreatedAt, &host.UpdatedAt)
+		&host.SmartDurations, &host.CreatedAt, &host.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -149,14 +151,14 @@ func (r *HostRepository) GetByEmail(ctx context.Context, tenantID, email string)
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
 		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false),
-		       google_id, google_email, created_at, updated_at
+		       google_id, google_email, COALESCE(smart_durations, false), created_at, updated_at
 		FROM hosts WHERE tenant_id = $1 AND email = $2
 	`)
 	err := r.db.QueryRowContext(ctx, query, tenantID, email).Scan(
 		&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
 		&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
 		&host.OnboardingCompleted, &host.GoogleID, &host.GoogleEmail,
-		&host.CreatedAt, &host.UpdatedAt)
+		&host.SmartDurations, &host.CreatedAt, &host.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -170,7 +172,7 @@ func (r *HostRepository) GetAllByEmail(ctx context.Context, email string) ([]*mo
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
 		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false),
-		       google_id, google_email, created_at, updated_at
+		       google_id, google_email, COALESCE(smart_durations, false), created_at, updated_at
 		FROM hosts WHERE email = $1
 	`)
 	rows, err := r.db.QueryContext(ctx, query, email)
@@ -186,7 +188,7 @@ func (r *HostRepository) GetAllByEmail(ctx context.Context, email string) ([]*mo
 			&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
 			&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
 			&host.OnboardingCompleted, &host.GoogleID, &host.GoogleEmail,
-			&host.CreatedAt, &host.UpdatedAt)
+			&host.SmartDurations, &host.CreatedAt, &host.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -210,14 +212,14 @@ func (r *HostRepository) GetBySlug(ctx context.Context, tenantID, slug string) (
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
 		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false),
-		       google_id, google_email, created_at, updated_at
+		       google_id, google_email, COALESCE(smart_durations, false), created_at, updated_at
 		FROM hosts WHERE tenant_id = $1 AND slug = $2
 	`)
 	err := r.db.QueryRowContext(ctx, query, tenantID, slug).Scan(
 		&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
 		&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
 		&host.OnboardingCompleted, &host.GoogleID, &host.GoogleEmail,
-		&host.CreatedAt, &host.UpdatedAt)
+		&host.SmartDurations, &host.CreatedAt, &host.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -227,11 +229,11 @@ func (r *HostRepository) GetBySlug(ctx context.Context, tenantID, slug string) (
 func (r *HostRepository) Update(ctx context.Context, host *models.Host) error {
 	query := q(r.driver, `
 		UPDATE hosts
-		SET name = $1, slug = $2, timezone = $3, default_calendar_id = $4
-		WHERE id = $5
+		SET name = $1, slug = $2, timezone = $3, default_calendar_id = $4, smart_durations = $5
+		WHERE id = $6
 	`)
 	_, err := r.db.ExecContext(ctx, query,
-		host.Name, host.Slug, host.Timezone, host.DefaultCalendarID, host.ID)
+		host.Name, host.Slug, host.Timezone, host.DefaultCalendarID, host.SmartDurations, host.ID)
 	return err
 }
 
@@ -252,7 +254,7 @@ func (r *HostRepository) GetByTenantID(ctx context.Context, tenantID string) ([]
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
 		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false),
-		       google_id, google_email, created_at, updated_at
+		       google_id, google_email, COALESCE(smart_durations, false), created_at, updated_at
 		FROM hosts WHERE tenant_id = $1
 		ORDER BY name ASC
 	`)
@@ -269,7 +271,7 @@ func (r *HostRepository) GetByTenantID(ctx context.Context, tenantID string) ([]
 			&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
 			&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
 			&host.OnboardingCompleted, &host.GoogleID, &host.GoogleEmail,
-			&host.CreatedAt, &host.UpdatedAt)
+			&host.SmartDurations, &host.CreatedAt, &host.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -289,7 +291,7 @@ func (r *HostRepository) GetByGoogleID(ctx context.Context, googleID string) ([]
 	query := q(r.driver, `
 		SELECT id, tenant_id, email, password_hash, name, slug, timezone,
 		       default_calendar_id, is_admin, COALESCE(onboarding_completed, false),
-		       google_id, google_email, created_at, updated_at
+		       google_id, google_email, COALESCE(smart_durations, false), created_at, updated_at
 		FROM hosts WHERE google_id = $1
 	`)
 	rows, err := r.db.QueryContext(ctx, query, googleID)
@@ -305,7 +307,7 @@ func (r *HostRepository) GetByGoogleID(ctx context.Context, googleID string) ([]
 			&host.ID, &host.TenantID, &host.Email, &host.PasswordHash, &host.Name,
 			&host.Slug, &host.Timezone, &host.DefaultCalendarID, &host.IsAdmin,
 			&host.OnboardingCompleted, &host.GoogleID, &host.GoogleEmail,
-			&host.CreatedAt, &host.UpdatedAt)
+			&host.SmartDurations, &host.CreatedAt, &host.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -933,13 +935,15 @@ func (r *BookingRepository) Update(ctx context.Context, booking *models.Booking)
 	query := q(r.driver, `
 		UPDATE bookings
 		SET status = $1, conference_link = $2, calendar_event_id = $3,
-		    cancelled_by = $4, cancel_reason = $5, reminder_sent = $6, is_archived = $7
-		WHERE id = $8
+		    cancelled_by = $4, cancel_reason = $5, reminder_sent = $6, is_archived = $7,
+		    start_time = $8, end_time = $9, duration = $10, updated_at = $11
+		WHERE id = $12
 	`)
 	_, err := r.db.ExecContext(ctx, query,
 		booking.Status, booking.ConferenceLink, booking.CalendarEventID,
 		booking.CancelledBy, booking.CancelReason, booking.ReminderSent,
-		booking.IsArchived, booking.ID)
+		booking.IsArchived, booking.StartTime, booking.EndTime, booking.Duration,
+		booking.UpdatedAt, booking.ID)
 	return err
 }
 
@@ -1044,6 +1048,93 @@ func (r *BookingRepository) GetBookingCountsByHostID(ctx context.Context, hostID
 	}
 
 	return counts, nil
+}
+
+// ArchiveOldBookings archives all unarchived bookings where end_time is before cutoffTime.
+// Returns the number of bookings archived.
+func (r *BookingRepository) ArchiveOldBookings(ctx context.Context, cutoffTime time.Time) (int, error) {
+	query := q(r.driver, `
+		UPDATE bookings
+		SET is_archived = true
+		WHERE (is_archived = false OR is_archived IS NULL)
+		  AND end_time < $1
+	`)
+	result, err := r.db.ExecContext(ctx, query, cutoffTime)
+	if err != nil {
+		return 0, err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return int(count), nil
+}
+
+// ArchiveOldBookingsByHostID archives all unarchived bookings for a specific host where end_time is before cutoffTime.
+// Returns the number of bookings archived.
+func (r *BookingRepository) ArchiveOldBookingsByHostID(ctx context.Context, hostID string, cutoffTime time.Time) (int, error) {
+	query := q(r.driver, `
+		UPDATE bookings
+		SET is_archived = true
+		WHERE (is_archived = false OR is_archived IS NULL)
+		  AND host_id = $1
+		  AND end_time < $2
+	`)
+	result, err := r.db.ExecContext(ctx, query, hostID, cutoffTime)
+	if err != nil {
+		return 0, err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return int(count), nil
+}
+
+// ListConfirmedByTenant returns all confirmed bookings for a tenant (via host join)
+func (r *BookingRepository) ListConfirmedByTenant(ctx context.Context, tenantID string) ([]*models.Booking, error) {
+	query := q(r.driver, `
+		SELECT b.id, b.template_id, b.host_id, b.token, b.status, b.start_time, b.end_time, b.duration,
+		       b.invitee_name, b.invitee_email, COALESCE(b.invitee_timezone, ''), COALESCE(b.invitee_phone, ''),
+		       b.additional_guests, b.answers, COALESCE(b.conference_link, ''), COALESCE(b.calendar_event_id, ''),
+		       COALESCE(b.cancelled_by, ''), COALESCE(b.cancel_reason, ''), COALESCE(b.reminder_sent, false),
+		       COALESCE(b.is_archived, false), b.created_at, b.updated_at
+		FROM bookings b
+		JOIN hosts h ON b.host_id = h.id
+		WHERE h.tenant_id = $1 AND b.status = 'confirmed'
+		ORDER BY b.start_time ASC
+	`)
+
+	rows, err := r.db.QueryContext(ctx, query, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error closing rows: %v", err)
+		}
+	}()
+
+	var bookings []*models.Booking
+	for rows.Next() {
+		booking := &models.Booking{}
+		err := rows.Scan(
+			&booking.ID, &booking.TemplateID, &booking.HostID, &booking.Token,
+			&booking.Status, &booking.StartTime, &booking.EndTime, &booking.Duration,
+			&booking.InviteeName, &booking.InviteeEmail, &booking.InviteeTimezone,
+			&booking.InviteePhone, &booking.AdditionalGuests, &booking.Answers,
+			&booking.ConferenceLink, &booking.CalendarEventID,
+			&booking.CancelledBy, &booking.CancelReason, &booking.ReminderSent,
+			&booking.IsArchived, &booking.CreatedAt, &booking.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		bookings = append(bookings, booking)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return bookings, nil
 }
 
 // SessionRepository handles session database operations
@@ -1376,7 +1467,7 @@ func (r *TemplateHostRepository) GetByTemplateIDWithHost(ctx context.Context, te
 		       th.created_at, th.updated_at,
 		       h.id, h.tenant_id, h.email, h.name, h.slug, h.timezone,
 		       h.default_calendar_id, h.is_admin, COALESCE(h.onboarding_completed, false),
-		       h.created_at, h.updated_at
+		       COALESCE(h.smart_durations, false), h.created_at, h.updated_at
 		FROM template_hosts th
 		JOIN hosts h ON th.host_id = h.id
 		WHERE th.template_id = $1
@@ -1397,7 +1488,7 @@ func (r *TemplateHostRepository) GetByTemplateIDWithHost(ctx context.Context, te
 			&th.DisplayOrder, &th.CreatedAt, &th.UpdatedAt,
 			&h.ID, &h.TenantID, &h.Email, &h.Name, &h.Slug, &h.Timezone,
 			&h.DefaultCalendarID, &h.IsAdmin, &h.OnboardingCompleted,
-			&h.CreatedAt, &h.UpdatedAt)
+			&h.SmartDurations, &h.CreatedAt, &h.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}

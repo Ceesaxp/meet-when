@@ -732,7 +732,7 @@ func (s *AuthService) HandleGoogleCallback(code, state, expectedNonce string) (*
 	nonce := parts[2]
 
 	// Validate flow
-	if flow != "signup" && flow != "login" {
+	if flow != "signup" && flow != "login" && flow != "native" {
 		return nil, "", ErrInvalidOAuthState
 	}
 

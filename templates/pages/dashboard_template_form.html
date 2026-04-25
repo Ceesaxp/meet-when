@@ -75,6 +75,15 @@
                 90 min
             </label>
         </div>
+
+        <div id="custom-durations"></div>
+
+        <div class="custom-duration-row">
+            <input type="number" id="custom-duration-input" class="form-input custom-duration-input"
+                   min="5" max="480" step="1" placeholder="Custom (5-480 min)">
+            <button type="button" id="add-custom-duration" class="btn btn-secondary btn-sm">Add</button>
+            <span id="custom-duration-error" class="field-error" style="display:none;"></span>
+        </div>
     </section>
 
     <section class="section">
@@ -407,6 +416,67 @@ document.querySelectorAll('#duration-chips .duration-chip input').forEach(functi
         this.closest('.duration-chip').classList.toggle('selected', this.checked);
     });
 });
+
+// Custom duration handling
+var presetValues = [15, 30, 45, 60, 90];
+var customDurationsContainer = document.getElementById('custom-durations');
+var customInput = document.getElementById('custom-duration-input');
+var addBtn = document.getElementById('add-custom-duration');
+var errorSpan = document.getElementById('custom-duration-error');
+
+function addCustomDuration(val) {
+    var chip = document.createElement('label');
+    chip.className = 'duration-chip selected';
+    chip.innerHTML = '<input type="checkbox" name="durations" value="' + val + '" checked>' + val + ' min <span class="custom-duration-remove" title="Remove">&times;</span>';
+    chip.querySelector('.custom-duration-remove').addEventListener('click', function(e) {
+        e.preventDefault();
+        chip.remove();
+    });
+    customDurationsContainer.appendChild(chip);
+}
+
+addBtn.addEventListener('click', function() {
+    var val = parseInt(customInput.value, 10);
+    errorSpan.style.display = 'none';
+    if (!customInput.value || isNaN(val)) {
+        errorSpan.textContent = 'Enter a number between 5 and 480';
+        errorSpan.style.display = 'inline';
+        return;
+    }
+    if (val < 5 || val > 480) {
+        errorSpan.textContent = 'Duration must be between 5 and 480 minutes';
+        errorSpan.style.display = 'inline';
+        return;
+    }
+    // Check if matches a preset chip
+    if (presetValues.indexOf(val) !== -1) {
+        var presetInput = document.querySelector('#duration-chips input[value="' + val + '"]');
+        if (presetInput && !presetInput.checked) {
+            presetInput.checked = true;
+            presetInput.closest('.duration-chip').classList.add('selected');
+        }
+        customInput.value = '';
+        return;
+    }
+    // Check for duplicate custom
+    var existing = customDurationsContainer.querySelectorAll('input[name="durations"]');
+    for (var i = 0; i < existing.length; i++) {
+        if (parseInt(existing[i].value, 10) === val) {
+            customInput.value = '';
+            return;
+        }
+    }
+    addCustomDuration(val);
+    customInput.value = '';
+});
+
+customInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); addBtn.click(); }
+});
+
+// On edit: render existing non-preset durations as custom chips
+{{if .Data.Template}}{{range .Data.Template.Durations}}if (presetValues.indexOf({{.}}) === -1) { addCustomDuration({{.}}); }
+{{end}}{{end}}
 
 // Radio card selection (location)
 document.querySelectorAll('#location-cards .radio-card input').forEach(function(input) {

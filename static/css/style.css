@@ -3270,6 +3270,32 @@ body.modal-open {
     display: none;
 }
 
+.custom-duration-remove {
+    margin-left: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 16px;
+    line-height: 1;
+}
+
+.custom-duration-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.custom-duration-input {
+    width: 180px;
+}
+
+#custom-durations {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
 /* Radio cards for location selection */
 .radio-cards {
     display: grid;

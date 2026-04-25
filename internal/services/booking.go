@@ -20,6 +20,21 @@ var (
 	ErrBookingCancelled   = errors.New("booking has already been cancelled")
 )
 
+// calculateSmartDuration adjusts a meeting duration to end early, giving buffer time.
+// Durations <= 30 min subtract 5 min; durations > 30 min subtract 10 min.
+// Minimum resulting duration is 5 minutes.
+func calculateSmartDuration(duration int) int {
+	if duration <= 30 {
+		duration -= 5
+	} else {
+		duration -= 10
+	}
+	if duration < 5 {
+		duration = 5
+	}
+	return duration
+}
+
 // BookingService handles booking operations
 type BookingService struct {
 	cfg          *config.Config
@@ -28,6 +43,7 @@ type BookingService struct {
 	conferencing *ConferencingService
 	email        *EmailService
 	auditLog     *AuditLogService
+	contact      *ContactService
 }
 
 // NewBookingService creates a new booking service
@@ -38,6 +54,7 @@ func NewBookingService(
 	conferencing *ConferencingService,
 	email *EmailService,
 	auditLog *AuditLogService,
+	contact *ContactService,
 ) *BookingService {
 	return &BookingService{
 		cfg:          cfg,
@@ -46,6 +63,7 @@ func NewBookingService(
 		conferencing: conferencing,
 		email:        email,
 		auditLog:     auditLog,
+		contact:      contact,
 	}
 }
 
@@ -92,8 +110,16 @@ func (s *BookingService) CreateBooking(ctx context.Context, input CreateBookingI
 		input.Duration = template.Durations[0]
 	}
 
-	// Calculate end time
-	endTime := input.StartTime.Add(time.Duration(input.Duration) * time.Minute)
+	// Get host and tenant
+	host, _ := s.repos.Host.GetByID(ctx, input.HostID)
+	tenant, _ := s.repos.Tenant.GetByID(ctx, input.TenantID)
+
+	// Calculate end time (apply smart duration if enabled)
+	actualDuration := input.Duration
+	if host != nil && host.SmartDurations {
+		actualDuration = calculateSmartDuration(input.Duration)
+	}
+	endTime := input.StartTime.Add(time.Duration(actualDuration) * time.Minute)
 
 	// Validate time is in the future with minimum notice
 	minNotice := time.Duration(template.MinNoticeMinutes) * time.Minute
@@ -139,10 +165,6 @@ func (s *BookingService) CreateBooking(ctx context.Context, input CreateBookingI
 	if err := s.repos.Booking.Create(ctx, booking); err != nil {
 		return nil, err
 	}
-
-	// Get host and tenant for emails
-	host, _ := s.repos.Host.GetByID(ctx, input.HostID)
-	tenant, _ := s.repos.Tenant.GetByID(ctx, input.TenantID)
 
 	details := &BookingWithDetails{
 		Booking:  booking,
@@ -414,8 +436,19 @@ func (s *BookingService) RescheduleBooking(ctx context.Context, input Reschedule
 		input.NewDuration = template.Durations[0]
 	}
 
-	// Calculate new end time
-	newEndTime := input.NewStartTime.Add(time.Duration(input.NewDuration) * time.Minute)
+	// Get host and tenant
+	host, _ := s.repos.Host.GetByID(ctx, oldBooking.HostID)
+	if host == nil {
+		return nil, time.Time{}, fmt.Errorf("host not found: %s", oldBooking.HostID)
+	}
+	tenant, _ := s.repos.Tenant.GetByID(ctx, host.TenantID)
+
+	// Calculate new end time (apply smart duration if enabled)
+	actualDuration := input.NewDuration
+	if host.SmartDurations {
+		actualDuration = calculateSmartDuration(input.NewDuration)
+	}
+	newEndTime := input.NewStartTime.Add(time.Duration(actualDuration) * time.Minute)
 
 	// Validate time is in the future with minimum notice
 	minNotice := time.Duration(template.MinNoticeMinutes) * time.Minute
@@ -437,10 +470,6 @@ func (s *BookingService) RescheduleBooking(ctx context.Context, input Reschedule
 	if err := s.repos.Booking.Update(ctx, oldBooking); err != nil {
 		return nil, time.Time{}, err
 	}
-
-	// Get host and tenant
-	host, _ := s.repos.Host.GetByID(ctx, oldBooking.HostID)
-	tenant, _ := s.repos.Tenant.GetByID(ctx, host.TenantID)
 
 	details := &BookingWithDetails{
 		Booking:  oldBooking,
@@ -501,16 +530,17 @@ func (s *BookingService) GetBookingCountsByHostID(ctx context.Context, hostID st
 	return s.repos.Booking.GetBookingCountsByHostID(ctx, hostID)
 }
 
-// ArchiveBooking archives a cancelled or rejected booking
+// ArchiveBooking archives a past booking regardless of status
 func (s *BookingService) ArchiveBooking(ctx context.Context, hostID, tenantID, bookingID string) error {
 	booking, err := s.repos.Booking.GetByID(ctx, bookingID)
 	if err != nil || booking == nil || booking.HostID != hostID {
 		return ErrBookingNotFound
 	}
 
-	// Only allow archiving cancelled or rejected bookings
-	if booking.Status != models.BookingStatusCancelled && booking.Status != models.BookingStatusRejected {
-		return errors.New("only cancelled or rejected bookings can be archived")
+	// Allow archiving any past booking; block future confirmed/pending bookings
+	isPast := booking.EndTime.Before(time.Now())
+	if !isPast && (booking.Status == models.BookingStatusConfirmed || booking.Status == models.BookingStatusPending) {
+		return errors.New("future confirmed or pending bookings cannot be archived")
 	}
 
 	booking.IsArchived = true
@@ -572,6 +602,23 @@ func (s *BookingService) BulkArchiveBookings(ctx context.Context, hostID, tenant
 	// Audit log
 	if count > 0 {
 		s.auditLog.Log(ctx, tenantID, &hostID, "booking.bulk_archived", "booking", "", models.JSONMap{
+			"count": count,
+		}, "")
+	}
+
+	return count, nil
+}
+
+// BulkArchivePastBookings archives all past bookings for a host regardless of status.
+// Uses the repository's ArchiveOldBookingsByHostID with time.Now() as cutoff.
+func (s *BookingService) BulkArchivePastBookings(ctx context.Context, hostID, tenantID string) (int, error) {
+	count, err := s.repos.Booking.ArchiveOldBookingsByHostID(ctx, hostID, time.Now())
+	if err != nil {
+		return 0, err
+	}
+
+	if count > 0 {
+		s.auditLog.Log(ctx, tenantID, &hostID, "booking.bulk_archived_past", "booking", "", models.JSONMap{
 			"count": count,
 		}, "")
 	}
@@ -732,6 +779,9 @@ func (s *BookingService) processConfirmedBooking(ctx context.Context, details *B
 
 	// Send confirmation emails
 	s.email.SendBookingConfirmed(ctx, details)
+
+	// Upsert contact from confirmed booking (errors are logged, not propagated)
+	s.contact.UpsertFromBooking(ctx, details)
 
 	return nil
 }
