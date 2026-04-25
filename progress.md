@@ -1821,4 +1821,7 @@ The following features from the requirements document are already fully implemen
   - `range over int` (e.g., `for i := range 7`) is the modernize-preferred pattern in this codebase
   - Events are intentionally NOT clipped here — clipping happens later in FlatLane (US-002) only for strip rendering
   - `GetAgendaEventsWithCalendars` accepts a `*models.Host` that can be used for timezone in the future
+  - **Critical timezone pattern**: `GetWeek` uses `weekStart.In(loc)` to read local calendar date. Callers passing a date-only UTC parse (`time.Parse("2006-01-02", s)`) MUST pre-convert: `utcY, utcMo, utcD := parsed.UTC().Date(); weekStart = time.Date(utcY, utcMo, utcD, 0, 0, 0, 0, loc)`. Do NOT use `.UTC().Date()` inside `GetWeek` — it breaks east-of-UTC hosts (e.g. JST 2026-04-20 00:00 → UTC April 19 → wrong week).
+  - DST-safe bucket boundaries: always use `monday.AddDate(0, 0, i+1)` not `dayStart.Add(24*time.Hour)` for day bucket edges
+  - All-day events stored as UTC midnight by providers; for bucket overlap checks, re-interpret UTC date as local midnight using `time.Date(y, m, d, 0, 0, 0, 0, loc)`
 ----
