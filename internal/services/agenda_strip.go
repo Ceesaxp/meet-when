@@ -98,7 +98,11 @@ func GenerateHourLabels(windowStart, windowEnd time.Time) []HourLabel {
 	}
 	endHour := windowEnd.Hour()
 
-	labels := make([]HourLabel, 0, endHour-startHour+1)
+	capHint := endHour - startHour + 1
+	if capHint < 0 {
+		capHint = 0
+	}
+	labels := make([]HourLabel, 0, capHint)
 	for h := startHour; h <= endHour; h++ {
 		t := time.Date(y, m, d, h, 0, 0, 0, loc)
 		if t.Before(windowStart) || t.After(windowEnd) {
