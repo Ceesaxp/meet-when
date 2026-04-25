@@ -1,0 +1,59 @@
+{{define "week_strip.html"}}
+<div class="week-strip-container">
+    {{if .Data.WeekDays}}
+    {{/* Shared hour-label header — same grid columns as each row */}}
+    <div class="strip-header" style="display: grid; grid-template-columns: 90px 1fr; margin-bottom: 4px;">
+        <div></div>
+        <div style="position: relative; height: 20px;">
+            {{range .Data.HourLabels}}
+            <span style="position: absolute; left: {{.LeftPct}}%; font-size: 0.65rem; color: var(--gray-500); transform: translateX(-50%);">{{.Label}}</span>
+            {{end}}
+        </div>
+    </div>
+
+    {{/* 7 day rows — each a tab button */}}
+    <div role="tablist">
+        {{range $i, $day := .Data.WeekDays}}
+        <button
+            class="week-strip-row{{if $day.IsActive}} week-strip-row--active{{end}}{{if $day.IsToday}} week-strip-row--today{{end}}"
+            role="tab"
+            aria-selected="{{if $day.IsActive}}true{{else}}false{{end}}"
+            aria-controls="week-day-panel-{{$i}}"
+            id="week-tab-{{$i}}"
+            data-day-index="{{$i}}"
+            data-full-date="{{$day.FullDateFormatted}}"
+            data-event-count="{{$day.EventCount}}"
+            type="button">
+            <span class="week-strip-day-label">{{$day.DayName}}<br><span style="font-size:0.75rem;color:var(--gray-500)">{{$day.DateFormatted}}</span></span>
+            <div class="strip-lane" style="position: relative;">
+                {{range $day.Blocks}}
+                <div class="strip-block"
+                     style="left: {{printf "%.4f" .LeftPct}}%; width: {{printf "%.4f" .WidthPct}}%; background: {{.Color}};"
+                     title="{{.Title}}">
+                    {{if .OverflowLeft}}<span class="strip-overflow strip-overflow--left">&#9664;</span>{{end}}
+                    {{if .OverflowRight}}<span class="strip-overflow strip-overflow--right">&#9654;</span>{{end}}
+                    {{if gt .WidthPct 8.0}}
+                    <span style="font-size:0.6rem;color:#fff;padding:0 2px;overflow:hidden;white-space:nowrap;display:block;text-overflow:ellipsis;">{{.Title}}</span>
+                    {{end}}
+                </div>
+                {{end}}
+            </div>
+        </button>
+        {{end}}
+    </div>
+
+    {{/* Calendar legend inside the strip card */}}
+    <ul class="calendar-legend" style="margin-top: 12px;">
+        {{range .Data.Calendars}}
+        <li style="display: flex; align-items: center; gap: 4px;">
+            <span class="calendar-dot" style="background-color: {{.Color}};"></span>
+            <span>{{.Name}}</span>
+        </li>
+        {{end}}
+    </ul>
+
+    {{else}}
+    <p style="color: var(--gray-500); font-size: 0.875rem;">No calendars connected.</p>
+    {{end}}
+</div>
+{{end}}

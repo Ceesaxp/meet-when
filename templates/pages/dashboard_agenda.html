@@ -8,7 +8,7 @@
         <h1 class="page-title">Agenda</h1>
         <p class="page-subtitle">
             {{if eq .Data.View "week"}}
-            Week of {{formatDate (index .Data.DayGroups 0).Date}}
+            {{if .Data.WeekDays}}Week of {{(index .Data.WeekDays 0).DateFormatted}}{{else}}This Week{{end}}
             {{else}}
             {{formatDate .Data.Today}}
             {{end}}
@@ -22,41 +22,83 @@
 </div>
 
 {{if eq .Data.View "week"}}
-<!-- Week view - events grouped by day -->
-<div class="agenda-week">
-    {{range .Data.DayGroups}}
-    <div class="day-group">
-        <div class="day-header">
-            <span class="day-name">{{.Date.Weekday}}</span>
-            <span class="day-date">{{formatDate .Date}}</span>
-        </div>
-        {{if .Events}}
-        <div class="events-list">
-            {{range .Events}}
-            <div class="event-item {{if .IsAllDay}}all-day{{end}}" style="{{if .CalendarColor}}border-left: 3px solid {{.CalendarColor}};{{end}}">
-                <div class="event-time">
-                    {{if .IsAllDay}}
-                    <span class="all-day-badge">All Day</span>
-                    {{else}}
-                    <div class="event-time-range">{{formatTime .Start}} - {{formatTime .End}}</div>
-                    <div class="event-duration">{{duration .Start .End}}</div>
-                    {{end}}
-                </div>
-                <div class="event-content">
-                    <div class="event-title">{{if .Title}}{{.Title}}{{else}}(No title){{end}}</div>
-                    <div class="event-details">
-                        <span class="event-calendar" {{if .CalendarColor}}style="color: {{.CalendarColor}};"{{end}}>{{.CalendarName}}</span>
-                    </div>
-                </div>
-            </div>
-            {{end}}
-        </div>
-        {{else}}
-        <div class="no-events">No events scheduled</div>
-        {{end}}
+<!-- Week view - visual strip with shared time axis -->
+{{template "week_strip.html" .}}
+
+{{/* Detail header — updated by JS when a day row is clicked */}}
+{{range .Data.WeekDays}}{{if .IsActive}}
+<div class="week-detail-header" id="week-detail-header">
+    <span class="week-detail-header-title" id="week-detail-title">{{.FullDateFormatted}} &middot; {{.EventCount}} event{{if ne .EventCount 1}}s{{end}}</span>
+    <span class="week-detail-header-hint">click any day above to switch</span>
+</div>
+{{end}}{{end}}
+
+<!-- Pre-rendered day detail panels — all 7 in DOM, only active visible -->
+<div class="week-day-details">
+    {{range $i, $day := .Data.WeekDays}}
+    <div class="week-day-detail{{if $day.IsActive}} week-day-detail--active{{end}}"
+         id="week-day-panel-{{$i}}"
+         data-day-index="{{$i}}"
+         role="tabpanel"
+         aria-labelledby="week-tab-{{$i}}">
+        {{template "day_detail.html" (dict "Events" $day.Events)}}
     </div>
     {{end}}
 </div>
+
+<script>
+(function() {
+    var strip = document.querySelector('[role="tablist"]');
+    if (!strip) return;
+
+    function activate(idx) {
+        var tabs = strip.querySelectorAll('[role="tab"]');
+        var panels = document.querySelectorAll('.week-day-detail');
+        var header = document.getElementById('week-detail-title');
+
+        tabs.forEach(function(t) {
+            var active = parseInt(t.dataset.dayIndex, 10) === idx;
+            t.classList.toggle('week-strip-row--active', active);
+            t.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+
+        panels.forEach(function(p) {
+            var active = parseInt(p.dataset.dayIndex, 10) === idx;
+            p.classList.toggle('week-day-detail--active', active);
+        });
+
+        var activeTab = strip.querySelector('[data-day-index="' + idx + '"]');
+        if (activeTab && header) {
+            var count = parseInt(activeTab.dataset.eventCount, 10) || 0;
+            header.textContent = activeTab.dataset.fullDate + ' \u00b7 ' + count + ' event' + (count === 1 ? '' : 's');
+        }
+    }
+
+    strip.addEventListener('click', function(e) {
+        var btn = e.target.closest('[role="tab"]');
+        if (!btn) return;
+        activate(parseInt(btn.dataset.dayIndex, 10));
+    });
+
+    strip.addEventListener('keydown', function(e) {
+        var btn = e.target.closest('[role="tab"]');
+        if (!btn) return;
+        var tabs = Array.from(strip.querySelectorAll('[role="tab"]'));
+        var idx = tabs.indexOf(btn);
+        if (e.key === 'ArrowDown' && idx < tabs.length - 1) {
+            tabs[idx + 1].focus();
+            e.preventDefault();
+        } else if (e.key === 'ArrowUp' && idx > 0) {
+            tabs[idx - 1].focus();
+            e.preventDefault();
+        } else if (e.key === 'Enter' || e.key === ' ') {
+            activate(parseInt(btn.dataset.dayIndex, 10));
+            e.preventDefault();
+        }
+    });
+})();
+</script>
+
 {{else}}
 <!-- Today view - Calendar Strip + Event List -->
 {{template "calendar_legend.html" .}}

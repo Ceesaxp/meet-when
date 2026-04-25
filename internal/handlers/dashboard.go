@@ -1311,14 +1311,6 @@ func (h *DashboardHandler) AuditLogs(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// AgendaDayGroup represents a group of events for a single day
-type AgendaDayGroup struct {
-	Date   time.Time
-	Events []services.AgendaEvent
-}
-
-
-
 // Agenda renders the agenda view with today's or this week's events
 func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())
@@ -1343,8 +1335,6 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 		view = "today"
 	}
 
-	var dayGroups []AgendaDayGroup
-
 	// today-view fields populated by AgendaService.GetDay
 	var agendaEvents []services.AgendaEvent
 	var agendaCalendars []*models.CalendarConnection
@@ -1352,23 +1342,33 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 	var windowStart, windowEnd time.Time
 	var hourLabels []services.HourLabel
 
+	// week-view fields
+	var weekDays []services.WeekDayView
+	var weekMonday time.Time
+
 	if view == "week" {
-		// This Week: Monday to Sunday of current week
-		weekday := now.Weekday()
-		daysFromMonday := int(weekday) - 1
-		if weekday == time.Sunday {
-			daysFromMonday = 6
-		}
-		monday := time.Date(now.Year(), now.Month(), now.Day()-daysFromMonday, 0, 0, 0, 0, loc)
-		sunday := monday.AddDate(0, 0, 7)
-
-		weekEvents, fetchErr := h.handlers.services.Calendar.GetAgendaEvents(r.Context(), host.Host.ID, monday, sunday)
-		if fetchErr != nil {
-			log.Printf("Error fetching agenda events: %v", fetchErr)
-			weekEvents = []services.AgendaEvent{}
+		// Parse optional ?week=YYYY-MM-DD; if absent or malformed fall back to now.
+		weekParam := r.URL.Query().Get("week")
+		weekStart := now
+		if weekParam != "" {
+			if parsed, parseErr := time.Parse("2006-01-02", weekParam); parseErr == nil {
+				// Date-only parse yields UTC midnight; re-interpret as local midnight
+				// so GetWeek's .In(loc) reads the correct calendar date.
+				utcY, utcMo, utcD := parsed.UTC().Date()
+				weekStart = time.Date(utcY, utcMo, utcD, 0, 0, 0, 0, loc)
+			}
 		}
 
-		dayGroups = groupEventsByDay(weekEvents, monday, loc)
+		weekView, weekErr := h.handlers.services.Agenda.GetWeek(r.Context(), host.Host.ID, weekStart)
+		if weekErr != nil {
+			log.Printf("Error fetching week agenda: %v", weekErr)
+		} else {
+			windowStart, windowEnd = services.ComputeSharedWindow(weekView.Days)
+			hourLabels = services.GenerateHourLabels(windowStart, windowEnd)
+			weekDays = services.BuildWeekDayViews(weekView, windowStart, windowEnd, now)
+			agendaCalendars = weekView.Calendars
+			weekMonday = weekView.WeekStart
+		}
 	} else {
 		// Today: use AgendaService for palette-aware view composition.
 		agendaView, agendaErr := h.handlers.services.Agenda.GetDay(r.Context(), host.Host.ID, now)
@@ -1391,7 +1391,8 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 		PendingCount: h.getPendingCount(r, host.Host.ID),
 		Data: map[string]interface{}{
 			"Events":      agendaEvents,
-			"DayGroups":   dayGroups,
+			"WeekDays":    weekDays,
+			"WeekMonday":  weekMonday,
 			"View":        view,
 			"Today":       now,
 			"Timezone":    host.Host.Timezone,
@@ -1402,35 +1403,6 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 			"HourLabels":  hourLabels,
 		},
 	})
-}
-
-// groupEventsByDay groups events by their date and returns a slice of day groups
-func groupEventsByDay(events []services.AgendaEvent, weekStart time.Time, loc *time.Location) []AgendaDayGroup {
-	// Create groups for each day of the week
-	groups := make([]AgendaDayGroup, 7)
-	for i := 0; i < 7; i++ {
-		groups[i] = AgendaDayGroup{
-			Date:   weekStart.AddDate(0, 0, i),
-			Events: []services.AgendaEvent{},
-		}
-	}
-
-	// Assign events to their respective days
-	for _, event := range events {
-		eventDate := event.Start.In(loc)
-		dayOfWeek := eventDate.Weekday()
-		// Convert to Monday=0 index
-		dayIndex := int(dayOfWeek) - 1
-		if dayOfWeek == time.Sunday {
-			dayIndex = 6
-		}
-
-		if dayIndex >= 0 && dayIndex < 7 {
-			groups[dayIndex].Events = append(groups[dayIndex].Events, event)
-		}
-	}
-
-	return groups
 }
 
 // filterAvailableHosts returns hosts that are not already in the pooled hosts list
