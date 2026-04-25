@@ -114,9 +114,18 @@ func (s *AgendaService) GetWeek(ctx context.Context, hostID string, weekStart ti
 
 	AssignColors(calendars)
 
-	// Normalize weekStart to 00:00 Monday in host timezone.
+	// Normalize weekStart to 00:00 Monday of the containing week in host
+	// timezone. If weekStart is already a Monday only the time portion is
+	// zeroed; for any other weekday we step back to the preceding Monday so
+	// that callers may safely pass time.Now() or any in-week date.
 	localStart := weekStart.In(loc)
-	monday := time.Date(localStart.Year(), localStart.Month(), localStart.Day(), 0, 0, 0, 0, loc)
+	weekday := localStart.Weekday()
+	daysFromMonday := int(weekday) - 1
+	if weekday == time.Sunday {
+		daysFromMonday = 6
+	}
+	y, mo, d := localStart.Date()
+	monday := time.Date(y, mo, d-daysFromMonday, 0, 0, 0, 0, loc)
 	nextMonday := monday.AddDate(0, 0, 7)
 
 	events, err := s.calendar.GetAgendaEventsWithCalendars(ctx, calendars, host, monday, nextMonday)
@@ -124,11 +133,14 @@ func (s *AgendaService) GetWeek(ctx context.Context, hostID string, weekStart ti
 		return nil, fmt.Errorf("fetch events: %w", err)
 	}
 
-	// Build 7 day buckets and assign events to all days they touch.
+	// Build 7 day buckets using calendar-date arithmetic so that DST
+	// transitions (spring-forward / fall-back) do not shift the bucket
+	// boundary away from local midnight. AddDate always lands on the
+	// calendar day's 00:00 in the target location.
 	var days [7]DayEvents
 	for i := range 7 {
 		dayStart := monday.AddDate(0, 0, i)
-		dayEnd := dayStart.Add(24 * time.Hour)
+		dayEnd := monday.AddDate(0, 0, i+1)
 		days[i] = DayEvents{DayStart: dayStart, DayEnd: dayEnd}
 	}
 
