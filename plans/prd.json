@@ -34,7 +34,7 @@
         "Build succeeds"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Unlike LanesByCalendar (one lane per calendar), FlatLane overlays all calendars into a single lane. Overflow fields are used by the template to render small arrow indicators at the strip edge (PRD §5.2, §7.3)."
     },
     {
@@ -49,7 +49,7 @@
         "Build succeeds"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "These fields enable the .strip-overflow arrow indicator in the template. The day strip from PR1 doesn't need overflow arrows (single-day window) but the fields won't break it."
     },
     {
@@ -65,7 +65,7 @@
         "Build succeeds"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "The shared window ensures all 7 day rows have identical column alignment so hour labels at the top apply to every row."
     },
     {
@@ -86,7 +86,7 @@
         "Tests pass"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Add tests to internal/services/agenda_strip_test.go (FlatLane, ComputeSharedWindow) and internal/services/agenda_test.go (GetWeek assignment)."
     },
     {
@@ -104,7 +104,7 @@
         "Build succeeds"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "FullDateFormatted and EventCount are used by the selected-day detail header (see mock line 100: 'Friday, April 17 · 8 events'). Events are unclipped originals for the detail list."
     },
     {

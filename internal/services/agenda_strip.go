@@ -9,11 +9,13 @@ import (
 
 // StripBlock represents a single event positioned within the visible day strip.
 type StripBlock struct {
-	LeftPct float64 // percentage from the left edge of the visible window
-	WidthPct float64 // percentage of the visible window width
-	Color   string
-	Title   string
-	EventID string
+	LeftPct       float64 // percentage from the left edge of the visible window
+	WidthPct      float64 // percentage of the visible window width
+	Color         string
+	Title         string
+	EventID       string
+	OverflowLeft  bool // event's original start is before windowStart
+	OverflowRight bool // event's original end is after windowEnd
 }
 
 // CalendarLane holds positioned blocks for one calendar within the day strip.
@@ -199,11 +201,13 @@ func LanesByCalendar(view *AgendaView) []CalendarLane {
 			}
 
 			blocks = append(blocks, StripBlock{
-				LeftPct:  leftPct,
-				WidthPct: widthPct,
-				Color:    color,
-				Title:    e.Title,
-				EventID:  e.ID,
+				LeftPct:       leftPct,
+				WidthPct:      widthPct,
+				Color:         color,
+				Title:         e.Title,
+				EventID:       e.ID,
+				OverflowLeft:  e.Start.Before(winStart),
+				OverflowRight: e.End.After(winEnd),
 			})
 		}
 
@@ -215,4 +219,187 @@ func LanesByCalendar(view *AgendaView) []CalendarLane {
 	}
 
 	return lanes
+}
+
+// ComputeSharedWindow returns a single visible time window that covers all
+// non-all-day events across all 7 days of a week. It applies the same adaptive
+// logic as ComputeVisibleWindow: baseline 09:00–18:00 in the first day's
+// location, extended 30 minutes before the earliest start and after the latest
+// end, contracted when events end earlier. If there are no timed events the
+// 09:00–18:00 baseline is returned using the first day's location. The returned
+// times use the first day's timezone so all day columns share identical offsets.
+func ComputeSharedWindow(days [7]DayEvents) (time.Time, time.Time) {
+	const padding = 30 * time.Minute
+
+	// Use the first day's location for the baseline.
+	loc := days[0].DayStart.Location()
+	y, m, d := days[0].DayStart.Date()
+	winStart := time.Date(y, m, d, 9, 0, 0, 0, loc)
+	winEnd := time.Date(y, m, d, 18, 0, 0, 0, loc)
+
+	var minStart, maxEnd time.Time
+	hasTimedEvent := false
+	for _, day := range days {
+		for _, e := range day.Events {
+			if e.IsAllDay {
+				continue
+			}
+			if !hasTimedEvent || e.Start.Before(minStart) {
+				minStart = e.Start
+			}
+			if !hasTimedEvent || e.End.After(maxEnd) {
+				maxEnd = e.End
+			}
+			hasTimedEvent = true
+		}
+	}
+
+	if hasTimedEvent {
+		if padded := minStart.Add(-padding); padded.Before(winStart) {
+			winStart = padded
+		}
+		winEnd = maxEnd.Add(padding)
+	}
+
+	// Clamp to [days[0].DayStart, days[6].DayEnd].
+	if winStart.Before(days[0].DayStart) {
+		winStart = days[0].DayStart
+	}
+	if winEnd.After(days[6].DayEnd) {
+		winEnd = days[6].DayEnd
+	}
+
+	return winStart, winEnd
+}
+
+// FlatLane converts a slice of AgendaEvents into a single flat lane of
+// StripBlocks positioned within [windowStart, windowEnd]. All-day events are
+// excluded. Events from all calendars are overlaid into one lane (unlike
+// LanesByCalendar which separates by calendar). Each block is clipped to the
+// window boundary; events that extend beyond the window get OverflowLeft or
+// OverflowRight set to true so templates can render edge arrow indicators.
+func FlatLane(events []AgendaEvent, windowStart, windowEnd time.Time) []StripBlock {
+	winDuration := windowEnd.Sub(windowStart).Seconds()
+	if winDuration <= 0 {
+		return nil
+	}
+
+	blocks := make([]StripBlock, 0, len(events))
+	for _, e := range events {
+		if e.IsAllDay {
+			continue
+		}
+
+		// Determine overflow before clipping.
+		overflowLeft := e.Start.Before(windowStart)
+		overflowRight := e.End.After(windowEnd)
+
+		// Clip to window boundary.
+		eStart := e.Start
+		eEnd := e.End
+		if eStart.Before(windowStart) {
+			eStart = windowStart
+		}
+		if eEnd.After(windowEnd) {
+			eEnd = windowEnd
+		}
+		if !eEnd.After(eStart) {
+			continue
+		}
+
+		leftPct := eStart.Sub(windowStart).Seconds() / winDuration * 100
+		widthPct := eEnd.Sub(eStart).Seconds() / winDuration * 100
+
+		// Clamp so the block does not overflow the right edge due to float arithmetic.
+		if leftPct+widthPct > 100 {
+			widthPct = 100 - leftPct
+		}
+		if widthPct < 0 {
+			widthPct = 0
+		}
+
+		color := e.CalendarColor
+		if color == "" {
+			color = "#5F5E5A"
+		}
+
+		blocks = append(blocks, StripBlock{
+			LeftPct:       leftPct,
+			WidthPct:      widthPct,
+			Color:         color,
+			Title:         e.Title,
+			EventID:       e.ID,
+			OverflowLeft:  overflowLeft,
+			OverflowRight: overflowRight,
+		})
+	}
+	return blocks
+}
+
+// WeekDayView bundles all per-day data needed to render one row of the week
+// strip and its corresponding detail panel.
+type WeekDayView struct {
+	Date              time.Time
+	DayName           string // e.g. "Mon"
+	DateFormatted     string // e.g. "Apr 13"
+	FullDateFormatted string // e.g. "Monday, April 13"
+	Blocks            []StripBlock
+	Events            []AgendaEvent // original unclipped events for the detail list
+	EventCount        int
+	IsToday           bool
+	IsActive          bool
+}
+
+// BuildWeekDayViews produces 7 WeekDayViews for the given week. Blocks are
+// positioned within [sharedWindowStart, sharedWindowEnd] via FlatLane. Events
+// are the original unclipped events from DayEvents for use in the detail panel.
+// IsToday is set for the day whose calendar date matches today. IsActive is set
+// for today (or for the first day that has events when today has none).
+func BuildWeekDayViews(week *WeekView, sharedWindowStart, sharedWindowEnd time.Time, today time.Time) []WeekDayView {
+	todayLocal := today.In(week.HostTZ)
+	todayY, todayM, todayD := todayLocal.Date()
+
+	views := make([]WeekDayView, 7)
+	activeFallback := -1 // index of first day with events
+
+	for i, day := range week.Days {
+		dayLocal := day.DayStart.In(week.HostTZ)
+		y, m, d := dayLocal.Date()
+		isToday := y == todayY && m == todayM && d == todayD
+
+		views[i] = WeekDayView{
+			Date:              day.DayStart,
+			DayName:           dayLocal.Format("Mon"),
+			DateFormatted:     dayLocal.Format("Jan 2"),
+			FullDateFormatted: dayLocal.Format("Monday, January 2"),
+			Blocks:            FlatLane(day.Events, sharedWindowStart, sharedWindowEnd),
+			Events:            day.Events,
+			EventCount:        len(day.Events),
+			IsToday:           isToday,
+		}
+
+		if activeFallback == -1 && len(day.Events) > 0 {
+			activeFallback = i
+		}
+	}
+
+	// Set IsActive: today if today is in this week, else first day with events,
+	// else Monday (index 0).
+	activeSet := false
+	for i := range views {
+		if views[i].IsToday {
+			views[i].IsActive = true
+			activeSet = true
+			break
+		}
+	}
+	if !activeSet {
+		idx := activeFallback
+		if idx == -1 {
+			idx = 0
+		}
+		views[idx].IsActive = true
+	}
+
+	return views
 }

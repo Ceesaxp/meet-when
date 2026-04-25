@@ -354,6 +354,212 @@ func TestLanesByCalendar_LeftPctPlusWidthPctNeverExceeds100(t *testing.T) {
 	}
 }
 
+// ─── FlatLane ────────────────────────────────────────────────────────────────
+
+// TestFlatLane_TwoCalendarsTwoBlocks verifies that 2 events from different
+// calendars on the same day produce 2 blocks in the flat lane.
+func TestFlatLane_TwoCalendarsTwoBlocks(t *testing.T) {
+	loc := time.UTC
+	winStart := time.Date(2024, 3, 15, 9, 0, 0, 0, loc)
+	winEnd := time.Date(2024, 3, 15, 18, 0, 0, 0, loc)
+
+	e1 := newEvent("c1", "#378ADD", localTime(loc, 10, 0), localTime(loc, 11, 0), false)
+	e2 := newEvent("c2", "#1D9E75", localTime(loc, 14, 0), localTime(loc, 15, 0), false)
+
+	blocks := FlatLane([]AgendaEvent{e1, e2}, winStart, winEnd)
+	if len(blocks) != 2 {
+		t.Errorf("want 2 blocks, got %d", len(blocks))
+	}
+}
+
+// TestFlatLane_AllDayEventsExcluded verifies that all-day events are not
+// converted to strip blocks by FlatLane.
+func TestFlatLane_AllDayEventsExcluded(t *testing.T) {
+	loc := time.UTC
+	winStart := time.Date(2024, 3, 15, 9, 0, 0, 0, loc)
+	winEnd := time.Date(2024, 3, 15, 18, 0, 0, 0, loc)
+
+	allDay := newEvent("c1", "#378ADD", localTime(loc, 0, 0), localTime(loc, 0, 0), true)
+	timed := newEvent("c2", "#1D9E75", localTime(loc, 10, 0), localTime(loc, 11, 0), false)
+
+	blocks := FlatLane([]AgendaEvent{allDay, timed}, winStart, winEnd)
+	if len(blocks) != 1 {
+		t.Errorf("want 1 block (all-day excluded), got %d", len(blocks))
+	}
+}
+
+// TestFlatLane_OverflowLeft verifies that an event starting before windowStart
+// produces a block with OverflowLeft=true and LeftPct=0.
+func TestFlatLane_OverflowLeft(t *testing.T) {
+	loc := time.UTC
+	winStart := time.Date(2024, 3, 15, 9, 0, 0, 0, loc)
+	winEnd := time.Date(2024, 3, 15, 18, 0, 0, 0, loc)
+
+	// Event starts at 07:00, before the 09:00 window start.
+	e := newEvent("c1", "#378ADD", localTime(loc, 7, 0), localTime(loc, 10, 0), false)
+	blocks := FlatLane([]AgendaEvent{e}, winStart, winEnd)
+
+	if len(blocks) != 1 {
+		t.Fatalf("want 1 block, got %d", len(blocks))
+	}
+	b := blocks[0]
+	if !b.OverflowLeft {
+		t.Error("OverflowLeft should be true for event starting before windowStart")
+	}
+	if b.LeftPct != 0 {
+		t.Errorf("LeftPct should be 0 for overflow-left block, got %.4f", b.LeftPct)
+	}
+}
+
+// TestFlatLane_OverflowRight verifies that an event ending after windowEnd
+// produces a block with OverflowRight=true.
+func TestFlatLane_OverflowRight(t *testing.T) {
+	loc := time.UTC
+	winStart := time.Date(2024, 3, 15, 9, 0, 0, 0, loc)
+	winEnd := time.Date(2024, 3, 15, 18, 0, 0, 0, loc)
+
+	// Event ends at 20:00, after the 18:00 window end.
+	e := newEvent("c1", "#378ADD", localTime(loc, 16, 0), localTime(loc, 20, 0), false)
+	blocks := FlatLane([]AgendaEvent{e}, winStart, winEnd)
+
+	if len(blocks) != 1 {
+		t.Fatalf("want 1 block, got %d", len(blocks))
+	}
+	b := blocks[0]
+	if !b.OverflowRight {
+		t.Error("OverflowRight should be true for event ending after windowEnd")
+	}
+}
+
+// ─── ComputeSharedWindow ─────────────────────────────────────────────────────
+
+func buildWeekDays(loc *time.Location, events map[int][]AgendaEvent) [7]DayEvents {
+	monday := time.Date(2024, 4, 14, 0, 0, 0, 0, loc) // a known Monday
+	var days [7]DayEvents
+	for i := range 7 {
+		days[i] = DayEvents{
+			DayStart: monday.AddDate(0, 0, i),
+			DayEnd:   monday.AddDate(0, 0, i+1),
+		}
+		if evts, ok := events[i]; ok {
+			days[i].Events = evts
+		}
+	}
+	return days
+}
+
+// TestComputeSharedWindow_EventsOnMondayAndThursday verifies that events on
+// non-adjacent days both influence the shared window.
+func TestComputeSharedWindow_EventsOnMondayAndThursday(t *testing.T) {
+	loc := time.UTC
+	monday := time.Date(2024, 4, 14, 0, 0, 0, 0, loc)
+	thursday := monday.AddDate(0, 0, 3)
+
+	// Monday 08:00-09:00, Thursday 19:00-20:00
+	evtMon := AgendaEvent{
+		ID: "mon", Title: "Mon",
+		Start: time.Date(monday.Year(), monday.Month(), monday.Day(), 8, 0, 0, 0, loc),
+		End:   time.Date(monday.Year(), monday.Month(), monday.Day(), 9, 0, 0, 0, loc),
+	}
+	evtThu := AgendaEvent{
+		ID: "thu", Title: "Thu",
+		Start: time.Date(thursday.Year(), thursday.Month(), thursday.Day(), 19, 0, 0, 0, loc),
+		End:   time.Date(thursday.Year(), thursday.Month(), thursday.Day(), 20, 0, 0, 0, loc),
+	}
+
+	days := buildWeekDays(loc, map[int][]AgendaEvent{0: {evtMon}, 3: {evtThu}})
+	winStart, winEnd := ComputeSharedWindow(days)
+
+	// minStart = 08:00 Mon → padded 07:30 < baseline 09:00 → winStart = 07:30
+	wantStart := time.Date(monday.Year(), monday.Month(), monday.Day(), 7, 30, 0, 0, loc)
+	// maxEnd = 20:00 Thu → winEnd = 20:30 Thu
+	wantEnd := time.Date(thursday.Year(), thursday.Month(), thursday.Day(), 20, 30, 0, 0, loc)
+
+	if !winStart.Equal(wantStart) {
+		t.Errorf("winStart: want %v, got %v", wantStart, winStart)
+	}
+	if !winEnd.Equal(wantEnd) {
+		t.Errorf("winEnd: want %v, got %v", wantEnd, winEnd)
+	}
+}
+
+// TestComputeSharedWindow_EmptyWeekReturnsBaseline verifies that a week with no
+// timed events returns the 09:00-18:00 baseline in the first day's timezone.
+func TestComputeSharedWindow_EmptyWeekReturnsBaseline(t *testing.T) {
+	loc := time.UTC
+	days := buildWeekDays(loc, nil)
+	winStart, winEnd := ComputeSharedWindow(days)
+
+	y, m, d := days[0].DayStart.Date()
+	wantStart := time.Date(y, m, d, 9, 0, 0, 0, loc)
+	wantEnd := time.Date(y, m, d, 18, 0, 0, 0, loc)
+
+	if !winStart.Equal(wantStart) {
+		t.Errorf("winStart: want %v, got %v", wantStart, winStart)
+	}
+	if !winEnd.Equal(wantEnd) {
+		t.Errorf("winEnd: want %v, got %v", wantEnd, winEnd)
+	}
+}
+
+// TestComputeSharedWindow_FlatLaneIntegration verifies that when a week has an
+// event at 07:00 Mon and 20:00 Thu, the shared window covers both and FlatLane
+// for a day with an event starting before the shared window produces a block
+// with OverflowLeft=true and LeftPct=0.
+func TestComputeSharedWindow_FlatLaneIntegration(t *testing.T) {
+	loc := time.UTC
+	monday := time.Date(2024, 4, 14, 0, 0, 0, 0, loc)
+	thursday := monday.AddDate(0, 0, 3)
+
+	// Monday 07:00-08:00 (before 09:00 baseline — will push window left)
+	evtMon := AgendaEvent{
+		ID: "mon", Title: "Early Mon",
+		Start: time.Date(monday.Year(), monday.Month(), monday.Day(), 7, 0, 0, 0, loc),
+		End:   time.Date(monday.Year(), monday.Month(), monday.Day(), 8, 0, 0, 0, loc),
+	}
+	// Thursday 20:00-21:00
+	evtThu := AgendaEvent{
+		ID: "thu", Title: "Late Thu",
+		Start: time.Date(thursday.Year(), thursday.Month(), thursday.Day(), 20, 0, 0, 0, loc),
+		End:   time.Date(thursday.Year(), thursday.Month(), thursday.Day(), 21, 0, 0, 0, loc),
+	}
+	days := buildWeekDays(loc, map[int][]AgendaEvent{0: {evtMon}, 3: {evtThu}})
+	winStart, winEnd := ComputeSharedWindow(days)
+
+	// winStart should be at most 06:30 (07:00 - 30min padding)
+	latestAllowedStart := time.Date(monday.Year(), monday.Month(), monday.Day(), 6, 30, 0, 0, loc)
+	if winStart.After(latestAllowedStart) {
+		t.Errorf("winStart %v should be at or before %v (early event not covered)", winStart, latestAllowedStart)
+	}
+
+	// winEnd should cover 21:00 Thu + 30min = 21:30 Thu
+	earliestAllowedEnd := time.Date(thursday.Year(), thursday.Month(), thursday.Day(), 21, 30, 0, 0, loc)
+	if winEnd.Before(earliestAllowedEnd) {
+		t.Errorf("winEnd %v should be at or after %v (late event not covered)", winEnd, earliestAllowedEnd)
+	}
+
+	// Now add a Saturday event that starts before winStart — FlatLane should
+	// produce a block with OverflowLeft=true and LeftPct=0.
+	saturday := monday.AddDate(0, 0, 5)
+	earlyEvt := AgendaEvent{
+		ID: "sat", Title: "Before window",
+		// Start 30 min before winStart
+		Start: winStart.Add(-30 * time.Minute),
+		End:   winStart.Add(30 * time.Minute),
+	}
+	blocks := FlatLane([]AgendaEvent{earlyEvt}, winStart, winEnd)
+	if len(blocks) != 1 {
+		t.Fatalf("want 1 block, got %d (saturday=%v)", len(blocks), saturday)
+	}
+	b := blocks[0]
+	if !b.OverflowLeft {
+		t.Error("OverflowLeft should be true for event starting before shared window")
+	}
+	if b.LeftPct != 0 {
+		t.Errorf("LeftPct should be 0 for overflow-left block, got %.4f", b.LeftPct)
+	}
+}
+
 // TestLanesByCalendar_DSTSpringForward verifies that an event spanning the
 // spring-forward transition (America/New_York, 2024-03-10 02:00 → 03:00) is
 // positioned correctly based on wall-clock duration.
