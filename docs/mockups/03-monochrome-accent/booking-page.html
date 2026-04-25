@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book: Discovery Call | MeetWhen - Monochrome Accent</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #FF3366;
+            --black: #0a0a0a;
+            --dark: #1a1a1a;
+            --gray-dark: #404040;
+            --gray: #737373;
+            --gray-light: #a3a3a3;
+            --light: #fafafa;
+            --white: #ffffff;
+            --border: #e5e5e5;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--white);
+            color: var(--black);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 48px 24px;
+        }
+
+        /* Navigation */
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 48px;
+        }
+
+        .back-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--gray);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+            min-height: 44px; /* Touch target */
+        }
+
+        .back-link:hover {
+            color: var(--black);
+        }
+
+        .back-link svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .step-counter {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--gray-light);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .step-counter span {
+            color: var(--black);
+        }
+
+        /* Main layout */
+        .booking-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 64px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: sticky;
+            top: 48px;
+        }
+
+        .sidebar-header {
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 24px;
+        }
+
+        .host-name {
+            font-size: 0.9rem;
+            color: var(--gray);
+            margin-bottom: 4px;
+        }
+
+        .meeting-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .sidebar-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .meta-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.95rem;
+            color: var(--gray-dark);
+        }
+
+        .meta-row svg {
+            width: 20px;
+            height: 20px;
+            color: var(--gray);
+            flex-shrink: 0;
+        }
+
+        .meta-row.selected {
+            padding: 16px;
+            background: var(--light);
+            margin: 8px -16px;
+            border-radius: 8px;
+            border-left: 3px solid var(--accent);
+        }
+
+        .meta-row.selected svg {
+            color: var(--accent);
+        }
+
+        /* Main content */
+        .main-content {
+            min-height: 500px;
+        }
+
+        .section-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--gray);
+            margin-bottom: 24px;
+        }
+
+        /* Calendar */
+        .calendar {
+            margin-bottom: 40px;
+        }
+
+        .calendar-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .calendar-month {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .nav-btns {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-btn {
+            width: 44px;
+            height: 44px;
+            border: 1px solid var(--border);
+            background: var(--white);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gray-dark);
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover, .nav-btn:active {
+            border-color: var(--black);
+            color: var(--black);
+        }
+
+        .nav-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+        }
+
+        .weekday {
+            text-align: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--gray-light);
+            padding: 12px 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .day {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 500;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            position: relative;
+            border-radius: 8px;
+            min-height: 44px; /* Touch target */
+        }
+
+        .day:hover:not(.disabled):not(.selected),
+        .day:active:not(.disabled):not(.selected) {
+            background: var(--light);
+        }
+
+        .day.disabled {
+            color: var(--border);
+            cursor: not-allowed;
+        }
+
+        .day.available {
+            font-weight: 600;
+        }
+
+        .day.available::after {
+            content: '';
+            position: absolute;
+            bottom: 6px;
+            width: 4px;
+            height: 4px;
+            background: var(--accent);
+            border-radius: 50%;
+        }
+
+        .day.selected {
+            background: var(--black);
+            color: var(--white);
+        }
+
+        .day.selected::after {
+            display: none;
+        }
+
+        .day.today:not(.selected) {
+            border: 2px solid var(--black);
+        }
+
+        /* Time slots */
+        .time-slots-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .selected-date {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .time-slots {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .time-slot {
+            padding: 16px;
+            text-align: center;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            min-height: 52px; /* Touch target */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .time-slot:hover, .time-slot:active {
+            border-color: var(--black);
+        }
+
+        .time-slot.selected {
+            background: var(--black);
+            border-color: var(--black);
+            color: var(--white);
+        }
+
+        /* CTA */
+        .cta-section {
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 32px;
+            border-top: 1px solid var(--border);
+        }
+
+        .cta-hint {
+            font-size: 0.9rem;
+            color: var(--gray);
+        }
+
+        .cta-btn {
+            padding: 16px 40px;
+            background: var(--black);
+            color: var(--white);
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+            min-height: 52px; /* Touch target */
+        }
+
+        .cta-btn:hover, .cta-btn:active {
+            background: var(--dark);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .cta-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* ==================== MOBILE STYLES ==================== */
+
+        /* Tablet */
+        @media (max-width: 900px) {
+            .container {
+                padding: 32px 20px;
+            }
+
+            .booking-layout {
+                grid-template-columns: 1fr;
+                gap: 32px;
+            }
+
+            .sidebar {
+                position: static;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                padding-bottom: 32px;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .sidebar-header {
+                border-bottom: none;
+                padding-bottom: 0;
+                margin-bottom: 0;
+            }
+
+            .sidebar-meta {
+                justify-content: flex-end;
+            }
+
+            .meta-row.selected {
+                margin: 0;
+                padding: 14px 16px;
+            }
+
+            .time-slots {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        /* Mobile */
+        @media (max-width: 640px) {
+            .container {
+                padding: 20px 16px;
+            }
+
+            .nav {
+                margin-bottom: 24px;
+            }
+
+            .sidebar {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .sidebar-header {
+                text-align: center;
+            }
+
+            .meeting-title {
+                font-size: 1.25rem;
+            }
+
+            .sidebar-meta {
+                flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 12px;
+            }
+
+            .meta-row {
+                font-size: 0.85rem;
+            }
+
+            .meta-row.selected {
+                width: 100%;
+                justify-content: center;
+            }
+
+            /* Calendar improvements for touch */
+            .calendar-grid {
+                gap: 2px;
+            }
+
+            .weekday {
+                padding: 8px 4px;
+                font-size: 0.7rem;
+            }
+
+            .day {
+                font-size: 0.9rem;
+                min-height: 48px;
+            }
+
+            .day.available::after {
+                bottom: 4px;
+                width: 3px;
+                height: 3px;
+            }
+
+            /* Time slots - 2 columns on mobile */
+            .time-slots {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+
+            .time-slot {
+                padding: 18px 12px;
+                font-size: 0.95rem;
+            }
+
+            /* CTA section */
+            .cta-section {
+                flex-direction: column;
+                gap: 16px;
+                padding-top: 24px;
+                margin-top: 32px;
+            }
+
+            .cta-hint {
+                order: 2;
+                text-align: center;
+            }
+
+            .cta-btn {
+                width: 100%;
+                justify-content: center;
+                padding: 18px 32px;
+            }
+        }
+
+        /* Small mobile */
+        @media (max-width: 380px) {
+            .step-counter {
+                font-size: 0.75rem;
+            }
+
+            .calendar-month {
+                font-size: 1.1rem;
+            }
+
+            .nav-btn {
+                width: 40px;
+                height: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav">
+            <a href="host-page.html" class="back-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                Sarah Chen
+            </a>
+            <span class="step-counter">Step <span>1</span> of 3</span>
+        </nav>
+
+        <div class="booking-layout">
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <p class="host-name">Sarah Chen</p>
+                    <h1 class="meeting-title">Discovery Call</h1>
+                </div>
+
+                <div class="sidebar-meta">
+                    <div class="meta-row">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 6v6l4 2"/>
+                        </svg>
+                        30 minutes
+                    </div>
+                    <div class="meta-row">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 10l-4 4l6 6l4-16l-18 7l4 2l2 6l3-4"/>
+                        </svg>
+                        Zoom
+                    </div>
+                    <div class="meta-row selected">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8" y1="2" x2="8" y2="6"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                        Wed, January 29 at 2:00 PM
+                    </div>
+                </div>
+            </aside>
+
+            <main class="main-content">
+                <div class="calendar">
+                    <div class="section-title">Select a Date</div>
+                    <div class="calendar-nav">
+                        <span class="calendar-month">January 2026</span>
+                        <div class="nav-btns">
+                            <button class="nav-btn" aria-label="Previous month">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M15 18l-6-6 6-6"/>
+                                </svg>
+                            </button>
+                            <button class="nav-btn" aria-label="Next month">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M9 18l6-6-6-6"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="calendar-grid" role="grid" aria-label="Calendar">
+                        <div class="weekday" role="columnheader">Sun</div>
+                        <div class="weekday" role="columnheader">Mon</div>
+                        <div class="weekday" role="columnheader">Tue</div>
+                        <div class="weekday" role="columnheader">Wed</div>
+                        <div class="weekday" role="columnheader">Thu</div>
+                        <div class="weekday" role="columnheader">Fri</div>
+                        <div class="weekday" role="columnheader">Sat</div>
+
+                        <div class="day disabled" role="gridcell"></div>
+                        <div class="day disabled" role="gridcell"></div>
+                        <div class="day disabled" role="gridcell"></div>
+                        <div class="day disabled" role="gridcell">1</div>
+                        <div class="day disabled" role="gridcell">2</div>
+                        <div class="day disabled" role="gridcell">3</div>
+                        <div class="day disabled" role="gridcell">4</div>
+
+                        <div class="day disabled" role="gridcell">5</div>
+                        <div class="day available" role="gridcell" tabindex="0">6</div>
+                        <div class="day available" role="gridcell" tabindex="0">7</div>
+                        <div class="day available" role="gridcell" tabindex="0">8</div>
+                        <div class="day available" role="gridcell" tabindex="0">9</div>
+                        <div class="day available" role="gridcell" tabindex="0">10</div>
+                        <div class="day disabled" role="gridcell">11</div>
+
+                        <div class="day disabled" role="gridcell">12</div>
+                        <div class="day available" role="gridcell" tabindex="0">13</div>
+                        <div class="day available" role="gridcell" tabindex="0">14</div>
+                        <div class="day available" role="gridcell" tabindex="0">15</div>
+                        <div class="day available" role="gridcell" tabindex="0">16</div>
+                        <div class="day available" role="gridcell" tabindex="0">17</div>
+                        <div class="day disabled" role="gridcell">18</div>
+
+                        <div class="day disabled" role="gridcell">19</div>
+                        <div class="day available" role="gridcell" tabindex="0">20</div>
+                        <div class="day available" role="gridcell" tabindex="0">21</div>
+                        <div class="day available" role="gridcell" tabindex="0">22</div>
+                        <div class="day available" role="gridcell" tabindex="0">23</div>
+                        <div class="day available" role="gridcell" tabindex="0">24</div>
+                        <div class="day disabled" role="gridcell">25</div>
+
+                        <div class="day disabled today" role="gridcell">26</div>
+                        <div class="day available" role="gridcell" tabindex="0">27</div>
+                        <div class="day available" role="gridcell" tabindex="0">28</div>
+                        <div class="day selected" role="gridcell" tabindex="0" aria-selected="true">29</div>
+                        <div class="day available" role="gridcell" tabindex="0">30</div>
+                        <div class="day available" role="gridcell" tabindex="0">31</div>
+                        <div class="day disabled" role="gridcell"></div>
+                    </div>
+                </div>
+
+                <div class="time-slots-section">
+                    <div class="time-slots-header">
+                        <span class="section-title">Select a Time</span>
+                        <span class="selected-date">Wednesday, January 29</span>
+                    </div>
+                    <div class="time-slots" role="listbox" aria-label="Available times">
+                        <div class="time-slot" role="option" tabindex="0">9:00 AM</div>
+                        <div class="time-slot" role="option" tabindex="0">10:00 AM</div>
+                        <div class="time-slot" role="option" tabindex="0">11:00 AM</div>
+                        <div class="time-slot" role="option" tabindex="0">1:00 PM</div>
+                        <div class="time-slot selected" role="option" tabindex="0" aria-selected="true">2:00 PM</div>
+                        <div class="time-slot" role="option" tabindex="0">3:00 PM</div>
+                        <div class="time-slot" role="option" tabindex="0">4:00 PM</div>
+                        <div class="time-slot" role="option" tabindex="0">5:00 PM</div>
+                    </div>
+                </div>
+
+                <div class="cta-section">
+                    <span class="cta-hint">Next: Enter your details</span>
+                    <button class="cta-btn">
+                        Continue
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

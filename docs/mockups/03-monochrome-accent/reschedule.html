@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reschedule Booking | MeetWhen</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #E85D40;
+            --accent-light: #FFF5F3;
+            --accent-hover: #D14D32;
+            --black: #111111;
+            --gray-900: #1a1a1a;
+            --gray-700: #404040;
+            --gray-500: #737373;
+            --gray-300: #d4d4d4;
+            --gray-200: #e5e5e5;
+            --gray-100: #f5f5f5;
+            --white: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--white);
+            color: var(--black);
+            min-height: 100vh;
+        }
+
+        .page-container {
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .page-header {
+            border-bottom: 1px solid var(--gray-200);
+            padding: 20px 24px;
+        }
+
+        .header-inner {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .back-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            border: 1px solid var(--gray-200);
+            background: var(--white);
+            color: var(--gray-700);
+            text-decoration: none;
+            transition: all 0.15s;
+        }
+
+        .back-btn:hover {
+            background: var(--gray-100);
+            border-color: var(--gray-300);
+        }
+
+        .back-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .header-content h1 {
+            font-size: 1.125rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .header-content p {
+            font-size: 0.85rem;
+            color: var(--gray-500);
+        }
+
+        /* Current booking info */
+        .current-booking {
+            background: var(--gray-100);
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .current-booking-inner {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .current-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--gray-500);
+            margin-bottom: 4px;
+        }
+
+        .current-time {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--gray-700);
+            text-decoration: line-through;
+        }
+
+        .arrow-icon {
+            color: var(--gray-500);
+        }
+
+        .new-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--accent);
+            margin-bottom: 4px;
+        }
+
+        .new-time {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--black);
+        }
+
+        .new-time.placeholder {
+            color: var(--gray-500);
+            font-weight: 400;
+        }
+
+        /* Main content */
+        .main-content {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        .section-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--gray-500);
+            margin-bottom: 20px;
+        }
+
+        /* Calendar */
+        .calendar-section {
+            margin-bottom: 40px;
+        }
+
+        .calendar {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .calendar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .calendar-month {
+            font-size: 1.125rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .calendar-nav {
+            display: flex;
+            gap: 8px;
+        }
+
+        .calendar-nav button {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            border: 1px solid var(--gray-200);
+            background: var(--white);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gray-700);
+            transition: all 0.15s;
+        }
+
+        .calendar-nav button:hover {
+            background: var(--gray-100);
+        }
+
+        .calendar-nav svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .calendar-grid {
+            padding: 16px 24px 24px;
+        }
+
+        .weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .weekday {
+            text-align: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--gray-500);
+            padding: 8px 0;
+        }
+
+        .days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+
+        .day {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: 2px solid transparent;
+            min-height: 44px;
+        }
+
+        .day:hover:not(.disabled):not(.selected) {
+            background: var(--gray-100);
+        }
+
+        .day.disabled {
+            color: var(--gray-300);
+            cursor: not-allowed;
+        }
+
+        .day.today {
+            border-color: var(--gray-300);
+        }
+
+        .day.selected {
+            background: var(--black);
+            color: var(--white);
+        }
+
+        .day.has-slots::after {
+            content: '';
+            position: absolute;
+            bottom: 6px;
+            width: 4px;
+            height: 4px;
+            background: var(--accent);
+            border-radius: 50%;
+        }
+
+        .day {
+            position: relative;
+        }
+
+        /* Time slots */
+        .slots-section {
+            margin-bottom: 40px;
+        }
+
+        .slots-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .time-slot {
+            padding: 16px;
+            text-align: center;
+            font-size: 0.95rem;
+            font-weight: 500;
+            border: 2px solid var(--gray-200);
+            border-radius: 10px;
+            background: var(--white);
+            cursor: pointer;
+            transition: all 0.15s;
+            min-height: 52px;
+        }
+
+        .time-slot:hover {
+            border-color: var(--gray-300);
+            background: var(--gray-100);
+        }
+
+        .time-slot:active {
+            transform: scale(0.98);
+        }
+
+        .time-slot.selected {
+            border-color: var(--black);
+            background: var(--black);
+            color: var(--white);
+        }
+
+        /* Actions */
+        .actions {
+            display: flex;
+            gap: 16px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 16px 32px;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            text-decoration: none;
+            border-radius: 12px;
+            transition: all 0.15s;
+            cursor: pointer;
+            border: none;
+            min-height: 56px;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: var(--white);
+            flex: 1;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-primary:disabled {
+            background: var(--gray-300);
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: var(--white);
+            color: var(--gray-700);
+            border: 2px solid var(--gray-200);
+            padding: 16px 24px;
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--gray-300);
+            background: var(--gray-100);
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .slots-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .current-booking-inner {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .arrow-icon {
+                transform: rotate(90deg);
+            }
+
+            .slots-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .actions {
+                flex-direction: column;
+            }
+
+            .btn-secondary {
+                order: 2;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-container">
+        <header class="page-header">
+            <div class="header-inner">
+                <a href="booking-confirmation.html" class="back-btn" aria-label="Go back">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="19" y1="12" x2="5" y2="12"/>
+                        <polyline points="12 19 5 12 12 5"/>
+                    </svg>
+                </a>
+                <div class="header-content">
+                    <h1>Reschedule Booking</h1>
+                    <p>Discovery Call with Sarah Chen</p>
+                </div>
+            </div>
+        </header>
+
+        <div class="current-booking">
+            <div class="current-booking-inner">
+                <div>
+                    <div class="current-label">Current time</div>
+                    <div class="current-time">Tue, Jan 28 at 2:00 PM</div>
+                </div>
+                <svg class="arrow-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                    <polyline points="12 5 19 12 12 19"/>
+                </svg>
+                <div>
+                    <div class="new-label">New time</div>
+                    <div class="new-time">Wed, Jan 29 at 10:00 AM</div>
+                    <!-- <div class="new-time placeholder">Select a new time</div> -->
+                </div>
+            </div>
+        </div>
+
+        <main class="main-content">
+            <section class="calendar-section">
+                <h2 class="section-title">Select a new date</h2>
+                <div class="calendar">
+                    <div class="calendar-header">
+                        <span class="calendar-month">January 2025</span>
+                        <div class="calendar-nav">
+                            <button type="button" aria-label="Previous month">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="15 18 9 12 15 6"/>
+                                </svg>
+                            </button>
+                            <button type="button" aria-label="Next month">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 18 15 12 9 6"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="calendar-grid">
+                        <div class="weekdays">
+                            <div class="weekday">Sun</div>
+                            <div class="weekday">Mon</div>
+                            <div class="weekday">Tue</div>
+                            <div class="weekday">Wed</div>
+                            <div class="weekday">Thu</div>
+                            <div class="weekday">Fri</div>
+                            <div class="weekday">Sat</div>
+                        </div>
+                        <div class="days">
+                            <div class="day disabled"></div>
+                            <div class="day disabled"></div>
+                            <div class="day disabled"></div>
+                            <div class="day disabled">1</div>
+                            <div class="day disabled">2</div>
+                            <div class="day disabled">3</div>
+                            <div class="day disabled">4</div>
+                            <div class="day disabled">5</div>
+                            <div class="day disabled">6</div>
+                            <div class="day disabled">7</div>
+                            <div class="day disabled">8</div>
+                            <div class="day disabled">9</div>
+                            <div class="day disabled">10</div>
+                            <div class="day disabled">11</div>
+                            <div class="day disabled">12</div>
+                            <div class="day disabled">13</div>
+                            <div class="day disabled">14</div>
+                            <div class="day disabled">15</div>
+                            <div class="day disabled">16</div>
+                            <div class="day disabled">17</div>
+                            <div class="day disabled">18</div>
+                            <div class="day disabled">19</div>
+                            <div class="day disabled">20</div>
+                            <div class="day disabled">21</div>
+                            <div class="day disabled">22</div>
+                            <div class="day disabled">23</div>
+                            <div class="day disabled">24</div>
+                            <div class="day disabled">25</div>
+                            <div class="day today">26</div>
+                            <div class="day has-slots">27</div>
+                            <div class="day has-slots">28</div>
+                            <div class="day selected has-slots">29</div>
+                            <div class="day has-slots">30</div>
+                            <div class="day has-slots">31</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="slots-section">
+                <h2 class="section-title">Available times for Wednesday, January 29</h2>
+                <div class="slots-grid">
+                    <button class="time-slot">9:00 AM</button>
+                    <button class="time-slot">9:30 AM</button>
+                    <button class="time-slot selected">10:00 AM</button>
+                    <button class="time-slot">10:30 AM</button>
+                    <button class="time-slot">11:00 AM</button>
+                    <button class="time-slot">11:30 AM</button>
+                    <button class="time-slot">1:00 PM</button>
+                    <button class="time-slot">1:30 PM</button>
+                    <button class="time-slot">2:00 PM</button>
+                    <button class="time-slot">2:30 PM</button>
+                    <button class="time-slot">3:00 PM</button>
+                    <button class="time-slot">3:30 PM</button>
+                </div>
+            </section>
+
+            <div class="actions">
+                <a href="booking-confirmation.html" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">Confirm Reschedule</button>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book: Discovery Call | MeetWhen - Gradient Flow</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --gradient-3: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --dark: #1a1a2e;
+            --light: #fafafa;
+            --gray: #6b7280;
+            --white: #ffffff;
+            --border: #e5e7eb;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--light);
+            color: var(--dark);
+            min-height: 100vh;
+        }
+
+        .flow-bg {
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            z-index: -1;
+            background:
+                radial-gradient(circle at 20% 80%, rgba(102, 126, 234, 0.12) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(240, 147, 251, 0.1) 0%, transparent 50%);
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--gray);
+            text-decoration: none;
+            font-weight: 500;
+            margin-bottom: 32px;
+            padding: 10px 18px;
+            background: var(--white);
+            border-radius: 100px;
+            transition: all 0.2s;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+        }
+
+        .back-link:hover {
+            color: var(--dark);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .back-link svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Booking card */
+        .booking-card {
+            background: var(--white);
+            border-radius: 32px;
+            overflow: hidden;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.06);
+        }
+
+        /* Header with gradient */
+        .booking-header {
+            background: var(--gradient-2);
+            padding: 40px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .booking-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 400px;
+            height: 400px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header-avatar {
+            width: 56px;
+            height: 56px;
+            background: rgba(255, 255, 255, 0.25);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .header-info h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .header-info p {
+            opacity: 0.9;
+            font-size: 0.95rem;
+        }
+
+        .header-meta {
+            margin-left: auto;
+            display: flex;
+            gap: 24px;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .meta-item svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Main content */
+        .booking-body {
+            padding: 40px;
+        }
+
+        /* Progress dots */
+        .progress-dots {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 40px;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--border);
+            transition: all 0.3s;
+        }
+
+        .dot.active {
+            width: 40px;
+            border-radius: 6px;
+            background: var(--gradient-2);
+        }
+
+        .dot.completed {
+            background: var(--gradient-1);
+        }
+
+        /* Calendar section */
+        .calendar-section {
+            display: grid;
+            grid-template-columns: 1fr 280px;
+            gap: 40px;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: var(--gradient-2);
+            border-radius: 50%;
+        }
+
+        /* Calendar */
+        .calendar {
+            background: var(--light);
+            border-radius: 20px;
+            padding: 24px;
+        }
+
+        .calendar-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .calendar-month {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .nav-btns {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: var(--white);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+
+        .nav-btn:hover {
+            background: var(--gradient-2);
+            color: white;
+        }
+
+        .nav-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+        }
+
+        .weekday {
+            text-align: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--gray);
+            padding: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .day {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 500;
+            font-size: 0.9rem;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .day:hover:not(.disabled):not(.selected) {
+            background: var(--white);
+        }
+
+        .day.disabled {
+            color: var(--border);
+            cursor: not-allowed;
+        }
+
+        .day.available::after {
+            content: '';
+            position: absolute;
+            bottom: 4px;
+            width: 4px;
+            height: 4px;
+            background: var(--gradient-2);
+            border-radius: 50%;
+        }
+
+        .day.selected {
+            background: var(--gradient-2);
+            color: white;
+        }
+
+        .day.selected::after {
+            display: none;
+        }
+
+        .day.today {
+            font-weight: 700;
+            color: #764ba2;
+        }
+
+        /* Time slots */
+        .time-section h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: var(--gray);
+        }
+
+        .time-slots {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .time-slots::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .time-slots::-webkit-scrollbar-track {
+            background: var(--light);
+            border-radius: 2px;
+        }
+
+        .time-slots::-webkit-scrollbar-thumb {
+            background: var(--gradient-2);
+            border-radius: 2px;
+        }
+
+        .time-slot {
+            padding: 14px 18px;
+            background: var(--light);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .time-slot:hover {
+            background: var(--white);
+            border-color: var(--border);
+        }
+
+        .time-slot.selected {
+            background: var(--gradient-2);
+            color: white;
+            border-color: transparent;
+        }
+
+        /* CTA */
+        .cta-section {
+            margin-top: 40px;
+            padding-top: 32px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .cta-btn {
+            padding: 16px 40px;
+            background: var(--gradient-2);
+            color: white;
+            border: none;
+            border-radius: 100px;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s;
+        }
+
+        .cta-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px rgba(240, 147, 251, 0.4);
+        }
+
+        .cta-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Mobile */
+        @media (max-width: 800px) {
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .header-meta {
+                margin-left: 0;
+                margin-top: 16px;
+            }
+
+            .calendar-section {
+                grid-template-columns: 1fr;
+            }
+
+            .time-slots {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                max-height: none;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .booking-header {
+                padding: 28px;
+            }
+
+            .booking-body {
+                padding: 24px;
+            }
+
+            .time-slots {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="flow-bg"></div>
+
+    <div class="container">
+        <a href="host-page.html" class="back-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+            Back
+        </a>
+
+        <div class="booking-card">
+            <div class="booking-header">
+                <div class="header-content">
+                    <div class="header-avatar">SC</div>
+                    <div class="header-info">
+                        <h1>Discovery Call</h1>
+                        <p>with Sarah Chen</p>
+                    </div>
+                    <div class="header-meta">
+                        <div class="meta-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 6v6l4 2"/>
+                            </svg>
+                            30 min
+                        </div>
+                        <div class="meta-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M15 10l-4 4l6 6l4-16l-18 7l4 2l2 6l3-4"/>
+                            </svg>
+                            Zoom
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="booking-body">
+                <div class="progress-dots">
+                    <div class="dot active"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                </div>
+
+                <div class="calendar-section">
+                    <div class="calendar-area">
+                        <div class="section-title">Select a Date</div>
+                        <div class="calendar">
+                            <div class="calendar-nav">
+                                <span class="calendar-month">January 2026</span>
+                                <div class="nav-btns">
+                                    <button class="nav-btn">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M15 18l-6-6 6-6"/>
+                                        </svg>
+                                    </button>
+                                    <button class="nav-btn">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M9 18l6-6-6-6"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="calendar-grid">
+                                <div class="weekday">S</div>
+                                <div class="weekday">M</div>
+                                <div class="weekday">T</div>
+                                <div class="weekday">W</div>
+                                <div class="weekday">T</div>
+                                <div class="weekday">F</div>
+                                <div class="weekday">S</div>
+
+                                <div class="day disabled"></div>
+                                <div class="day disabled"></div>
+                                <div class="day disabled"></div>
+                                <div class="day disabled">1</div>
+                                <div class="day disabled">2</div>
+                                <div class="day disabled">3</div>
+                                <div class="day disabled">4</div>
+
+                                <div class="day disabled">5</div>
+                                <div class="day available">6</div>
+                                <div class="day available">7</div>
+                                <div class="day available">8</div>
+                                <div class="day available">9</div>
+                                <div class="day available">10</div>
+                                <div class="day disabled">11</div>
+
+                                <div class="day disabled">12</div>
+                                <div class="day available">13</div>
+                                <div class="day available">14</div>
+                                <div class="day available">15</div>
+                                <div class="day available">16</div>
+                                <div class="day available">17</div>
+                                <div class="day disabled">18</div>
+
+                                <div class="day disabled">19</div>
+                                <div class="day available">20</div>
+                                <div class="day available">21</div>
+                                <div class="day available">22</div>
+                                <div class="day available">23</div>
+                                <div class="day available">24</div>
+                                <div class="day disabled">25</div>
+
+                                <div class="day disabled today">26</div>
+                                <div class="day available">27</div>
+                                <div class="day available">28</div>
+                                <div class="day selected">29</div>
+                                <div class="day available">30</div>
+                                <div class="day available">31</div>
+                                <div class="day disabled"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="time-section">
+                        <div class="section-title">Wed, Jan 29</div>
+                        <div class="time-slots">
+                            <div class="time-slot">9:00 AM</div>
+                            <div class="time-slot">10:00 AM</div>
+                            <div class="time-slot">11:00 AM</div>
+                            <div class="time-slot">1:00 PM</div>
+                            <div class="time-slot selected">2:00 PM</div>
+                            <div class="time-slot">3:00 PM</div>
+                            <div class="time-slot">4:00 PM</div>
+                            <div class="time-slot">5:00 PM</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cta-section">
+                    <button class="cta-btn">
+                        Continue
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

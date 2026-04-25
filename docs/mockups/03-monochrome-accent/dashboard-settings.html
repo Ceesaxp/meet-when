@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings | MeetWhen</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #E85D40;
+            --accent-light: #FFF5F3;
+            --black: #111111;
+            --gray-900: #1a1a1a;
+            --gray-700: #404040;
+            --gray-500: #737373;
+            --gray-300: #d4d4d4;
+            --gray-200: #e5e5e5;
+            --gray-100: #f5f5f5;
+            --white: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--gray-100);
+            color: var(--black);
+            min-height: 100vh;
+        }
+
+        .dashboard {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            background: var(--white);
+            border-right: 1px solid var(--gray-200);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .logo {
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            color: var(--black);
+            text-decoration: none;
+        }
+
+        .logo span {
+            color: var(--accent);
+        }
+
+        .nav-menu {
+            flex: 1;
+            padding: 16px 12px;
+            list-style: none;
+        }
+
+        .nav-item {
+            margin-bottom: 4px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            color: var(--gray-700);
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.15s;
+        }
+
+        .nav-link:hover {
+            background: var(--gray-100);
+            color: var(--black);
+        }
+
+        .nav-link.active {
+            background: var(--black);
+            color: var(--white);
+        }
+
+        .nav-link svg {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        .nav-badge {
+            margin-left: auto;
+            background: var(--accent);
+            color: var(--white);
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 100px;
+        }
+
+        .sidebar-footer {
+            padding: 16px;
+            border-top: 1px solid var(--gray-200);
+        }
+
+        .user-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 10px;
+            background: var(--gray-100);
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: var(--black);
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .user-info {
+            flex: 1;
+        }
+
+        .user-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .user-email {
+            font-size: 0.8rem;
+            color: var(--gray-500);
+        }
+
+        /* Main content */
+        .main {
+            flex: 1;
+            margin-left: 260px;
+            padding: 32px;
+            max-width: 800px;
+        }
+
+        .page-header {
+            margin-bottom: 32px;
+        }
+
+        .page-title {
+            font-size: 1.75rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+        }
+
+        /* Section */
+        .section {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .section-header {
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 1.125rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 4px;
+        }
+
+        .section-subtitle {
+            font-size: 0.9rem;
+            color: var(--gray-500);
+        }
+
+        /* Form */
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 14px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            border: 1px solid var(--gray-200);
+            border-radius: 10px;
+            background: var(--white);
+            color: var(--black);
+            transition: all 0.15s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--black);
+        }
+
+        .form-input::placeholder {
+            color: var(--gray-500);
+        }
+
+        .form-hint {
+            margin-top: 6px;
+            font-size: 0.8rem;
+            color: var(--gray-500);
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 12px 14px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            border: 1px solid var(--gray-200);
+            border-radius: 10px;
+            background: var(--white);
+            color: var(--black);
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 16px;
+        }
+
+        .form-select:focus {
+            outline: none;
+            border-color: var(--black);
+        }
+
+        /* Toggle */
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .toggle-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .toggle-row:first-child {
+            padding-top: 0;
+        }
+
+        .toggle-info h4 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .toggle-info p {
+            font-size: 0.85rem;
+            color: var(--gray-500);
+        }
+
+        .toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: var(--gray-200);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+
+        .toggle.active {
+            background: var(--accent);
+        }
+
+        .toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: var(--white);
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+
+        .toggle.active::after {
+            transform: translateX(20px);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 20px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            font-family: inherit;
+            text-decoration: none;
+            border-radius: 10px;
+            transition: all 0.15s;
+            cursor: pointer;
+            border: none;
+            min-height: 48px;
+        }
+
+        .btn-primary {
+            background: var(--black);
+            color: var(--white);
+        }
+
+        .btn-primary:hover {
+            background: var(--gray-900);
+        }
+
+        .btn-outline {
+            background: var(--white);
+            color: var(--gray-700);
+            border: 1px solid var(--gray-200);
+        }
+
+        .btn-outline:hover {
+            background: var(--gray-100);
+            border-color: var(--gray-300);
+        }
+
+        .btn-danger {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+
+        .btn-danger:hover {
+            background: #fee2e2;
+        }
+
+        .section-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid var(--gray-100);
+        }
+
+        /* Availability grid */
+        .availability-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .availability-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .day-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 120px;
+        }
+
+        .day-checkbox {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--accent);
+        }
+
+        .day-name {
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .time-range {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .time-input {
+            padding: 10px 12px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            background: var(--white);
+            width: 110px;
+        }
+
+        .time-input:focus {
+            outline: none;
+            border-color: var(--black);
+        }
+
+        .time-separator {
+            color: var(--gray-500);
+            font-size: 0.9rem;
+        }
+
+        /* Mobile header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: var(--white);
+            border-bottom: 1px solid var(--gray-200);
+            padding: 0 20px;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 99;
+        }
+
+        .mobile-menu-btn {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: none;
+            border: 1px solid var(--gray-200);
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .mobile-header {
+                display: flex;
+            }
+
+            .main {
+                margin-left: 0;
+                padding: 88px 20px 32px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .availability-row {
+                flex-wrap: wrap;
+            }
+
+            .day-toggle {
+                width: 100%;
+                margin-bottom: 8px;
+            }
+
+            .time-range {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <header class="mobile-header">
+            <a href="#" class="logo">Meet<span>When</span></a>
+            <button class="mobile-menu-btn" aria-label="Menu">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 12h18M3 6h18M3 18h18"/>
+                </svg>
+            </button>
+        </header>
+
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <a href="#" class="logo">Meet<span>When</span></a>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="dashboard-home.html" class="nav-link">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                            <polyline points="9 22 9 12 15 12 15 22"/>
+                        </svg>
+                        Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="dashboard-templates.html" class="nav-link">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8" y1="2" x2="8" y2="6"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                        Meeting Types
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="dashboard-bookings.html" class="nav-link">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                        </svg>
+                        Bookings
+                        <span class="nav-badge">3</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="dashboard-agenda.html" class="nav-link">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                        Agenda
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="dashboard-calendars.html" class="nav-link">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                        </svg>
+                        Calendars
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="dashboard-settings.html" class="nav-link active">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                        Settings
+                    </a>
+                </li>
+            </ul>
+            <div class="sidebar-footer">
+                <div class="user-card">
+                    <div class="user-avatar">SC</div>
+                    <div class="user-info">
+                        <div class="user-name">Sarah Chen</div>
+                        <div class="user-email">sarah@techcorp.io</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div class="page-header">
+                <h1 class="page-title">Settings</h1>
+            </div>
+
+            <section class="section">
+                <div class="section-header">
+                    <h2 class="section-title">Profile</h2>
+                    <p class="section-subtitle">Your personal information</p>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="first_name">First name</label>
+                        <input type="text" id="first_name" class="form-input" value="Sarah">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="last_name">Last name</label>
+                        <input type="text" id="last_name" class="form-input" value="Chen">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="email">Email</label>
+                    <input type="email" id="email" class="form-input" value="sarah@techcorp.io">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="slug">Booking URL</label>
+                    <input type="text" id="slug" class="form-input" value="sarah">
+                    <p class="form-hint">Your booking page: meetwhen.io/m/techcorp/sarah</p>
+                </div>
+
+                <div class="section-actions">
+                    <button class="btn btn-primary">Save Changes</button>
+                </div>
+            </section>
+
+            <section class="section">
+                <div class="section-header">
+                    <h2 class="section-title">Availability</h2>
+                    <p class="section-subtitle">Set your default working hours</p>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="timezone">Timezone</label>
+                    <select id="timezone" class="form-select">
+                        <option value="America/Los_Angeles" selected>Pacific Time (PT)</option>
+                        <option value="America/Denver">Mountain Time (MT)</option>
+                        <option value="America/Chicago">Central Time (CT)</option>
+                        <option value="America/New_York">Eastern Time (ET)</option>
+                        <option value="Europe/London">London (GMT)</option>
+                        <option value="Europe/Paris">Paris (CET)</option>
+                    </select>
+                </div>
+
+                <div class="availability-grid">
+                    <div class="availability-row">
+                        <div class="day-toggle">
+                            <input type="checkbox" class="day-checkbox" checked>
+                            <span class="day-name">Monday</span>
+                        </div>
+                        <div class="time-range">
+                            <input type="time" class="time-input" value="09:00">
+                            <span class="time-separator">to</span>
+                            <input type="time" class="time-input" value="17:00">
+                        </div>
+                    </div>
+                    <div class="availability-row">
+                        <div class="day-toggle">
+                            <input type="checkbox" class="day-checkbox" checked>
+                            <span class="day-name">Tuesday</span>
+                        </div>
+                        <div class="time-range">
+                            <input type="time" class="time-input" value="09:00">
+                            <span class="time-separator">to</span>
+                            <input type="time" class="time-input" value="17:00">
+                        </div>
+                    </div>
+                    <div class="availability-row">
+                        <div class="day-toggle">
+                            <input type="checkbox" class="day-checkbox" checked>
+                            <span class="day-name">Wednesday</span>
+                        </div>
+                        <div class="time-range">
+                            <input type="time" class="time-input" value="09:00">
+                            <span class="time-separator">to</span>
+                            <input type="time" class="time-input" value="17:00">
+                        </div>
+                    </div>
+                    <div class="availability-row">
+                        <div class="day-toggle">
+                            <input type="checkbox" class="day-checkbox" checked>
+                            <span class="day-name">Thursday</span>
+                        </div>
+                        <div class="time-range">
+                            <input type="time" class="time-input" value="09:00">
+                            <span class="time-separator">to</span>
+                            <input type="time" class="time-input" value="17:00">
+                        </div>
+                    </div>
+                    <div class="availability-row">
+                        <div class="day-toggle">
+                            <input type="checkbox" class="day-checkbox" checked>
+                            <span class="day-name">Friday</span>
+                        </div>
+                        <div class="time-range">
+                            <input type="time" class="time-input" value="09:00">
+                            <span class="time-separator">to</span>
+                            <input type="time" class="time-input" value="17:00">
+                        </div>
+                    </div>
+                    <div class="availability-row">
+                        <div class="day-toggle">
+                            <input type="checkbox" class="day-checkbox">
+                            <span class="day-name">Saturday</span>
+                        </div>
+                        <div class="time-range">
+                            <input type="time" class="time-input" value="09:00" disabled>
+                            <span class="time-separator">to</span>
+                            <input type="time" class="time-input" value="17:00" disabled>
+                        </div>
+                    </div>
+                    <div class="availability-row">
+                        <div class="day-toggle">
+                            <input type="checkbox" class="day-checkbox">
+                            <span class="day-name">Sunday</span>
+                        </div>
+                        <div class="time-range">
+                            <input type="time" class="time-input" value="09:00" disabled>
+                            <span class="time-separator">to</span>
+                            <input type="time" class="time-input" value="17:00" disabled>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-actions">
+                    <button class="btn btn-primary">Save Changes</button>
+                </div>
+            </section>
+
+            <section class="section">
+                <div class="section-header">
+                    <h2 class="section-title">Notifications</h2>
+                    <p class="section-subtitle">Choose when to be notified</p>
+                </div>
+
+                <div class="toggle-row">
+                    <div class="toggle-info">
+                        <h4>New booking notifications</h4>
+                        <p>Receive an email when someone books a meeting</p>
+                    </div>
+                    <div class="toggle active"></div>
+                </div>
+                <div class="toggle-row">
+                    <div class="toggle-info">
+                        <h4>Booking reminders</h4>
+                        <p>Get reminded 15 minutes before a meeting</p>
+                    </div>
+                    <div class="toggle active"></div>
+                </div>
+                <div class="toggle-row">
+                    <div class="toggle-info">
+                        <h4>Cancellation notifications</h4>
+                        <p>Get notified when someone cancels a booking</p>
+                    </div>
+                    <div class="toggle active"></div>
+                </div>
+            </section>
+
+            <section class="section">
+                <div class="section-header">
+                    <h2 class="section-title">Danger Zone</h2>
+                    <p class="section-subtitle">Irreversible actions</p>
+                </div>
+
+                <div class="toggle-row">
+                    <div class="toggle-info">
+                        <h4>Delete account</h4>
+                        <p>Permanently delete your account and all data</p>
+                    </div>
+                    <button class="btn btn-danger">Delete Account</button>
+                </div>
+            </section>
+        </main>
+    </div>
+</body>
+</html>

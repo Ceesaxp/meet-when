@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Confirmed | MeetWhen</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #E85D40;
+            --accent-light: #FFF5F3;
+            --black: #111111;
+            --gray-900: #1a1a1a;
+            --gray-700: #404040;
+            --gray-500: #737373;
+            --gray-300: #d4d4d4;
+            --gray-200: #e5e5e5;
+            --gray-100: #f5f5f5;
+            --white: #ffffff;
+            --success: #16a34a;
+            --success-bg: #f0fdf4;
+            --warning: #ca8a04;
+            --warning-bg: #fefce8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--gray-100);
+            color: var(--black);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 560px;
+            margin: 0 auto;
+            padding: 60px 24px;
+        }
+
+        /* Status header */
+        .status-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .status-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+        }
+
+        .status-icon.confirmed {
+            background: var(--success-bg);
+            color: var(--success);
+        }
+
+        .status-icon.pending {
+            background: var(--warning-bg);
+            color: var(--warning);
+        }
+
+        .status-icon svg {
+            width: 40px;
+            height: 40px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 100px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 16px;
+        }
+
+        .status-badge.confirmed {
+            background: var(--success-bg);
+            color: var(--success);
+        }
+
+        .status-badge.pending {
+            background: var(--warning-bg);
+            color: var(--warning);
+        }
+
+        .status-header h1 {
+            font-size: 1.75rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin-bottom: 8px;
+        }
+
+        .status-header p {
+            color: var(--gray-500);
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+
+        .status-header p strong {
+            color: var(--black);
+        }
+
+        /* Booking card */
+        .booking-card {
+            background: var(--white);
+            border-radius: 16px;
+            border: 1px solid var(--gray-200);
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+
+        .booking-card-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .booking-card-header h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 4px;
+        }
+
+        .booking-card-header p {
+            color: var(--gray-500);
+            font-size: 0.9rem;
+        }
+
+        .booking-details {
+            padding: 0;
+        }
+
+        .detail-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .detail-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--gray-100);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .detail-icon svg {
+            width: 20px;
+            height: 20px;
+            color: var(--gray-700);
+        }
+
+        .detail-content {
+            flex: 1;
+        }
+
+        .detail-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+
+        .detail-value {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--black);
+        }
+
+        .detail-value a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .detail-value a:hover {
+            text-decoration: underline;
+        }
+
+        /* Actions */
+        .primary-actions {
+            margin-bottom: 16px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 16px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            text-decoration: none;
+            border-radius: 12px;
+            transition: all 0.15s;
+            cursor: pointer;
+            border: none;
+            min-height: 56px;
+        }
+
+        .btn-primary {
+            background: var(--black);
+            color: var(--white);
+        }
+
+        .btn-primary:hover {
+            background: var(--gray-900);
+        }
+
+        .btn-primary:active {
+            transform: scale(0.98);
+        }
+
+        .btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .secondary-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn-secondary {
+            flex: 1;
+            background: var(--white);
+            color: var(--gray-700);
+            border: 2px solid var(--gray-200);
+            padding: 14px 20px;
+            font-size: 0.95rem;
+            min-height: 52px;
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--gray-300);
+            background: var(--gray-100);
+        }
+
+        .btn-danger {
+            color: #dc2626;
+        }
+
+        .btn-danger:hover {
+            border-color: #fecaca;
+            background: #fef2f2;
+        }
+
+        /* Back link */
+        .back-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 32px;
+            color: var(--gray-500);
+            text-decoration: none;
+            font-size: 0.95rem;
+        }
+
+        .back-link:hover {
+            color: var(--black);
+        }
+
+        .back-link svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Pending notice */
+        .pending-notice {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 16px 20px;
+            background: var(--warning-bg);
+            border-radius: 12px;
+            margin-bottom: 24px;
+            font-size: 0.9rem;
+            color: var(--warning);
+        }
+
+        .pending-notice svg {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        /* Mobile */
+        @media (max-width: 480px) {
+            .container {
+                padding: 40px 20px;
+            }
+
+            .secondary-actions {
+                flex-direction: column;
+            }
+
+            .btn-secondary {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Confirmed state -->
+        <div class="status-header">
+            <div class="status-icon confirmed">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+            </div>
+            <span class="status-badge confirmed">Confirmed</span>
+            <h1>You're all set!</h1>
+            <p>Your meeting with <strong>Sarah Chen</strong> is confirmed. We've sent you a confirmation email with all the details.</p>
+        </div>
+
+        <!-- Pending state (uncomment to preview)
+        <div class="status-header">
+            <div class="status-icon pending">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                </svg>
+            </div>
+            <span class="status-badge pending">Awaiting Approval</span>
+            <h1>Booking request sent</h1>
+            <p>Your booking request has been sent to <strong>Sarah Chen</strong>. They will review your request and you'll receive an email once it's confirmed.</p>
+        </div>
+
+        <div class="pending-notice">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span>The host needs to approve this booking before it's confirmed.</span>
+        </div>
+        -->
+
+        <div class="booking-card">
+            <div class="booking-card-header">
+                <h2>Discovery Call</h2>
+                <p>with Sarah Chen</p>
+            </div>
+            <div class="booking-details">
+                <div class="detail-row">
+                    <div class="detail-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8" y1="2" x2="8" y2="6"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                    </div>
+                    <div class="detail-content">
+                        <span class="detail-label">Date & Time</span>
+                        <span class="detail-value">Tuesday, January 28, 2025 at 2:00 PM</span>
+                    </div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                    </div>
+                    <div class="detail-content">
+                        <span class="detail-label">Duration</span>
+                        <span class="detail-value">30 minutes</span>
+                    </div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="23 7 16 12 23 17 23 7"/>
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                        </svg>
+                    </div>
+                    <div class="detail-content">
+                        <span class="detail-label">Location</span>
+                        <span class="detail-value"><a href="#">Join Google Meet</a></span>
+                    </div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="2" y1="12" x2="22" y2="12"/>
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                        </svg>
+                    </div>
+                    <div class="detail-content">
+                        <span class="detail-label">Timezone</span>
+                        <span class="detail-value">Pacific Time (PT)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="primary-actions">
+            <a href="#" class="btn btn-primary" download>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                    <line x1="16" y1="2" x2="16" y2="6"/>
+                    <line x1="8" y1="2" x2="8" y2="6"/>
+                    <line x1="3" y1="10" x2="21" y2="10"/>
+                    <line x1="12" y1="14" x2="12" y2="18"/>
+                    <line x1="10" y1="16" x2="14" y2="16"/>
+                </svg>
+                Add to Calendar
+            </a>
+        </div>
+
+        <div class="secondary-actions">
+            <a href="reschedule.html" class="btn btn-secondary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px">
+                    <polyline points="23 4 23 10 17 10"/>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+                Reschedule
+            </a>
+            <button class="btn btn-secondary btn-danger">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="15" y1="9" x2="9" y2="15"/>
+                    <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+                Cancel
+            </button>
+        </div>
+
+        <a href="host-page.html" class="back-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="19" y1="12" x2="5" y2="12"/>
+                <polyline points="12 19 5 12 12 5"/>
+            </svg>
+            Book another meeting
+        </a>
+    </div>
+</body>
+</html>

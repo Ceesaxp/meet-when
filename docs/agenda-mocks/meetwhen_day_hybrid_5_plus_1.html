@@ -1,0 +1,122 @@
+<div style="padding: 1rem 0;">
+<h2 class="sr-only">Day view: horizontal strip overview above color-coded list</h2>
+
+<div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px;">
+  <div>
+    <h3 style="margin: 0; font-size: 22px; font-weight: 500;">Agenda</h3>
+    <p style="margin: 2px 0 0; font-size: 13px; color: var(--color-text-secondary);">Friday, April 17</p>
+  </div>
+  <div style="display: inline-flex; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); overflow: hidden; font-size: 13px;">
+    <span style="padding: 6px 12px; background: var(--color-background-secondary); font-weight: 500;">Today</span>
+    <span style="padding: 6px 12px; color: var(--color-text-secondary); border-left: 0.5px solid var(--color-border-tertiary);">This week</span>
+  </div>
+</div>
+
+<!-- THE STRIP (overview) -->
+<div style="background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 12px 14px; margin-bottom: 14px;">
+
+  <div style="display: grid; grid-template-columns: 110px 1fr; gap: 8px; font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 4px;">
+    <div></div>
+    <div style="display: grid; grid-template-columns: repeat(13, 1fr); padding: 0 2px;">
+      <span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span><span>17</span><span>18</span><span>19</span><span>20</span><span>21</span>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 110px 1fr; gap: 8px; align-items: center; margin-bottom: 6px;">
+    <div style="font-size: 12px; display: flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #378ADD;"></span>digital.space</div>
+    <div style="position: relative; height: 22px; background: var(--color-background-secondary); border-radius: 4px;">
+      <div style="position: absolute; left: 8.33%; right: 75%; top: 2px; bottom: 2px; background: #378ADD; border-radius: 3px;" title="Pitch — Konstantin · 10:00–10:45"></div>
+      <div style="position: absolute; left: 25%; right: 66.67%; top: 2px; bottom: 2px; background: #378ADD; border-radius: 3px;" title="Pitch — Anton · 12:00–12:45"></div>
+      <div style="position: absolute; left: 41.67%; right: 50%; top: 2px; bottom: 2px; background: #378ADD; border-radius: 3px;" title="Pitch — AGIGO · 14:00–14:45"></div>
+      <div style="position: absolute; left: 50%; right: 25%; top: 2px; bottom: 2px; background: #378ADD; border-radius: 3px;" title="block · 15:00–18:00"></div>
+      <div style="position: absolute; left: 83.33%; right: 0%; top: 2px; bottom: 2px; background: #378ADD; border-radius: 3px;" title="Health Tech Friday · 19:00–21:00"></div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 110px 1fr; gap: 8px; align-items: center; margin-bottom: 6px;">
+    <div style="font-size: 12px; display: flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #1D9E75;"></span>personal</div>
+    <div style="position: relative; height: 22px; background: var(--color-background-secondary); border-radius: 4px;">
+      <div style="position: absolute; left: 20.83%; right: 75%; top: 2px; bottom: 2px; background: #1D9E75; border-radius: 3px;" title="Vet — puppy · 11:30–12:00"></div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 110px 1fr; gap: 8px; align-items: center; margin-bottom: 6px;">
+    <div style="font-size: 12px; display: flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #D85A30;"></span>daria-shared</div>
+    <div style="position: relative; height: 22px; background: var(--color-background-secondary); border-radius: 4px;">
+      <div style="position: absolute; left: 79.17%; right: 16.67%; top: 2px; bottom: 2px; background: #D85A30; border-radius: 3px;" title="Dinner with Daria · 18:30–19:30"></div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 110px 1fr; gap: 8px; align-items: center;">
+    <div style="font-size: 12px; display: flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #7F77DD;"></span>squirro-board</div>
+    <div style="position: relative; height: 22px; background: var(--color-background-secondary); border-radius: 4px;">
+      <div style="position: absolute; left: 37.5%; right: 58.33%; top: 2px; bottom: 2px; background: #7F77DD; border-radius: 3px;" title="Board sync · 13:30–14:00"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- THE LIST (detail) -->
+<div style="background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden;">
+<table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+  <thead>
+    <tr style="background: var(--color-background-secondary); text-align: left;">
+      <th style="padding: 10px 14px; font-weight: 500; font-size: 12px; color: var(--color-text-secondary); width: 150px;">Time</th>
+      <th style="padding: 10px 14px; font-weight: 500; font-size: 12px; color: var(--color-text-secondary);">Event</th>
+      <th style="padding: 10px 14px; font-weight: 500; font-size: 12px; color: var(--color-text-secondary); width: 80px;">Duration</th>
+      <th style="padding: 10px 14px; font-weight: 500; font-size: 12px; color: var(--color-text-secondary);">Calendar</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="border-top: 0.5px solid var(--color-border-tertiary); box-shadow: inset 3px 0 0 #378ADD;">
+      <td style="padding: 12px 14px;">10:00 – 10:45</td>
+      <td style="padding: 12px 14px;">Pitch session with Konstantin Zakharyan</td>
+      <td style="padding: 12px 14px; color: var(--color-text-secondary);">45 min</td>
+      <td style="padding: 12px 14px;"><span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #378ADD;"></span>digital.space</span></td>
+    </tr>
+    <tr style="border-top: 0.5px solid var(--color-border-tertiary); box-shadow: inset 3px 0 0 #1D9E75;">
+      <td style="padding: 12px 14px;">11:30 – 12:00</td>
+      <td style="padding: 12px 14px;">Vet appointment — puppy</td>
+      <td style="padding: 12px 14px; color: var(--color-text-secondary);">30 min</td>
+      <td style="padding: 12px 14px;"><span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #1D9E75;"></span>personal</span></td>
+    </tr>
+    <tr style="border-top: 0.5px solid var(--color-border-tertiary); box-shadow: inset 3px 0 0 #378ADD;">
+      <td style="padding: 12px 14px;">12:00 – 12:45</td>
+      <td style="padding: 12px 14px;">Pitch session with Anton Isaichev</td>
+      <td style="padding: 12px 14px; color: var(--color-text-secondary);">45 min</td>
+      <td style="padding: 12px 14px;"><span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #378ADD;"></span>digital.space</span></td>
+    </tr>
+    <tr style="border-top: 0.5px solid var(--color-border-tertiary); box-shadow: inset 3px 0 0 #7F77DD;">
+      <td style="padding: 12px 14px;">13:30 – 14:00</td>
+      <td style="padding: 12px 14px;">Squirro board sync</td>
+      <td style="padding: 12px 14px; color: var(--color-text-secondary);">30 min</td>
+      <td style="padding: 12px 14px;"><span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #7F77DD;"></span>squirro-board</span></td>
+    </tr>
+    <tr style="border-top: 0.5px solid var(--color-border-tertiary); box-shadow: inset 3px 0 0 #378ADD;">
+      <td style="padding: 12px 14px;">14:00 – 14:45</td>
+      <td style="padding: 12px 14px;">Pitch session with AGIGO</td>
+      <td style="padding: 12px 14px; color: var(--color-text-secondary);">45 min</td>
+      <td style="padding: 12px 14px;"><span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #378ADD;"></span>digital.space</span></td>
+    </tr>
+    <tr style="border-top: 0.5px solid var(--color-border-tertiary); box-shadow: inset 3px 0 0 #378ADD;">
+      <td style="padding: 12px 14px;">15:00 – 18:00</td>
+      <td style="padding: 12px 14px;">block</td>
+      <td style="padding: 12px 14px; color: var(--color-text-secondary);">3 hours</td>
+      <td style="padding: 12px 14px;"><span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #378ADD;"></span>digital.space</span></td>
+    </tr>
+    <tr style="border-top: 0.5px solid var(--color-border-tertiary); box-shadow: inset 3px 0 0 #D85A30;">
+      <td style="padding: 12px 14px;">18:30 – 19:30</td>
+      <td style="padding: 12px 14px;">Dinner with Daria</td>
+      <td style="padding: 12px 14px; color: var(--color-text-secondary);">1 hour</td>
+      <td style="padding: 12px 14px;"><span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #D85A30;"></span>daria-shared</span></td>
+    </tr>
+    <tr style="border-top: 0.5px solid var(--color-border-tertiary); box-shadow: inset 3px 0 0 #378ADD;">
+      <td style="padding: 12px 14px;">19:00 – 21:00</td>
+      <td style="padding: 12px 14px;">Health Tech Friday Pitch Session [Plug and Play]</td>
+      <td style="padding: 12px 14px; color: var(--color-text-secondary);">2 hours</td>
+      <td style="padding: 12px 14px;"><span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #378ADD;"></span>digital.space</span></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>

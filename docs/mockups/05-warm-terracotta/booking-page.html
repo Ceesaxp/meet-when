@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book: Discovery Call | MeetWhen - Warm Terracotta</title>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --terracotta: #C65D3B;
+            --terracotta-light: #E88B6A;
+            --sand: #F5EDE4;
+            --sand-dark: #E5D9CB;
+            --olive: #6B7B5E;
+            --charcoal: #2D2D2D;
+            --warm-gray: #7A7570;
+            --white: #FFFFFF;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Karla', sans-serif;
+            background: var(--sand);
+            color: var(--charcoal);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 48px 24px;
+        }
+
+        /* Back link */
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--warm-gray);
+            text-decoration: none;
+            font-weight: 500;
+            margin-bottom: 40px;
+            transition: color 0.2s;
+            min-height: 44px; /* Touch target */
+        }
+
+        .back-link:hover, .back-link:active {
+            color: var(--terracotta);
+        }
+
+        .back-link svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Booking card */
+        .booking-card {
+            background: var(--white);
+            border-radius: 28px;
+            overflow: hidden;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.06);
+            display: grid;
+            grid-template-columns: 340px 1fr;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: linear-gradient(180deg, var(--terracotta) 0%, var(--terracotta-light) 100%);
+            color: var(--white);
+            padding: 48px 40px;
+            position: relative;
+        }
+
+        .sidebar::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 200px;
+            background: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0,100 C100,150 200,50 300,100 C350,125 375,90 400,100 L400,200 L0,200 Z' fill='rgba(255,255,255,0.08)'/%3E%3C/svg%3E");
+            background-size: cover;
+        }
+
+        .sidebar-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .sidebar-avatar {
+            width: 72px;
+            height: 72px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Libre Baskerville', serif;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 24px;
+        }
+
+        .sidebar-host {
+            font-size: 0.95rem;
+            opacity: 0.85;
+            margin-bottom: 4px;
+        }
+
+        .sidebar-title {
+            font-family: 'Libre Baskerville', serif;
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 32px;
+        }
+
+        .sidebar-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 0.95rem;
+        }
+
+        .meta-item svg {
+            width: 22px;
+            height: 22px;
+            opacity: 0.8;
+            flex-shrink: 0;
+        }
+
+        .meta-item.highlight {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 18px 20px;
+            border-radius: 14px;
+            margin-top: 8px;
+        }
+
+        /* Main content */
+        .main-content {
+            padding: 48px;
+        }
+
+        /* Progress */
+        .progress-bar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+
+        .progress-step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--warm-gray);
+        }
+
+        .progress-step .number {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--sand);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+
+        .progress-step.active .number {
+            background: var(--terracotta);
+            color: var(--white);
+        }
+
+        .progress-step.active {
+            color: var(--charcoal);
+            font-weight: 600;
+        }
+
+        .progress-line {
+            flex: 1;
+            height: 2px;
+            background: var(--sand);
+            border-radius: 1px;
+        }
+
+        /* Section title */
+        .section-title {
+            font-family: 'Libre Baskerville', serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+            color: var(--charcoal);
+        }
+
+        /* Calendar */
+        .calendar-container {
+            margin-bottom: 40px;
+        }
+
+        .calendar-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .calendar-month {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--charcoal);
+        }
+
+        .nav-btns {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-btn {
+            width: 44px;
+            height: 44px;
+            border: none;
+            background: var(--sand);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--warm-gray);
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover, .nav-btn:active {
+            background: var(--terracotta);
+            color: var(--white);
+        }
+
+        .nav-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+        }
+
+        .weekday {
+            text-align: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--warm-gray);
+            padding: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .day {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 500;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            min-height: 44px; /* Touch target */
+        }
+
+        .day:hover:not(.disabled):not(.selected),
+        .day:active:not(.disabled):not(.selected) {
+            background: var(--sand);
+        }
+
+        .day.disabled {
+            color: var(--sand-dark);
+            cursor: not-allowed;
+        }
+
+        .day.available::after {
+            content: '';
+            position: absolute;
+            bottom: 5px;
+            width: 4px;
+            height: 4px;
+            background: var(--olive);
+            border-radius: 50%;
+        }
+
+        .day.selected {
+            background: var(--terracotta);
+            color: var(--white);
+        }
+
+        .day.selected::after {
+            display: none;
+        }
+
+        .day.today:not(.selected) {
+            border: 2px solid var(--terracotta);
+        }
+
+        /* Time slots */
+        .time-slots-section {
+            margin-bottom: 40px;
+        }
+
+        .time-slots {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+
+        .time-slot {
+            padding: 16px;
+            text-align: center;
+            background: var(--sand);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 52px; /* Touch target */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .time-slot:hover, .time-slot:active {
+            border-color: var(--terracotta-light);
+            background: var(--white);
+        }
+
+        .time-slot.selected {
+            background: var(--terracotta);
+            border-color: var(--terracotta);
+            color: var(--white);
+        }
+
+        /* CTA */
+        .cta-section {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .cta-btn {
+            padding: 18px 48px;
+            background: var(--terracotta);
+            color: var(--white);
+            border: none;
+            border-radius: 100px;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s;
+            min-height: 56px; /* Touch target */
+        }
+
+        .cta-btn:hover, .cta-btn:active {
+            background: var(--charcoal);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .cta-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* ==================== MOBILE STYLES ==================== */
+
+        /* Mobile header - shown only on mobile */
+        .mobile-header {
+            display: none;
+            background: linear-gradient(135deg, var(--terracotta) 0%, var(--terracotta-light) 100%);
+            color: var(--white);
+            padding: 24px 20px;
+            border-radius: 28px 28px 0 0;
+        }
+
+        .mobile-header-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .mobile-avatar {
+            width: 52px;
+            height: 52px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Libre Baskerville', serif;
+            font-size: 20px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .mobile-info h1 {
+            font-family: 'Libre Baskerville', serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .mobile-info p {
+            font-size: 0.9rem;
+            opacity: 0.85;
+        }
+
+        .mobile-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .mobile-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+
+        .mobile-meta-item svg {
+            width: 18px;
+            height: 18px;
+            opacity: 0.8;
+        }
+
+        .mobile-selection {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 14px 16px;
+            border-radius: 12px;
+            margin-top: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+
+        .mobile-selection svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Tablet */
+        @media (max-width: 900px) {
+            .container {
+                padding: 32px 20px;
+            }
+
+            .booking-card {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                display: none;
+            }
+
+            .mobile-header {
+                display: block;
+            }
+
+            .main-content {
+                padding: 32px 24px;
+            }
+
+            /* Progress bar for tablet */
+            .progress-bar {
+                margin-bottom: 32px;
+            }
+
+            .progress-step span:not(.number) {
+                display: inline;
+            }
+
+            .time-slots {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        /* Mobile */
+        @media (max-width: 640px) {
+            .container {
+                padding: 20px 16px;
+            }
+
+            .back-link {
+                margin-bottom: 24px;
+            }
+
+            .mobile-header {
+                padding: 20px 16px;
+                border-radius: 20px 20px 0 0;
+            }
+
+            .mobile-info h1 {
+                font-size: 1.1rem;
+            }
+
+            .main-content {
+                padding: 24px 16px;
+            }
+
+            /* Simplified progress for mobile */
+            .progress-bar {
+                justify-content: center;
+                gap: 12px;
+                margin-bottom: 28px;
+            }
+
+            .progress-step span:not(.number) {
+                display: none;
+            }
+
+            .progress-step .number {
+                width: 36px;
+                height: 36px;
+            }
+
+            .progress-line {
+                display: none;
+            }
+
+            .section-title {
+                font-size: 1.1rem;
+                margin-bottom: 20px;
+            }
+
+            /* Calendar improvements for touch */
+            .calendar-grid {
+                gap: 4px;
+            }
+
+            .weekday {
+                padding: 8px 4px;
+                font-size: 0.7rem;
+            }
+
+            .day {
+                font-size: 0.9rem;
+                min-height: 48px;
+            }
+
+            .day.available::after {
+                bottom: 4px;
+                width: 3px;
+                height: 3px;
+            }
+
+            .calendar-container {
+                margin-bottom: 32px;
+            }
+
+            /* Time slots - 2 columns on mobile */
+            .time-slots {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+
+            .time-slot {
+                padding: 16px 12px;
+                font-size: 0.95rem;
+            }
+
+            .time-slots-section {
+                margin-bottom: 32px;
+            }
+
+            /* Full-width CTA */
+            .cta-btn {
+                width: 100%;
+                justify-content: center;
+                padding: 18px 32px;
+            }
+        }
+
+        /* Small mobile */
+        @media (max-width: 380px) {
+            .mobile-header-row {
+                flex-wrap: wrap;
+            }
+
+            .mobile-meta {
+                gap: 12px;
+            }
+
+            .calendar-month {
+                font-size: 1rem;
+            }
+
+            .nav-btn {
+                width: 40px;
+                height: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="host-page.html" class="back-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+            Back to Sarah Chen
+        </a>
+
+        <div class="booking-card">
+            <!-- Mobile header - replaces sidebar on mobile -->
+            <header class="mobile-header">
+                <div class="mobile-header-row">
+                    <div class="mobile-avatar">SC</div>
+                    <div class="mobile-info">
+                        <h1>Discovery Call</h1>
+                        <p>with Sarah Chen</p>
+                    </div>
+                </div>
+                <div class="mobile-meta">
+                    <div class="mobile-meta-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 6v6l4 2"/>
+                        </svg>
+                        30 min
+                    </div>
+                    <div class="mobile-meta-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 10l-4 4l6 6l4-16l-18 7l4 2l2 6l3-4"/>
+                        </svg>
+                        Zoom
+                    </div>
+                </div>
+                <div class="mobile-selection">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                        <line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    Wed, January 29 at 2:00 PM
+                </div>
+            </header>
+
+            <!-- Desktop sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-content">
+                    <div class="sidebar-avatar">SC</div>
+                    <p class="sidebar-host">Sarah Chen</p>
+                    <h1 class="sidebar-title">Discovery Call</h1>
+
+                    <div class="sidebar-meta">
+                        <div class="meta-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 6v6l4 2"/>
+                            </svg>
+                            30 minutes
+                        </div>
+                        <div class="meta-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M15 10l-4 4l6 6l4-16l-18 7l4 2l2 6l3-4"/>
+                            </svg>
+                            Zoom
+                        </div>
+                        <div class="meta-item highlight">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                <line x1="16" y1="2" x2="16" y2="6"/>
+                                <line x1="8" y1="2" x2="8" y2="6"/>
+                                <line x1="3" y1="10" x2="21" y2="10"/>
+                            </svg>
+                            Wed, January 29 at 2:00 PM
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="main-content">
+                <div class="progress-bar">
+                    <div class="progress-step active">
+                        <span class="number">1</span>
+                        <span>Select time</span>
+                    </div>
+                    <div class="progress-line"></div>
+                    <div class="progress-step">
+                        <span class="number">2</span>
+                        <span>Your details</span>
+                    </div>
+                    <div class="progress-line"></div>
+                    <div class="progress-step">
+                        <span class="number">3</span>
+                        <span>Confirm</span>
+                    </div>
+                </div>
+
+                <div class="calendar-container">
+                    <h2 class="section-title">Select a Date</h2>
+                    <div class="calendar-nav">
+                        <span class="calendar-month">January 2026</span>
+                        <div class="nav-btns">
+                            <button class="nav-btn" aria-label="Previous month">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M15 18l-6-6 6-6"/>
+                                </svg>
+                            </button>
+                            <button class="nav-btn" aria-label="Next month">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M9 18l6-6-6-6"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="calendar-grid" role="grid" aria-label="Calendar">
+                        <div class="weekday" role="columnheader">Sun</div>
+                        <div class="weekday" role="columnheader">Mon</div>
+                        <div class="weekday" role="columnheader">Tue</div>
+                        <div class="weekday" role="columnheader">Wed</div>
+                        <div class="weekday" role="columnheader">Thu</div>
+                        <div class="weekday" role="columnheader">Fri</div>
+                        <div class="weekday" role="columnheader">Sat</div>
+
+                        <div class="day disabled" role="gridcell"></div>
+                        <div class="day disabled" role="gridcell"></div>
+                        <div class="day disabled" role="gridcell"></div>
+                        <div class="day disabled" role="gridcell">1</div>
+                        <div class="day disabled" role="gridcell">2</div>
+                        <div class="day disabled" role="gridcell">3</div>
+                        <div class="day disabled" role="gridcell">4</div>
+
+                        <div class="day disabled" role="gridcell">5</div>
+                        <div class="day available" role="gridcell" tabindex="0">6</div>
+                        <div class="day available" role="gridcell" tabindex="0">7</div>
+                        <div class="day available" role="gridcell" tabindex="0">8</div>
+                        <div class="day available" role="gridcell" tabindex="0">9</div>
+                        <div class="day available" role="gridcell" tabindex="0">10</div>
+                        <div class="day disabled" role="gridcell">11</div>
+
+                        <div class="day disabled" role="gridcell">12</div>
+                        <div class="day available" role="gridcell" tabindex="0">13</div>
+                        <div class="day available" role="gridcell" tabindex="0">14</div>
+                        <div class="day available" role="gridcell" tabindex="0">15</div>
+                        <div class="day available" role="gridcell" tabindex="0">16</div>
+                        <div class="day available" role="gridcell" tabindex="0">17</div>
+                        <div class="day disabled" role="gridcell">18</div>
+
+                        <div class="day disabled" role="gridcell">19</div>
+                        <div class="day available" role="gridcell" tabindex="0">20</div>
+                        <div class="day available" role="gridcell" tabindex="0">21</div>
+                        <div class="day available" role="gridcell" tabindex="0">22</div>
+                        <div class="day available" role="gridcell" tabindex="0">23</div>
+                        <div class="day available" role="gridcell" tabindex="0">24</div>
+                        <div class="day disabled" role="gridcell">25</div>
+
+                        <div class="day disabled today" role="gridcell">26</div>
+                        <div class="day available" role="gridcell" tabindex="0">27</div>
+                        <div class="day available" role="gridcell" tabindex="0">28</div>
+                        <div class="day selected" role="gridcell" tabindex="0" aria-selected="true">29</div>
+                        <div class="day available" role="gridcell" tabindex="0">30</div>
+                        <div class="day available" role="gridcell" tabindex="0">31</div>
+                        <div class="day disabled" role="gridcell"></div>
+                    </div>
+                </div>
+
+                <div class="time-slots-section">
+                    <h2 class="section-title">Select a Time</h2>
+                    <div class="time-slots" role="listbox" aria-label="Available times">
+                        <div class="time-slot" role="option" tabindex="0">9:00 AM</div>
+                        <div class="time-slot" role="option" tabindex="0">10:00 AM</div>
+                        <div class="time-slot" role="option" tabindex="0">11:00 AM</div>
+                        <div class="time-slot" role="option" tabindex="0">1:00 PM</div>
+                        <div class="time-slot selected" role="option" tabindex="0" aria-selected="true">2:00 PM</div>
+                        <div class="time-slot" role="option" tabindex="0">3:00 PM</div>
+                        <div class="time-slot" role="option" tabindex="0">4:00 PM</div>
+                        <div class="time-slot" role="option" tabindex="0">5:00 PM</div>
+                    </div>
+                </div>
+
+                <div class="cta-section">
+                    <button class="cta-btn">
+                        Continue
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

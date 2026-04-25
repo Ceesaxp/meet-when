@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sarah Chen | MeetWhen - Monochrome Accent Design</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #FF3366;
+            --black: #0a0a0a;
+            --dark: #1a1a1a;
+            --gray-dark: #404040;
+            --gray: #737373;
+            --gray-light: #a3a3a3;
+            --light: #fafafa;
+            --white: #ffffff;
+            --border: #e5e5e5;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--white);
+            color: var(--black);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 80px 24px;
+        }
+
+        /* Header */
+        .profile-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 24px;
+            margin-bottom: 64px;
+            padding-bottom: 48px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .avatar {
+            width: 80px;
+            height: 80px;
+            background: var(--black);
+            color: var(--white);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .profile-info {
+            flex: 1;
+        }
+
+        .profile-name {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            margin-bottom: 4px;
+        }
+
+        .profile-role {
+            font-size: 1rem;
+            color: var(--gray);
+        }
+
+        .profile-role span {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .profile-bio {
+            margin-top: 16px;
+            color: var(--gray-dark);
+            line-height: 1.6;
+            max-width: 500px;
+        }
+
+        /* Section */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 32px;
+        }
+
+        .section-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--gray);
+        }
+
+        .section-count {
+            font-size: 0.85rem;
+            color: var(--gray-light);
+        }
+
+        /* Meeting list */
+        .meetings-list {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .meeting-item {
+            display: flex;
+            align-items: center;
+            padding: 28px 0;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .meeting-item:first-child {
+            border-top: 1px solid var(--border);
+        }
+
+        .meeting-item::before {
+            content: '';
+            position: absolute;
+            left: -24px;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--accent);
+            transform: scaleY(0);
+            transition: transform 0.2s;
+        }
+
+        .meeting-item:hover::before {
+            transform: scaleY(1);
+        }
+
+        .meeting-item:hover {
+            padding-left: 16px;
+        }
+
+        .meeting-duration {
+            width: 72px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--gray);
+            flex-shrink: 0;
+        }
+
+        .meeting-content {
+            flex: 1;
+        }
+
+        .meeting-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            letter-spacing: -0.01em;
+        }
+
+        .meeting-description {
+            color: var(--gray);
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .meeting-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--gray-light);
+            margin-left: 24px;
+        }
+
+        .meeting-meta svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .meeting-arrow {
+            margin-left: 24px;
+            opacity: 0;
+            transform: translateX(-8px);
+            transition: all 0.2s;
+            color: var(--accent);
+        }
+
+        .meeting-item:hover .meeting-arrow {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .meeting-arrow svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 80px;
+            padding-top: 32px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            color: var(--gray);
+        }
+
+        .footer a {
+            color: var(--black);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .footer a:hover {
+            color: var(--accent);
+        }
+
+        .timezone {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .timezone svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Mobile */
+        @media (max-width: 640px) {
+            .container {
+                padding: 48px 20px;
+            }
+
+            .profile-header {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .avatar {
+                margin: 0 auto;
+            }
+
+            .profile-bio {
+                max-width: none;
+            }
+
+            .meeting-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .meeting-duration {
+                width: auto;
+            }
+
+            .meeting-meta {
+                margin-left: 0;
+                margin-top: 8px;
+            }
+
+            .meeting-arrow {
+                display: none;
+            }
+
+            .footer {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="profile-header">
+            <div class="avatar">SC</div>
+            <div class="profile-info">
+                <h1 class="profile-name">Sarah Chen</h1>
+                <p class="profile-role">Product Lead at <span>TechCorp</span></p>
+                <p class="profile-bio">
+                    I help teams build better products through strategic planning and user-centered design.
+                    Let's connect and explore how we can work together.
+                </p>
+            </div>
+        </header>
+
+        <div class="section-header">
+            <span class="section-title">Available Meetings</span>
+            <span class="section-count">3 types</span>
+        </div>
+
+        <div class="meetings-list">
+            <div class="meeting-item">
+                <span class="meeting-duration">15 min</span>
+                <div class="meeting-content">
+                    <h3 class="meeting-title">Quick Sync</h3>
+                    <p class="meeting-description">Fast check-in for quick questions or status updates.</p>
+                </div>
+                <div class="meeting-meta">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 10l-4 4l6 6l4-16l-18 7l4 2l2 6l3-4"/>
+                    </svg>
+                    Google Meet
+                </div>
+                <div class="meeting-arrow">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="meeting-item">
+                <span class="meeting-duration">30 min</span>
+                <div class="meeting-content">
+                    <h3 class="meeting-title">Discovery Call</h3>
+                    <p class="meeting-description">Let's explore how we can work together and discuss your needs.</p>
+                </div>
+                <div class="meeting-meta">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 10l-4 4l6 6l4-16l-18 7l4 2l2 6l3-4"/>
+                    </svg>
+                    Zoom
+                </div>
+                <div class="meeting-arrow">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="meeting-item">
+                <span class="meeting-duration">60 min</span>
+                <div class="meeting-content">
+                    <h3 class="meeting-title">Deep Dive Session</h3>
+                    <p class="meeting-description">In-depth strategy session for complex discussions or workshops.</p>
+                </div>
+                <div class="meeting-meta">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 10l-4 4l6 6l4-16l-18 7l4 2l2 6l3-4"/>
+                    </svg>
+                    Google Meet
+                </div>
+                <div class="meeting-arrow">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <span>Powered by <a href="#">MeetWhen</a></span>
+            <div class="timezone">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+                Pacific Time (PT)
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

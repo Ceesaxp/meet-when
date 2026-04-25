@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookings | MeetWhen</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #E85D40;
+            --accent-light: #FFF5F3;
+            --black: #111111;
+            --gray-900: #1a1a1a;
+            --gray-700: #404040;
+            --gray-500: #737373;
+            --gray-300: #d4d4d4;
+            --gray-200: #e5e5e5;
+            --gray-100: #f5f5f5;
+            --white: #ffffff;
+            --success: #16a34a;
+            --success-bg: #f0fdf4;
+            --warning: #ca8a04;
+            --warning-bg: #fefce8;
+            --error: #dc2626;
+            --error-bg: #fef2f2;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--gray-100);
+            color: var(--black);
+            min-height: 100vh;
+        }
+
+        .dashboard {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            background: var(--white);
+            border-right: 1px solid var(--gray-200);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .logo {
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            color: var(--black);
+            text-decoration: none;
+        }
+
+        .logo span {
+            color: var(--accent);
+        }
+
+        .nav-menu {
+            flex: 1;
+            padding: 16px 12px;
+            list-style: none;
+        }
+
+        .nav-item {
+            margin-bottom: 4px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            color: var(--gray-700);
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.15s;
+        }
+
+        .nav-link:hover {
+            background: var(--gray-100);
+            color: var(--black);
+        }
+
+        .nav-link.active {
+            background: var(--black);
+            color: var(--white);
+        }
+
+        .nav-link svg {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        .nav-badge {
+            margin-left: auto;
+            background: var(--accent);
+            color: var(--white);
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 100px;
+        }
+
+        .nav-link.active .nav-badge {
+            background: var(--white);
+            color: var(--black);
+        }
+
+        .sidebar-footer {
+            padding: 16px;
+            border-top: 1px solid var(--gray-200);
+        }
+
+        .user-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 10px;
+            background: var(--gray-100);
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: var(--black);
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .user-info {
+            flex: 1;
+        }
+
+        .user-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .user-email {
+            font-size: 0.8rem;
+            color: var(--gray-500);
+        }
+
+        /* Main content */
+        .main {
+            flex: 1;
+            margin-left: 260px;
+            padding: 32px;
+        }
+
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .page-title {
+            font-size: 1.75rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+        }
+
+        /* Filters */
+        .filters {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 10px 18px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: 1px solid var(--gray-200);
+            border-radius: 100px;
+            background: var(--white);
+            color: var(--gray-700);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .filter-btn:hover {
+            border-color: var(--gray-300);
+            background: var(--gray-100);
+        }
+
+        .filter-btn.active {
+            border-color: var(--black);
+            background: var(--black);
+            color: var(--white);
+        }
+
+        .filter-count {
+            display: inline-block;
+            margin-left: 6px;
+            padding: 2px 8px;
+            background: rgba(0,0,0,0.1);
+            border-radius: 100px;
+            font-size: 0.75rem;
+        }
+
+        .filter-btn.active .filter-count {
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* Table */
+        .table-container {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table th {
+            text-align: left;
+            padding: 16px 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--gray-500);
+            background: var(--gray-100);
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .table td {
+            padding: 16px 20px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid var(--gray-100);
+            vertical-align: middle;
+        }
+
+        .table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .table tr:hover td {
+            background: var(--gray-100);
+        }
+
+        .guest-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .guest-name {
+            font-weight: 500;
+        }
+
+        .guest-email {
+            font-size: 0.8rem;
+            color: var(--gray-500);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-pending {
+            background: var(--warning-bg);
+            color: var(--warning);
+        }
+
+        .badge-confirmed {
+            background: var(--success-bg);
+            color: var(--success);
+        }
+
+        .badge-cancelled {
+            background: var(--gray-100);
+            color: var(--gray-500);
+        }
+
+        .badge-rejected {
+            background: var(--error-bg);
+            color: var(--error);
+        }
+
+        .table-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-sm {
+            padding: 8px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-approve {
+            background: var(--success-bg);
+            color: var(--success);
+        }
+
+        .btn-approve:hover {
+            background: #dcfce7;
+        }
+
+        .btn-cancel {
+            background: var(--gray-100);
+            color: var(--gray-700);
+        }
+
+        .btn-cancel:hover {
+            background: var(--gray-200);
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-top: 1px solid var(--gray-200);
+        }
+
+        .pagination-info {
+            font-size: 0.85rem;
+            color: var(--gray-500);
+        }
+
+        .pagination-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .pagination-btn {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            background: var(--white);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+            background: var(--gray-100);
+        }
+
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Mobile header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: var(--white);
+            border-bottom: 1px solid var(--gray-200);
+            padding: 0 20px;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 99;
+        }
+
+        .mobile-menu-btn {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: none;
+            border: 1px solid var(--gray-200);
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .mobile-header {
+                display: flex;
+            }
+
+            .main {
+                margin-left: 0;
+                padding: 88px 20px 32px;
+            }
+
+            .table-container {
+                overflow-x: auto;
+            }
+
+            .table {
+                min-width: 700px;
+            }
+
+            .filters {
+                overflow-x: auto;
+                flex-wrap: nowrap;
+                padding-bottom: 8px;
+            }
+
+            .filter-btn {
+                flex-shrink: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <header class="mobile-header">
+            <a href="#" class="logo">Meet<span>When</span></a>
+            <button class="mobile-menu-btn" aria-label="Menu">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 12h18M3 6h18M3 18h18"/>
+                </svg>
+            </button>
+        </header>
+
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <a href="#" class="logo">Meet<span>When</span></a>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="dashboard-home.html" class="nav-link">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                            <polyline points="9 22 9 12 15 12 15 22"/>
+                        </svg>
+                        Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="dashboard-templates.html" class="nav-link">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8" y1="2" x2="8" y2="6"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                        Meeting Types
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="dashboard-bookings.html" class="nav-link active">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                        </svg>
+                        Bookings
+                        <span class="nav-badge">3</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="dashboard-agenda.html" class="nav-link">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                        Agenda
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="dashboard-calendars.html" class="nav-link">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                        </svg>
+                        Calendars
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="dashboard-settings.html" class="nav-link">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                        Settings
+                    </a>
+                </li>
+            </ul>
+            <div class="sidebar-footer">
+                <div class="user-card">
+                    <div class="user-avatar">SC</div>
+                    <div class="user-info">
+                        <div class="user-name">Sarah Chen</div>
+                        <div class="user-email">sarah@techcorp.io</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div class="page-header">
+                <h1 class="page-title">Bookings</h1>
+            </div>
+
+            <div class="filters">
+                <button class="filter-btn active">All<span class="filter-count">12</span></button>
+                <button class="filter-btn">Pending<span class="filter-count">3</span></button>
+                <button class="filter-btn">Confirmed<span class="filter-count">5</span></button>
+                <button class="filter-btn">Past<span class="filter-count">4</span></button>
+                <button class="filter-btn">Cancelled</button>
+            </div>
+
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>Guest</th>
+                            <th>Meeting Type</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Jan 28, 2025 at 2:00 PM</td>
+                            <td>
+                                <div class="guest-info">
+                                    <span class="guest-name">Alex Rivera</span>
+                                    <span class="guest-email">alex@startup.io</span>
+                                </div>
+                            </td>
+                            <td>Discovery Call (30 min)</td>
+                            <td><span class="badge badge-pending">Pending</span></td>
+                            <td>
+                                <div class="table-actions">
+                                    <button class="btn-sm btn-approve">Approve</button>
+                                    <button class="btn-sm btn-cancel">Decline</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Jan 29, 2025 at 10:00 AM</td>
+                            <td>
+                                <div class="guest-info">
+                                    <span class="guest-name">Jordan Lee</span>
+                                    <span class="guest-email">jordan@company.com</span>
+                                </div>
+                            </td>
+                            <td>Quick Sync (15 min)</td>
+                            <td><span class="badge badge-confirmed">Confirmed</span></td>
+                            <td>
+                                <div class="table-actions">
+                                    <button class="btn-sm btn-cancel">Cancel</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Jan 29, 2025 at 3:00 PM</td>
+                            <td>
+                                <div class="guest-info">
+                                    <span class="guest-name">Morgan Taylor</span>
+                                    <span class="guest-email">morgan@agency.co</span>
+                                </div>
+                            </td>
+                            <td>Deep Dive (60 min)</td>
+                            <td><span class="badge badge-pending">Pending</span></td>
+                            <td>
+                                <div class="table-actions">
+                                    <button class="btn-sm btn-approve">Approve</button>
+                                    <button class="btn-sm btn-cancel">Decline</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Jan 30, 2025 at 11:00 AM</td>
+                            <td>
+                                <div class="guest-info">
+                                    <span class="guest-name">Casey Smith</span>
+                                    <span class="guest-email">casey@firm.com</span>
+                                </div>
+                            </td>
+                            <td>Discovery Call (30 min)</td>
+                            <td><span class="badge badge-confirmed">Confirmed</span></td>
+                            <td>
+                                <div class="table-actions">
+                                    <button class="btn-sm btn-cancel">Cancel</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Jan 30, 2025 at 2:30 PM</td>
+                            <td>
+                                <div class="guest-info">
+                                    <span class="guest-name">Riley Johnson</span>
+                                    <span class="guest-email">riley@tech.io</span>
+                                </div>
+                            </td>
+                            <td>Quick Sync (15 min)</td>
+                            <td><span class="badge badge-pending">Pending</span></td>
+                            <td>
+                                <div class="table-actions">
+                                    <button class="btn-sm btn-approve">Approve</button>
+                                    <button class="btn-sm btn-cancel">Decline</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="pagination">
+                    <span class="pagination-info">Showing 1-5 of 12 bookings</span>
+                    <div class="pagination-buttons">
+                        <button class="pagination-btn" disabled>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 18 9 12 15 6"/>
+                            </svg>
+                        </button>
+                        <button class="pagination-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 18 15 12 9 6"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
