@@ -17,7 +17,7 @@
         "Build succeeds"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "IMPORTANT: Events are NOT clipped to day boundaries here. Clipping happens only in FlatLane (US-002) for strip rendering. The detail list uses original event times so overnight events show their full duration. See PRD §9 table: 'Full duration in the list.'"
     },
     {

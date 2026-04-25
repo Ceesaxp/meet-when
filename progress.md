@@ -1810,3 +1810,15 @@ The following features from the requirements document are already fully implemen
   - When features are built as part of earlier stories, check all acceptance criteria before assuming more work is needed
   - The contact backfill pattern (check-then-populate on first access) is a lazy initialization approach
 ----
+
+## 2026-04-25 - US-001 (PR2) - Add GetWeek method to AgendaService
+- Added `DayEvents` struct (DayStart, DayEnd, Events) and `WeekView` struct (Calendars, Days [7]DayEvents, WeekStart, HostTZ) to `internal/services/agenda.go`
+- Added `GetWeek(ctx, hostID, weekStart)` method: loads host+calendars once, calls AssignColors once, fetches full Mon 00:00–next Mon 00:00 window in one call
+- Events assigned to every day they touch (Start < dayEnd AND End > dayStart) without clipping; each day's events sorted by start time
+- Files changed:
+  - `internal/services/agenda.go`
+- **Learnings for future iterations:**
+  - `range over int` (e.g., `for i := range 7`) is the modernize-preferred pattern in this codebase
+  - Events are intentionally NOT clipped here — clipping happens later in FlatLane (US-002) only for strip rendering
+  - `GetAgendaEventsWithCalendars` accepts a `*models.Host` that can be used for timezone in the future
+----
