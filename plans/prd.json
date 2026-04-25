@@ -17,7 +17,7 @@
         "Build succeeds"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "IMPORTANT: Events are NOT clipped to day boundaries here. Clipping happens only in FlatLane (US-002) for strip rendering. The detail list uses original event times so overnight events show their full duration. See PRD §9 table: 'Full duration in the list.'"
     },
     {
@@ -34,7 +34,7 @@
         "Build succeeds"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Unlike LanesByCalendar (one lane per calendar), FlatLane overlays all calendars into a single lane. Overflow fields are used by the template to render small arrow indicators at the strip edge (PRD §5.2, §7.3)."
     },
     {
@@ -49,7 +49,7 @@
         "Build succeeds"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "These fields enable the .strip-overflow arrow indicator in the template. The day strip from PR1 doesn't need overflow arrows (single-day window) but the fields won't break it."
     },
     {
@@ -65,7 +65,7 @@
         "Build succeeds"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "The shared window ensures all 7 day rows have identical column alignment so hour labels at the top apply to every row."
     },
     {
@@ -86,7 +86,7 @@
         "Tests pass"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Add tests to internal/services/agenda_strip_test.go (FlatLane, ComputeSharedWindow) and internal/services/agenda_test.go (GetWeek assignment)."
     },
     {
@@ -104,7 +104,7 @@
         "Build succeeds"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "FullDateFormatted and EventCount are used by the selected-day detail header (see mock line 100: 'Friday, April 17 · 8 events'). Events are unclipped originals for the detail list."
     },
     {
@@ -125,7 +125,7 @@
         "Build succeeds"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "Reference mock: docs/agenda-mocks/meetwhen_week_hybrid_5_plus_1.html. The selected row uses grid 90px+1fr, background highlight, and 2px left border."
     },
     {
@@ -145,7 +145,7 @@
         "Build succeeds"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "Accesses .Data because it's called via {{template \"week_strip.html\" .}} from the page template where . is PageData. Rows are <button role='tab'> for keyboard accessibility (Tab/Enter/Space to switch days). Mock reference: docs/agenda-mocks/meetwhen_week_hybrid_5_plus_1.html"
     },
     {
@@ -161,7 +161,7 @@
         "Build succeeds"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "Reuses day_detail.html from PR1 via dict helper to construct the expected data shape. This avoids duplicating the event list markup. The detail header is rendered once (not per-day) and updated by JS when the active day changes (US-009). dict template func already exists (added in PR1). NOTE: The week mock shows a denser table-style detail (with header row) vs PR1's simpler card-style list. PR2 accepts the PR1 detail styling for now — a week-specific detail refinement (table layout matching the mock) is deferred to a follow-up."
     },
     {
@@ -179,7 +179,7 @@
         "Build succeeds"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "~25 lines of vanilla JS. No HTMX needed for intra-week switching — the data is already in the DOM. Each row stores its full date and event count in data attributes for the header update."
     },
     {
@@ -198,7 +198,7 @@
         "Build succeeds"
       ],
       "priority": 11,
-      "passes": false,
+      "passes": true,
       "notes": "The ?week= param enables direct linking to a specific week (e.g. /dashboard/agenda?view=week&week=2026-04-13). PRD §6 specifies this route shape."
     },
     {
@@ -213,7 +213,7 @@
         "Build succeeds"
       ],
       "priority": 12,
-      "passes": false,
+      "passes": true,
       "notes": "This replaces the old list-based week view with the strip visualization. Calendar legend is inside week_strip.html (matching mock layout where legend is inside the strip card)."
     }
   ]

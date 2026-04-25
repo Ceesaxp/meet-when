@@ -1810,3 +1810,36 @@ The following features from the requirements document are already fully implemen
   - When features are built as part of earlier stories, check all acceptance criteria before assuming more work is needed
   - The contact backfill pattern (check-then-populate on first access) is a lazy initialization approach
 ----
+
+## 2026-04-25 - US-001 (PR2) - Add GetWeek method to AgendaService
+- Added `DayEvents` struct (DayStart, DayEnd, Events) and `WeekView` struct (Calendars, Days [7]DayEvents, WeekStart, HostTZ) to `internal/services/agenda.go`
+- Added `GetWeek(ctx, hostID, weekStart)` method: loads host+calendars once, calls AssignColors once, fetches full Mon 00:00–next Mon 00:00 window in one call
+- Events assigned to every day they touch (Start < dayEnd AND End > dayStart) without clipping; each day's events sorted by start time
+- Files changed:
+  - `internal/services/agenda.go`
+- **Learnings for future iterations:**
+  - `range over int` (e.g., `for i := range 7`) is the modernize-preferred pattern in this codebase
+  - Events are intentionally NOT clipped here — clipping happens later in FlatLane (US-002) only for strip rendering
+  - `GetAgendaEventsWithCalendars` accepts a `*models.Host` that can be used for timezone in the future
+  - **Critical timezone pattern**: `GetWeek` uses `weekStart.In(loc)` to read local calendar date. Callers passing a date-only UTC parse (`time.Parse("2006-01-02", s)`) MUST pre-convert: `utcY, utcMo, utcD := parsed.UTC().Date(); weekStart = time.Date(utcY, utcMo, utcD, 0, 0, 0, 0, loc)`. Do NOT use `.UTC().Date()` inside `GetWeek` — it breaks east-of-UTC hosts (e.g. JST 2026-04-20 00:00 → UTC April 19 → wrong week).
+  - DST-safe bucket boundaries: always use `monday.AddDate(0, 0, i+1)` not `dayStart.Add(24*time.Hour)` for day bucket edges
+  - All-day events stored as UTC midnight by providers; for bucket overlap checks, re-interpret UTC date as local midnight using `time.Date(y, m, d, 0, 0, 0, 0, loc)`
+----
+
+## 2026-04-25 - US-002/002b/003/004/005/006/007/008/009/010/011 (PR2) - Full week view implementation
+- **US-002/002b**: Added `FlatLane` function and `OverflowLeft`/`OverflowRight` fields to `StripBlock`. Updated `LanesByCalendar` to set overflow fields. `FlatLane` overlays all calendars into one lane; overflow set when original event extents exceed the window.
+- **US-003**: Added `ComputeSharedWindow([7]DayEvents)` — same adaptive 09:00–18:00±30min logic as `ComputeVisibleWindow` but across all 7 days.
+- **US-004**: Tests in `agenda_test.go` (extracted `assignEventsToBuckets` helper for direct testing without repo mocks) and `agenda_strip_test.go` (FlatLane, overflow, ComputeSharedWindow, shared-window+FlatLane integration).
+- **US-005**: `WeekDayView` struct and `BuildWeekDayViews` with formatted date strings, FlatLane blocks, IsToday/IsActive logic.
+- **US-006**: CSS for `.week-strip-container`, `.week-strip-row`, `.week-strip-row--active`, `.week-strip-row--today`, `.week-day-detail`, `.week-detail-header`, `.strip-overflow`.
+- **US-007**: `templates/partials/week_strip.html` with `role="tablist"`, 7 `<button role="tab">` rows, shared hour-label header, overflow indicators, calendar legend inside the card.
+- **US-008/009**: Pre-rendered 7 day panels in `dashboard_agenda.html`, detail header, 28-line vanilla JS day-switching with keyboard Arrow Up/Down + Enter/Space.
+- **US-010**: Handler updated — parses `?week=YYYY-MM-DD` (re-interprets UTC date as local midnight for `GetWeek`), calls `GetWeek`+`ComputeSharedWindow`+`BuildWeekDayViews`. Removed `AgendaDayGroup` type and `groupEventsByDay` function.
+- **US-011**: Week view template branch replaced with `week_strip.html` partial + detail panels + JS.
+- Files changed: `internal/services/agenda.go`, `internal/services/agenda_strip.go`, `internal/services/agenda_test.go`, `internal/services/agenda_strip_test.go`, `internal/handlers/dashboard.go`, `static/css/style.css`, `templates/partials/week_strip.html`, `templates/pages/dashboard_agenda.html`
+- **Learnings for future iterations:**
+  - Testing Go code that calls through `*repository.Repositories` (concrete struct, not interface): extract the pure business logic into a package-level helper function that can be tested directly — no mocks needed.
+  - `time.Parse("2006-01-02", s)` returns midnight UTC. When passing to a service that uses `.In(loc)`, pre-convert: `utcY, utcMo, utcD := parsed.UTC().Date(); t = time.Date(utcY, utcMo, utcD, 0, 0, 0, 0, loc)`. The handler (US-010) is the right place for this conversion, not inside `GetWeek`.
+  - `plans/` is in `.gitignore` — always use `git add -f plans/prd.json` when committing PRD updates.
+  - `{{template "day_detail.html" (dict "Events" $day.Events)}}` pattern works well for passing a named subset of data to a partial that expects a flat struct.
+----

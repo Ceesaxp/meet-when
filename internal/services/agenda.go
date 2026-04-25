@@ -10,6 +10,23 @@ import (
 	"github.com/meet-when/meet-when/internal/repository"
 )
 
+// DayEvents holds the events that touch a single calendar day.
+// Events are NOT clipped to day boundaries — the original Start/End are
+// preserved so the detail list can show the full duration of overnight events.
+type DayEvents struct {
+	DayStart time.Time
+	DayEnd   time.Time
+	Events   []AgendaEvent
+}
+
+// WeekView is the view model for a full 7-day week.
+type WeekView struct {
+	Calendars []*models.CalendarConnection
+	Days      [7]DayEvents
+	WeekStart time.Time
+	HostTZ    *time.Location
+}
+
 // AgendaService composes the full agenda day view model.
 type AgendaService struct {
 	repos    *repository.Repositories
@@ -71,4 +88,103 @@ func (s *AgendaService) GetDay(ctx context.Context, hostID string, date time.Tim
 		DayEnd:    dayEnd,
 		HostTZ:    loc,
 	}, nil
+}
+
+// GetWeek returns a WeekView for the 7-day period starting on weekStart (a
+// Monday in the host's timezone). Events are assigned to each day they touch
+// (event.Start < dayEnd AND event.End > dayStart) without clipping — the
+// original Start/End are preserved so overnight events appear with their full
+// duration in the detail list. Events appear in BOTH days they span across
+// midnight. Each day's events are sorted by start time.
+func (s *AgendaService) GetWeek(ctx context.Context, hostID string, weekStart time.Time) (*WeekView, error) {
+	host, err := s.repos.Host.GetByID(ctx, hostID)
+	if err != nil {
+		return nil, fmt.Errorf("load host: %w", err)
+	}
+
+	loc, err := time.LoadLocation(host.Timezone)
+	if err != nil {
+		loc = time.UTC
+	}
+
+	calendars, err := s.repos.Calendar.GetByHostID(ctx, hostID)
+	if err != nil {
+		return nil, fmt.Errorf("load calendars: %w", err)
+	}
+
+	AssignColors(calendars)
+
+	// Normalize weekStart to 00:00 Monday of the containing week in host
+	// timezone. weekStart must already carry the correct local instant — either
+	// time.Now().In(loc) or a date-only parse reinterpreted as local midnight:
+	//
+	//   utcY, utcMo, utcD := parsed.UTC().Date()
+	//   weekStart = time.Date(utcY, utcMo, utcD, 0, 0, 0, 0, loc)
+	//
+	// Using .UTC().Date() inside GetWeek would break positive-offset hosts:
+	// e.g. 2026-04-20 00:00 JST → UTC April 19 → week backs up to April 13.
+	localStart := weekStart.In(loc)
+	y, mo, d := localStart.Date()
+	weekday := localStart.Weekday()
+	daysFromMonday := int(weekday) - 1
+	if weekday == time.Sunday {
+		daysFromMonday = 6
+	}
+	monday := time.Date(y, mo, d-daysFromMonday, 0, 0, 0, 0, loc)
+	nextMonday := monday.AddDate(0, 0, 7)
+
+	events, err := s.calendar.GetAgendaEventsWithCalendars(ctx, calendars, host, monday, nextMonday)
+	if err != nil {
+		return nil, fmt.Errorf("fetch events: %w", err)
+	}
+
+	// Build 7 day buckets using calendar-date arithmetic so that DST
+	// transitions (spring-forward / fall-back) do not shift the bucket
+	// boundary away from local midnight. AddDate always lands on the
+	// calendar day's 00:00 in the target location.
+	var days [7]DayEvents
+	for i := range 7 {
+		dayStart := monday.AddDate(0, 0, i)
+		dayEnd := monday.AddDate(0, 0, i+1)
+		days[i] = DayEvents{DayStart: dayStart, DayEnd: dayEnd}
+	}
+
+	assignEventsToBuckets(events, &days, loc)
+
+	// Sort each day's events by start time.
+	for i := range days {
+		slices.SortFunc(days[i].Events, func(a, b AgendaEvent) int {
+			return a.Start.Compare(b.Start)
+		})
+	}
+
+	return &WeekView{
+		Calendars: calendars,
+		Days:      days,
+		WeekStart: monday,
+		HostTZ:    loc,
+	}, nil
+}
+
+// assignEventsToBuckets assigns each event to every day bucket it overlaps.
+// All-day events (stored as UTC midnight by calendar providers) are
+// re-interpreted in loc so that "2026-04-21 UTC" maps to April 21 locally
+// rather than the previous local day for west-of-UTC hosts. Original event
+// Start/End are stored unchanged so downstream detail views are unaffected.
+func assignEventsToBuckets(events []AgendaEvent, days *[7]DayEvents, loc *time.Location) {
+	for _, e := range events {
+		eStart, eEnd := e.Start, e.End
+		if e.IsAllDay {
+			y, m, d := e.Start.UTC().Date()
+			eStart = time.Date(y, m, d, 0, 0, 0, 0, loc)
+			yE, mE, dE := e.End.UTC().Date()
+			eEnd = time.Date(yE, mE, dE, 0, 0, 0, 0, loc)
+		}
+		for i := range days {
+			// Event touches this day if it starts before dayEnd AND ends after dayStart.
+			if eStart.Before(days[i].DayEnd) && eEnd.After(days[i].DayStart) {
+				days[i].Events = append(days[i].Events, e)
+			}
+		}
+	}
 }

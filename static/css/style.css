@@ -5190,6 +5190,112 @@ body.modal-open {
 }
 
 /* ============================================
+   Week Strip
+   ============================================ */
+
+.week-strip-container {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+}
+
+.week-strip-row {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    cursor: pointer;
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    border-radius: var(--radius-sm);
+}
+
+.week-strip-row:hover {
+    background: var(--gray-100);
+}
+
+.week-strip-row--active {
+    background: var(--gray-100);
+    border-left: 2px solid var(--accent);
+    padding-left: 6px;
+}
+
+.week-strip-row--today .week-strip-day-label::after {
+    content: " today";
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    vertical-align: middle;
+    margin-left: 2px;
+}
+
+.week-strip-day-label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--gray-700);
+    white-space: nowrap;
+}
+
+.week-day-details {
+    margin-top: 12px;
+}
+
+.week-day-detail {
+    display: none;
+}
+
+.week-day-detail--active {
+    display: block;
+}
+
+.week-detail-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 10px 0 8px;
+    border-bottom: 1px solid var(--gray-100);
+    margin-bottom: 8px;
+}
+
+.week-detail-header-title {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--gray-900);
+}
+
+.week-detail-header-hint {
+    font-size: 0.8rem;
+    color: var(--gray-500);
+}
+
+.strip-overflow {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.5rem;
+    color: var(--gray-500);
+    pointer-events: none;
+}
+
+.strip-overflow--left {
+    left: 0;
+}
+
+.strip-overflow--right {
+    right: 0;
+}
+
+/* ============================================
    Color Swatch Picker
    ============================================ */
 
