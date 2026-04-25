@@ -900,6 +900,325 @@ body.landing .section-header {
     max-width: 600px;
 }
 
+/* ============================================
+   Onboarding Wizard
+   ============================================ */
+.onboarding-container {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 48px 24px;
+}
+
+.onboarding-header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.onboarding-header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 16px 0 4px;
+}
+
+.onboarding-header p {
+    color: var(--gray-500);
+    font-size: 0.9rem;
+}
+
+.onboarding-progress {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 32px;
+}
+
+.progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.progress-step .step-number {
+    width: 36px;
+    height: 36px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    background: var(--gray-200);
+    color: var(--gray-500);
+}
+
+.progress-step.active .step-number {
+    background: var(--accent);
+    color: var(--white);
+}
+
+.progress-step.completed .step-number {
+    background: var(--accent);
+    color: var(--white);
+}
+
+.step-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--gray-500);
+}
+
+.progress-step.active .step-label {
+    color: var(--black);
+    font-weight: 600;
+}
+
+.progress-line {
+    width: 48px;
+    height: 2px;
+    background: var(--gray-200);
+    margin: 0 8px;
+    margin-bottom: 22px; /* offset for step-label height */
+}
+
+.progress-line.active {
+    background: var(--accent);
+}
+
+.onboarding-content {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+}
+
+.onboarding-step h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.onboarding-step .step-description {
+    color: var(--gray-500);
+    font-size: 0.875rem;
+    margin-bottom: 24px;
+}
+
+.onboarding-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--gray-100);
+}
+
+/* Calendar connection options in step 2 */
+.calendar-options {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.calendar-option {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 20px;
+}
+
+.calendar-option-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.calendar-option-header h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.calendar-option p {
+    color: var(--gray-500);
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+}
+
+.caldav-details {
+    margin-top: 12px;
+}
+
+.caldav-form {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.connected-calendars {
+    margin-bottom: 20px;
+    padding: 16px;
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+}
+
+.connected-calendars h3 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.connected-calendars ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.connected-calendars li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+    padding: 4px 0;
+}
+
+/* ============================================
+   Onboarding Complete
+   ============================================ */
+.onboarding-complete-container {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 48px 24px;
+    text-align: center;
+}
+
+.onboarding-complete-container .success-icon {
+    color: var(--accent);
+    margin-bottom: 16px;
+}
+
+.onboarding-complete-container h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.onboarding-complete-container .subtitle {
+    color: var(--gray-500);
+    font-size: 0.95rem;
+    margin-bottom: 32px;
+}
+
+.booking-link-box {
+    text-align: left;
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.link-container {
+    display: flex;
+    gap: 8px;
+}
+
+.link-container .form-input {
+    flex: 1;
+}
+
+.copy-feedback {
+    color: var(--accent);
+    font-size: 0.8rem;
+    margin-top: 8px;
+}
+
+.templates-list {
+    text-align: left;
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.templates-list h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.templates-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.templates-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-top: 1px solid var(--gray-100);
+}
+
+.templates-list li:first-child {
+    border-top: none;
+    padding-top: 0;
+}
+
+.template-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.template-link {
+    font-size: 0.8rem;
+    color: var(--gray-500);
+}
+
+.next-steps {
+    text-align: left;
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.next-steps h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.next-steps ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.next-steps li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    padding: 8px 0;
+}
+
+.next-steps li svg {
+    flex-shrink: 0;
+    color: var(--accent);
+    margin-top: 1px;
+}
+
+.action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
 /* CTA */
 .cta {
     padding: 100px 24px;
