@@ -626,9 +626,11 @@ func (r *TemplateRepository) Create(ctx context.Context, tmpl *models.MeetingTem
 			is_active, is_private, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
 	`)
+	// Empty CalendarID must be stored as NULL to satisfy the FK constraint.
+	calendarID := sql.NullString{String: tmpl.CalendarID, Valid: tmpl.CalendarID != ""}
 	_, err := r.db.ExecContext(ctx, query,
 		tmpl.ID, tmpl.HostID, tmpl.Slug, tmpl.Name, tmpl.Description,
-		tmpl.Durations, tmpl.LocationType, tmpl.CustomLocation, tmpl.CalendarID,
+		tmpl.Durations, tmpl.LocationType, tmpl.CustomLocation, calendarID,
 		tmpl.RequiresApproval, tmpl.MinNoticeMinutes, tmpl.MaxScheduleDays,
 		tmpl.PreBufferMinutes, tmpl.PostBufferMinutes, tmpl.AvailabilityRules,
 		tmpl.InviteeQuestions, tmpl.ConfirmationEmail, tmpl.ReminderEmail,
@@ -746,9 +748,10 @@ func (r *TemplateRepository) Update(ctx context.Context, tmpl *models.MeetingTem
 		    confirmation_email = $15, reminder_email = $16, is_active = $17, is_private = $18
 		WHERE id = $19
 	`)
+	calendarID := sql.NullString{String: tmpl.CalendarID, Valid: tmpl.CalendarID != ""}
 	_, err := r.db.ExecContext(ctx, query,
 		tmpl.Slug, tmpl.Name, tmpl.Description, tmpl.Durations, tmpl.LocationType,
-		tmpl.CustomLocation, tmpl.CalendarID, tmpl.RequiresApproval,
+		tmpl.CustomLocation, calendarID, tmpl.RequiresApproval,
 		tmpl.MinNoticeMinutes, tmpl.MaxScheduleDays, tmpl.PreBufferMinutes,
 		tmpl.PostBufferMinutes, tmpl.AvailabilityRules, tmpl.InviteeQuestions,
 		tmpl.ConfirmationEmail, tmpl.ReminderEmail, tmpl.IsActive, tmpl.IsPrivate, tmpl.ID)
