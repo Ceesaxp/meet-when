@@ -221,52 +221,74 @@ func LanesByCalendar(view *AgendaView) []CalendarLane {
 	return lanes
 }
 
-// ComputeSharedWindow returns a single visible time window that covers all
-// non-all-day events across all 7 days of a week. It applies the same adaptive
-// logic as ComputeVisibleWindow: baseline 09:00–18:00 in the first day's
-// location, extended 30 minutes before the earliest start and after the latest
-// end, contracted when events end earlier. If there are no timed events the
-// 09:00–18:00 baseline is returned using the first day's location. The returned
-// times use the first day's timezone so all day columns share identical offsets.
+// ComputeSharedWindow returns a single visible time window expressed on day 0
+// (Monday) that covers all non-all-day events across all 7 days. It applies
+// the same adaptive logic as ComputeVisibleWindow: baseline 09:00–18:00,
+// extended 30 minutes before the earliest start and after the latest end.
+//
+// Critically, the window is derived from time-of-day only — each event's
+// start/end is clipped to its own day boundary, then converted to an offset
+// from that day's midnight. This ensures the returned window is a pure
+// time-of-day range: e.g. 07:30–19:30 on day 0. Callers (BuildWeekDayViews)
+// shift this to each day's own coordinates before calling FlatLane, so every
+// day row aligns with the shared hour-label header.
 func ComputeSharedWindow(days [7]DayEvents) (time.Time, time.Time) {
 	const padding = 30 * time.Minute
 
-	// Use the first day's location for the baseline.
+	// Express baseline on day 0.
 	loc := days[0].DayStart.Location()
 	y, m, d := days[0].DayStart.Date()
 	winStart := time.Date(y, m, d, 9, 0, 0, 0, loc)
 	winEnd := time.Date(y, m, d, 18, 0, 0, 0, loc)
 
-	var minStart, maxEnd time.Time
+	// Track min/max as time-of-day durations from midnight.
+	var minTOD, maxTOD time.Duration
 	hasTimedEvent := false
 	for _, day := range days {
 		for _, e := range day.Events {
 			if e.IsAllDay {
 				continue
 			}
-			if !hasTimedEvent || e.Start.Before(minStart) {
-				minStart = e.Start
+			// Clip event to this day's boundaries before measuring TOD so that
+			// overnight events (e.g. 22:00 Mon → 02:00 Tue) contribute at most
+			// 00:00–24:00 on each day they appear in.
+			eStart := e.Start
+			eEnd := e.End
+			if eStart.Before(day.DayStart) {
+				eStart = day.DayStart
 			}
-			if !hasTimedEvent || e.End.After(maxEnd) {
-				maxEnd = e.End
+			if eEnd.After(day.DayEnd) {
+				eEnd = day.DayEnd
+			}
+			if !eEnd.After(eStart) {
+				continue
+			}
+			startTOD := eStart.Sub(day.DayStart)
+			endTOD := eEnd.Sub(day.DayStart)
+
+			if !hasTimedEvent || startTOD < minTOD {
+				minTOD = startTOD
+			}
+			if !hasTimedEvent || endTOD > maxTOD {
+				maxTOD = endTOD
 			}
 			hasTimedEvent = true
 		}
 	}
 
 	if hasTimedEvent {
-		if padded := minStart.Add(-padding); padded.Before(winStart) {
+		if padded := days[0].DayStart.Add(minTOD - padding); padded.Before(winStart) {
 			winStart = padded
 		}
-		winEnd = maxEnd.Add(padding)
+		winEnd = days[0].DayStart.Add(maxTOD + padding)
 	}
 
-	// Clamp to [days[0].DayStart, days[6].DayEnd].
+	// Clamp to [days[0].DayStart, days[0].DayEnd] — one calendar day.
 	if winStart.Before(days[0].DayStart) {
 		winStart = days[0].DayStart
 	}
-	if winEnd.After(days[6].DayEnd) {
-		winEnd = days[6].DayEnd
+	if winEnd.After(days[0].DayEnd) {
+		winEnd = days[0].DayEnd
 	}
 
 	return winStart, winEnd
@@ -351,13 +373,24 @@ type WeekDayView struct {
 }
 
 // BuildWeekDayViews produces 7 WeekDayViews for the given week. Blocks are
-// positioned within [sharedWindowStart, sharedWindowEnd] via FlatLane. Events
-// are the original unclipped events from DayEvents for use in the detail panel.
+// positioned within the shared time-of-day window via FlatLane. Events are the
+// original unclipped events from DayEvents for use in the detail panel.
 // IsToday is set for the day whose calendar date matches today. IsActive is set
 // for today (or for the first day that has events when today has none).
+//
+// sharedWindowStart and sharedWindowEnd are expressed on day 0 (Monday). They
+// represent a time-of-day range (e.g. Monday 07:30–Monday 19:30). For each day
+// row, the window is shifted to that day's own coordinates before calling
+// FlatLane, ensuring every row's blocks align with the shared hour-label header.
 func BuildWeekDayViews(week *WeekView, sharedWindowStart, sharedWindowEnd time.Time, today time.Time) []WeekDayView {
 	todayLocal := today.In(week.HostTZ)
 	todayY, todayM, todayD := todayLocal.Date()
+
+	// sharedWindowStart/End are on day 0. Compute offsets from day 0's midnight
+	// so we can re-anchor the window onto each day.
+	day0Start := week.Days[0].DayStart
+	windowStartOffset := sharedWindowStart.Sub(day0Start)
+	windowEndOffset := sharedWindowEnd.Sub(day0Start)
 
 	views := make([]WeekDayView, 7)
 	activeFallback := -1 // index of first day with events
@@ -367,12 +400,16 @@ func BuildWeekDayViews(week *WeekView, sharedWindowStart, sharedWindowEnd time.T
 		y, m, d := dayLocal.Date()
 		isToday := y == todayY && m == todayM && d == todayD
 
+		// Shift the shared window to this day's coordinates.
+		dayWindowStart := day.DayStart.Add(windowStartOffset)
+		dayWindowEnd := day.DayStart.Add(windowEndOffset)
+
 		views[i] = WeekDayView{
 			Date:              day.DayStart,
 			DayName:           dayLocal.Format("Mon"),
 			DateFormatted:     dayLocal.Format("Jan 2"),
 			FullDateFormatted: dayLocal.Format("Monday, January 2"),
-			Blocks:            FlatLane(day.Events, sharedWindowStart, sharedWindowEnd),
+			Blocks:            FlatLane(day.Events, dayWindowStart, dayWindowEnd),
 			Events:            day.Events,
 			EventCount:        len(day.Events),
 			IsToday:           isToday,

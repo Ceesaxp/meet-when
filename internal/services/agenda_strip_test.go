@@ -470,10 +470,10 @@ func TestComputeSharedWindow_EventsOnMondayAndThursday(t *testing.T) {
 	days := buildWeekDays(loc, map[int][]AgendaEvent{0: {evtMon}, 3: {evtThu}})
 	winStart, winEnd := ComputeSharedWindow(days)
 
-	// minStart = 08:00 Mon → padded 07:30 < baseline 09:00 → winStart = 07:30
+	// minStart = 08:00 Mon → padded 07:30 < baseline 09:00 → winStart = 07:30 (day 0)
 	wantStart := time.Date(monday.Year(), monday.Month(), monday.Day(), 7, 30, 0, 0, loc)
-	// maxEnd = 20:00 Thu → winEnd = 20:30 Thu
-	wantEnd := time.Date(thursday.Year(), thursday.Month(), thursday.Day(), 20, 30, 0, 0, loc)
+	// maxTOD = 20:00 (Thu's TOD) → winEnd = Monday 20:30 (day-0 coordinates)
+	wantEnd := time.Date(monday.Year(), monday.Month(), monday.Day(), 20, 30, 0, 0, loc)
 
 	if !winStart.Equal(wantStart) {
 		t.Errorf("winStart: want %v, got %v", wantStart, winStart)
@@ -532,10 +532,12 @@ func TestComputeSharedWindow_FlatLaneIntegration(t *testing.T) {
 		t.Errorf("winStart %v should be at or before %v (early event not covered)", winStart, latestAllowedStart)
 	}
 
-	// winEnd should cover 21:00 Thu + 30min = 21:30 Thu
-	earliestAllowedEnd := time.Date(thursday.Year(), thursday.Month(), thursday.Day(), 21, 30, 0, 0, loc)
+	// winEnd should represent 21:30 time-of-day on day 0 (Monday coordinates).
+	// The late Thursday event contributes TOD 21:00 + 30min padding = 21:30, and
+	// ComputeSharedWindow expresses that as Monday 21:30.
+	earliestAllowedEnd := time.Date(monday.Year(), monday.Month(), monday.Day(), 21, 30, 0, 0, loc)
 	if winEnd.Before(earliestAllowedEnd) {
-		t.Errorf("winEnd %v should be at or after %v (late event not covered)", winEnd, earliestAllowedEnd)
+		t.Errorf("winEnd %v should be at or after %v (late event TOD not covered)", winEnd, earliestAllowedEnd)
 	}
 
 	// Now add a Saturday event that starts before winStart — FlatLane should
