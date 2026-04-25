@@ -1,327 +1,220 @@
 {
   "project": "MeetWhen",
-  "branchName": "ralph/q2-2026-enhancements",
-  "description": "Q2 2026 Enhancements — session duration fix, reschedule links, custom/smart durations, auto-archive, and CRM lite",
+  "branchName": "ralph/visual-agenda-pr2",
+  "description": "Visual Agenda PR2 - Week view with 7 stacked day strips, shared time axis, and client-side day switching. Builds on PR1 color infrastructure. Reference mock: docs/agenda-mocks/meetwhen_week_hybrid_5_plus_1.html",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Change session duration default to 7 days and use config value",
-      "description": "As a host, I want to stay logged in for 7 days so I don't have to re-authenticate daily.",
+      "title": "Add GetWeek method to AgendaService",
+      "description": "As a developer, I need a service method that returns all 7 days of agenda data in a single provider call so the week view avoids redundant fetches.",
       "acceptanceCriteria": [
-        "SESSION_DURATION_HOURS default changed from 24 to 168 in internal/config/config.go",
-        "All http.SetCookie calls in internal/handlers/auth.go use cfg.App.SessionDuration for MaxAge instead of hardcoded 24 * time.Hour",
-        "Grep auth.go for all MaxAge occurrences and fix every one (Login, Register, SelectOrg, Google login/signup)",
-        "Session record TTL in database matches the configured duration",
-        "Existing sessions continue to work after deployment (no breaking schema changes)",
+        "Add WeekView struct to internal/services/agenda.go with fields: Calendars []*models.CalendarConnection, Days [7]DayEvents, WeekStart time.Time, HostTZ *time.Location",
+        "DayEvents struct has fields: DayStart time.Time, DayEnd time.Time, Events []AgendaEvent (original unclipped events that touch this day — an overnight event 22:00 Mon to 02:00 Tue appears in BOTH Monday and Tuesday with its original Start/End preserved)",
+        "Add GetWeek(ctx, hostID string, weekStart time.Time) (*WeekView, error) method to AgendaService",
+        "GetWeek loads host and calendars once, calls AssignColors once, then calls GetAgendaEventsWithCalendars once for the full Mon 00:00 to next Mon 00:00 window",
+        "Events are assigned to each day they touch (event.Start < dayEnd AND event.End > dayStart), NOT clipped — the original Start/End are preserved so the detail list shows full duration",
+        "Each day's events are sorted by start time using slices.SortFunc",
         "Build succeeds"
       ],
       "priority": 1,
-      "passes": true,
-      "notes": ""
+      "passes": false,
+      "notes": "IMPORTANT: Events are NOT clipped to day boundaries here. Clipping happens only in FlatLane (US-002) for strip rendering. The detail list uses original event times so overnight events show their full duration. See PRD §9 table: 'Full duration in the list.'"
     },
     {
       "id": "US-002",
-      "title": "Add reschedule link to confirmation email body",
-      "description": "As an invitee, I want a reschedule link in my booking confirmation email so I can change the meeting time.",
+      "title": "Add FlatLane function for week strip blocks",
+      "description": "As a developer, I need a function that produces a single flat lane of overlaid colored blocks for one day, used in the compact week strip.",
       "acceptanceCriteria": [
-        "Confirmation email body includes a clearly labeled 'Reschedule this meeting' link",
-        "Link format: {BASE_URL}/m/{tenant_slug}/{host_slug}/{template_slug}/reschedule/{booking_id}",
-        "Link is on its own line, visually distinct from surrounding text",
+        "Add FlatLane(events []AgendaEvent, windowStart, windowEnd time.Time) []StripBlock to internal/services/agenda_strip.go",
+        "Returns all non-all-day events as StripBlocks positioned within [windowStart, windowEnd]",
+        "Events are clipped to the window boundary (same intersection logic as LanesByCalendar) — this is where clipping happens, not in GetWeek",
+        "Each block uses the event's CalendarColor (fallback #5F5E5A)",
+        "All-day events are excluded",
+        "If an event extends beyond the shared window on either side, the block is clamped to the window edge AND the block gets Overflow field set: OverflowLeft bool, OverflowRight bool (new fields on StripBlock)",
         "Build succeeds"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": "Edit internal/services/email.go — the confirmation email template function."
+      "passes": false,
+      "notes": "Unlike LanesByCalendar (one lane per calendar), FlatLane overlays all calendars into a single lane. Overflow fields are used by the template to render small arrow indicators at the strip edge (PRD §5.2, §7.3)."
     },
     {
-      "id": "US-003",
-      "title": "Add reschedule link to ICS calendar event descriptions",
-      "description": "As an invitee, I want a reschedule link in my calendar event details so I can find it when viewing the meeting.",
+      "id": "US-002b",
+      "title": "Add OverflowLeft and OverflowRight fields to StripBlock",
+      "description": "As a developer, I need overflow indicators on strip blocks so the template can show arrows for events that extend beyond the visible window.",
       "acceptanceCriteria": [
-        "ICS DESCRIPTION field in email attachment includes reschedule URL on its own line, labeled 'Reschedule this meeting:'",
-        "Google Calendar API event description also includes the reschedule URL",
-        "CalDAV/iCloud event description also includes the reschedule URL",
-        "Verify that the existing reschedule page handles cancelled or past bookings gracefully (shows appropriate message, does not error)",
+        "Add OverflowLeft bool and OverflowRight bool fields to the StripBlock struct in internal/services/agenda_strip.go",
+        "Update LanesByCalendar to set OverflowLeft=true when an event's original start is before windowStart, OverflowRight=true when original end is after windowEnd",
+        "Update FlatLane (from US-002) to set the same overflow fields",
+        "Existing PR1 day_strip.html template continues to work (new fields are zero-value false by default)",
         "Build succeeds"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "Three locations: ICS generation in email.go, Google Calendar event in calendar.go, CalDAV event in calendar.go. Also verify FR-203: reschedule page graceful handling of edge cases."
+      "passes": false,
+      "notes": "These fields enable the .strip-overflow arrow indicator in the template. The day strip from PR1 doesn't need overflow arrows (single-day window) but the fields won't break it."
     },
     {
-      "id": "US-004",
-      "title": "Add reschedule link to reminder email",
-      "description": "As an invitee, I want a reschedule link in reminder emails so I can adjust if my schedule changed.",
+      "id": "US-003",
+      "title": "Add ComputeSharedWindow for week-wide time axis",
+      "description": "As a developer, I need a function that computes a single visible window across all 7 days so the week strip columns align.",
       "acceptanceCriteria": [
-        "Reminder email body includes the same reschedule link format as confirmation email",
-        "Reminder ICS attachment description includes the reschedule URL",
+        "Add ComputeSharedWindow(days [7]DayEvents) (time.Time, time.Time) to internal/services/agenda_strip.go",
+        "Collects all non-all-day events across all 7 days, finds the overall earliest start and latest end",
+        "Applies the same adaptive logic as ComputeVisibleWindow (baseline 09:00-18:00, extend with 30min padding, contract if narrower)",
+        "Returns times using the first day's location (all days share the same host timezone)",
+        "If no timed events in entire week, returns 09:00-18:00 baseline",
         "Build succeeds"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "Already completed as part of US-002 (defaultReminderBody has reschedule link) and US-003 (generateICS has reschedule URL, called for reminders at line 559)."
+      "passes": false,
+      "notes": "The shared window ensures all 7 day rows have identical column alignment so hour labels at the top apply to every row."
+    },
+    {
+      "id": "US-004",
+      "title": "Add unit tests for GetWeek, FlatLane, overflow, and ComputeSharedWindow",
+      "description": "As a developer, I need tests for the new week view functions to prevent regressions.",
+      "acceptanceCriteria": [
+        "Test GetWeek event assignment: event 22:00 Mon to 02:00 Tue appears in BOTH Monday and Tuesday with original Start/End preserved (not clipped)",
+        "Test GetWeek: all-day event appears in the correct day only",
+        "Test FlatLane: 2 events from different calendars on the same day produce 2 blocks in one lane",
+        "Test FlatLane: all-day events excluded",
+        "Test FlatLane overflow: event starting before windowStart produces block with OverflowLeft=true",
+        "Test FlatLane overflow: event ending after windowEnd produces block with OverflowRight=true",
+        "Test ComputeSharedWindow: events only on Mon and Thu still produces a single shared window covering both",
+        "Test ComputeSharedWindow: empty week returns 09:00-18:00",
+        "Test shared-window + FlatLane integration: week with an event at 07:00 Mon and an event at 20:00 Thu produces a shared window that excludes neither, and FlatLane for a day with an event starting before the shared window produces a block with OverflowLeft=true and LeftPct=0",
+        "Build succeeds",
+        "Tests pass"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "Add tests to internal/services/agenda_strip_test.go (FlatLane, ComputeSharedWindow) and internal/services/agenda_test.go (GetWeek assignment)."
     },
     {
       "id": "US-005",
-      "title": "Add backend validation for custom durations",
-      "description": "As a developer, I need backend validation so only valid durations (5-480 minutes) are accepted.",
+      "title": "Add WeekDayView struct for template data",
+      "description": "As a developer, I need a view model struct that bundles per-day strip blocks with event data so the template can render each day row and its detail panel.",
       "acceptanceCriteria": [
-        "Template service rejects durations outside the 5-480 minute range with a clear error message",
-        "Template service rejects non-integer or negative values",
-        "Duplicate durations within a template are deduplicated before save",
-        "Durations are sorted ascending before storage",
+        "Add WeekDayView struct to internal/services/agenda_strip.go with fields: Date time.Time, DayName string (e.g. 'Mon'), DateFormatted string (e.g. 'Apr 13'), FullDateFormatted string (e.g. 'Monday, April 13'), Blocks []StripBlock, Events []AgendaEvent, EventCount int, IsToday bool, IsActive bool",
+        "Add BuildWeekDayViews(week *WeekView, sharedWindowStart, sharedWindowEnd time.Time, today time.Time) []WeekDayView function",
+        "Function produces 7 WeekDayViews, each with FlatLane blocks positioned within the shared window",
+        "Events field contains the original unclipped events from DayEvents (for the detail panel list)",
+        "EventCount is len(Events)",
+        "IsToday is true for the day matching today's date",
+        "IsActive is true for today (or first day with events if today has none)",
         "Build succeeds"
       ],
-      "priority": 5,
-      "passes": true,
-      "notes": "Backend-only change in template service. Must be done before UI changes."
+      "priority": 6,
+      "passes": false,
+      "notes": "FullDateFormatted and EventCount are used by the selected-day detail header (see mock line 100: 'Friday, April 17 · 8 events'). Events are unclipped originals for the detail list."
     },
     {
       "id": "US-006",
-      "title": "Expand preset duration chips in template form",
-      "description": "As a host, I want more preset duration options (20, 25, 50, 75, 120 min) in the template form.",
+      "title": "Add week strip and overflow CSS component styles",
+      "description": "As a developer, I need CSS for the week strip rows, overflow indicators, active day highlight, and day-detail toggling.",
       "acceptanceCriteria": [
-        "Duration chip options are: 15, 20, 25, 30, 45, 50, 60, 75, 90, 120 minutes",
-        "Chips displayed in ascending order",
-        "Existing templates with current durations continue to work unchanged",
-        "Build succeeds",
-        "Verify in browser using dev-browser skill"
+        "Add .week-strip-container: background, border, border-radius, padding (matches mock card style)",
+        "Add .week-strip-row: grid with 90px label + 1fr lane, cursor pointer, padding 4px 0",
+        "Add .week-strip-row--active: highlighted background, left accent border, slightly more padding (see mock line 60: background + border-left 2px solid info color)",
+        "Add .week-strip-row--today: 'today' badge style (small text label next to date)",
+        "Add .week-day-details: container for all 7 pre-rendered detail blocks",
+        "Add .week-day-detail: display none by default",
+        "Add .week-day-detail--active: display block",
+        "Add .week-detail-header: flex row with day title + 'click any day above' helper text (see mock lines 99-102)",
+        "Add .strip-overflow: small arrow indicator (CSS pseudo-element or inline SVG) at strip edge for blocks with OverflowLeft/OverflowRight",
+        "Reuse existing .strip-lane, .strip-block classes from PR1",
+        "Build succeeds"
       ],
-      "priority": 6,
-      "passes": true,
-      "notes": "Edit templates/pages/dashboard_template_form.html — update the hardcoded chip values."
+      "priority": 7,
+      "passes": false,
+      "notes": "Reference mock: docs/agenda-mocks/meetwhen_week_hybrid_5_plus_1.html. The selected row uses grid 90px+1fr, background highlight, and 2px left border."
     },
     {
       "id": "US-007",
-      "title": "Add custom duration free-form input to template form",
-      "description": "As a host, I want to type a custom meeting duration so I can offer non-standard lengths.",
+      "title": "Create week_strip.html partial template",
+      "description": "As a host, I want to see 7 stacked day strips with a shared time axis when viewing This Week.",
       "acceptanceCriteria": [
-        "A 'Custom' input field appears alongside the preset chips",
-        "Host can type any integer value between 5 and 480",
-        "Invalid values show an inline error message",
-        "Custom value is added to the template durations array alongside selected presets",
-        "If custom value matches a preset, no duplicate is created",
-        "Build succeeds",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 7,
-      "passes": true,
-      "notes": "UI change in templates/pages/dashboard_template_form.html. Backend validation already in place from US-005."
-    },
-    {
-      "id": "US-008",
-      "title": "Add smart_durations column to hosts table",
-      "description": "As a developer, I need a database column to store the smart durations preference per host.",
-      "acceptanceCriteria": [
-        "New migration adds boolean column smart_durations to hosts table with default false",
-        "Migration works with both SQLite and PostgreSQL",
-        "Host model struct in internal/models/models.go includes SmartDurations bool field",
+        "Create templates/partials/week_strip.html with {{define \"week_strip.html\"}}",
+        "Template accesses .Data.WeekDays ([]WeekDayView), .Data.HourLabels, .Data.Calendars",
+        "Renders a .week-strip-container with shared .strip-header (hour labels) at the top, using grid-template-columns: 90px 1fr matching the day rows",
+        "The .week-strip-container has role='tablist' attribute",
+        "Renders 7 .week-strip-row elements as <button role='tab'> (not div), each with: day label (abbreviated weekday + date), .strip-lane containing FlatLane blocks",
+        "Active day row gets .week-strip-row--active class and aria-selected='true', today row gets .week-strip-row--today with a small 'today' text label",
+        "Each row has data-day-index attribute, aria-controls='week-day-panel-{index}' linking to its detail panel",
+        "Strip blocks with OverflowLeft or OverflowRight render a .strip-overflow indicator at the corresponding edge",
+        "Calendar legend rendered inside the strip container below the rows (inside the card border, matching mock lines 89-94)",
         "Build succeeds"
       ],
       "priority": 8,
-      "passes": true,
-      "notes": "Schema-only change. Create a new migration file in migrations/ directory."
+      "passes": false,
+      "notes": "Accesses .Data because it's called via {{template \"week_strip.html\" .}} from the page template where . is PageData. Rows are <button role='tab'> for keyboard accessibility (Tab/Enter/Space to switch days). Mock reference: docs/agenda-mocks/meetwhen_week_hybrid_5_plus_1.html"
+    },
+    {
+      "id": "US-008",
+      "title": "Pre-render all 7 day-detail blocks in week view template",
+      "description": "As a developer, I need all 7 day detail panels rendered server-side so day switching is instant with no server round-trip.",
+      "acceptanceCriteria": [
+        "In the week view branch of templates/pages/dashboard_agenda.html, after the week_strip partial, render a .week-day-details container",
+        "Before the details container, render a .week-detail-header with: the active day's FullDateFormatted + ' · N events' and a helper text 'click any day above' (matching mock lines 99-102)",
+        "Inside .week-day-details: iterate .Data.WeekDays using {{range $i, $day := .Data.WeekDays}} and for each day render a <div class='week-day-detail' id='week-day-panel-{{$i}}' data-day-index='{{$i}}' role='tabpanel' aria-labelledby matching the corresponding tab button>",
+        "Each detail block reuses day_detail.html partial: call {{template \"day_detail.html\" (dict \"Events\" $day.Events)}} to pass the day's events in the same shape the partial expects (.Events at top level)",
+        "The active day's div gets .week-day-detail--active class (visible), others are hidden",
+        "Build succeeds"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "Reuses day_detail.html from PR1 via dict helper to construct the expected data shape. This avoids duplicating the event list markup. The detail header is rendered once (not per-day) and updated by JS when the active day changes (US-009). dict template func already exists (added in PR1). NOTE: The week mock shows a denser table-style detail (with header row) vs PR1's simpler card-style list. PR2 accepts the PR1 detail styling for now — a week-specific detail refinement (table layout matching the mock) is deferred to a follow-up."
     },
     {
       "id": "US-009",
-      "title": "Add smart durations toggle to settings page",
-      "description": "As a host, I want a toggle on my settings page to enable smart durations.",
+      "title": "Add client-side day switching with keyboard support",
+      "description": "As a host, I want to click or keyboard-navigate to a day in the week strip to instantly show that day's events below.",
       "acceptanceCriteria": [
-        "Toggle labeled 'Smart durations' on the Settings page",
-        "Helper text: 'End meetings 5-10 minutes early to give you buffer time'",
-        "Toggle saves the smart_durations value to the host record via UpdateSettings handler",
-        "Build succeeds",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 9,
-      "passes": true,
-      "notes": "Edit templates/pages/dashboard_settings.html and the UpdateSettings handler."
-    },
-    {
-      "id": "US-010",
-      "title": "Apply smart duration logic at booking creation",
-      "description": "As a system, I need to shave time off meeting end times when smart durations is enabled.",
-      "acceptanceCriteria": [
-        "When host has smart_durations enabled: durations <= 30 min subtract 5 min, durations > 30 min subtract 10 min",
-        "Minimum resulting duration is 5 minutes (never goes to 0)",
-        "Adjusted duration is used for booking end_time calculation",
-        "Adjusted duration is used for ICS DTEND, Google Calendar end time, and CalDAV end time",
-        "Original unadjusted duration is stored on the booking record for display",
-        "Invitee booking page still shows the original duration (e.g. '30 min' not '25 min')",
+        "Add a small inline <script> block in dashboard_agenda.html week view section that handles day switching",
+        "Clicking a .week-strip-row: removes .week-strip-row--active and aria-selected from the previous row, adds them to the clicked row",
+        "Simultaneously: removes .week-day-detail--active from the previous detail block, adds it to the matching detail block (matched by data-day-index)",
+        "Updates the .week-detail-header text to show the newly selected day's full date and event count",
+        "Keyboard: Tab focuses the strip rows, Enter/Space activates the focused row (same as click). Arrow Up/Down moves focus between rows",
+        "No server round-trip — pure DOM class toggle",
+        "Works correctly when the page first loads (active day is pre-set server-side via IsActive)",
         "Build succeeds"
       ],
       "priority": 10,
-      "passes": true,
-      "notes": "Apply in booking service layer. Formula: actual = duration <= 30 ? duration - 5 : duration - 10; actual = max(actual, 5). Note: shares ICS/calendar code paths with US-003 (reschedule links) — US-003 runs first."
+      "passes": false,
+      "notes": "~25 lines of vanilla JS. No HTMX needed for intra-week switching — the data is already in the DOM. Each row stores its full date and event count in data attributes for the header update."
     },
     {
-      "id": "US-011",
-      "title": "Apply smart duration to rescheduled bookings",
-      "description": "As a system, I need smart durations applied consistently when bookings are rescheduled.",
+      "id": "US-010",
+      "title": "Wire week view handler to use AgendaService.GetWeek and parse week param",
+      "description": "As a developer, I need the Agenda handler's week branch to use the new service method, parse the week query param, and pass the correct data to the template.",
       "acceptanceCriteria": [
-        "Rescheduled booking end_time uses the same smart duration logic as new bookings",
-        "Uses the host's current smart_durations setting at reschedule time",
+        "Update the Agenda handler's week branch in internal/handlers/dashboard.go",
+        "Parse optional ?week=YYYY-MM-DD query param; if present, normalize to Monday of that week (if the date is not a Monday, find the preceding Monday); if absent or malformed (unparseable date), fall back to current week's Monday silently (no 400 error — treat it like the param was omitted)",
+        "Call AgendaService.GetWeek with the resolved Monday",
+        "Compute shared window via ComputeSharedWindow, generate hour labels via GenerateHourLabels",
+        "Build WeekDayViews via BuildWeekDayViews",
+        "Pass to template Data map: WeekDays ([]WeekDayView), HourLabels, Calendars, WindowStart, WindowEnd — in addition to existing View, Today, Timezone fields",
+        "Remove the now-unused groupEventsByDay function and AgendaDayGroup type from dashboard.go",
+        "Existing today view branch remains unchanged",
         "Build succeeds"
       ],
       "priority": 11,
-      "passes": true,
-      "notes": "Update the RescheduleBooking method in booking service."
+      "passes": false,
+      "notes": "The ?week= param enables direct linking to a specific week (e.g. /dashboard/agenda?view=week&week=2026-04-13). PRD §6 specifies this route shape."
     },
     {
-      "id": "US-012",
-      "title": "Remove status restriction on booking archival",
-      "description": "As a host, I want to archive any past booking regardless of its status.",
+      "id": "US-011",
+      "title": "Update dashboard_agenda.html week view to use strip and detail partials",
+      "description": "As a host, when I click This Week I want to see the visual week strip with clickable day rows and a detail panel below.",
       "acceptanceCriteria": [
-        "ArchiveBooking service method allows archiving any booking whose end_time is in the past",
-        "Future bookings with status confirmed or pending cannot be archived",
-        "Manual archive button works for individual past confirmed bookings",
+        "Replace the existing week view branch in templates/pages/dashboard_agenda.html",
+        "New structure: {{template \"week_strip.html\" .}} (which includes legend internally) + detail header + pre-rendered day details (from US-008) + day switching script (from US-009)",
+        "Existing Today/This Week tab links still work",
+        "Week subtitle shows 'Week of [Monday date]' using the first WeekDayView's DateFormatted",
         "Build succeeds"
       ],
       "priority": 12,
-      "passes": true,
-      "notes": "Modify ArchiveBooking in internal/services/booking.go — change the status check to a time check."
-    },
-    {
-      "id": "US-013",
-      "title": "Add ArchiveOldBookings repository method",
-      "description": "As a developer, I need a bulk archive query that archives bookings older than a cutoff time.",
-      "acceptanceCriteria": [
-        "New repository method: ArchiveOldBookings(ctx, cutoffTime) returns (count int, err error)",
-        "Archives all unarchived bookings where end_time < cutoffTime, across all tenants",
-        "Uses q() helper for SQLite/Postgres compatibility",
-        "Build succeeds"
-      ],
-      "priority": 13,
-      "passes": true,
-      "notes": "Add to booking repository. Used by both the background job and the dashboard button."
-    },
-    {
-      "id": "US-014",
-      "title": "Add 'Archive all past' button to bookings dashboard",
-      "description": "As a host, I want a button to archive all past meetings at once.",
-      "acceptanceCriteria": [
-        "'Archive all past' button visible on the bookings dashboard page",
-        "Button calls ArchiveOldBookings with now as cutoff (archives everything past)",
-        "Button is hidden when there are no past unarchived bookings",
-        "Shows confirmation with count before archiving (e.g. 'Archive 12 past meetings?')",
-        "Build succeeds",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 14,
-      "passes": true,
-      "notes": "Add button to dashboard template and a new handler endpoint."
-    },
-    {
-      "id": "US-015",
-      "title": "Add automatic archival background worker",
-      "description": "As a system, I need to auto-archive bookings older than 2 weeks on a daily schedule.",
-      "acceptanceCriteria": [
-        "Background goroutine starts on application boot in main.go",
-        "Runs on a 24-hour ticker",
-        "Calls ArchiveOldBookings with now minus 14 days as cutoff",
-        "Logs the number of bookings archived per run",
-        "Graceful shutdown: stops when application context is cancelled",
-        "Build succeeds"
-      ],
-      "priority": 15,
-      "passes": true,
-      "notes": "Add worker goroutine in cmd/server/main.go. Use context.Context and time.Ticker."
-    },
-    {
-      "id": "US-016",
-      "title": "Create contacts table and model",
-      "description": "As a developer, I need a contacts data model to store deduplicated invitee information.",
-      "acceptanceCriteria": [
-        "New migration creates contacts table with: id (UUID PK), tenant_id (FK), name (text not null), email (text not null), phone (text nullable), timezone (text nullable), first_met (timestamp), last_met (timestamp), meeting_count (integer default 0), created_at, updated_at",
-        "Unique constraint on (tenant_id, email)",
-        "Index on tenant_id for list queries",
-        "Index on email for lookup",
-        "Migration works with both SQLite and PostgreSQL",
-        "Go model struct added to internal/models/models.go",
-        "Build succeeds"
-      ],
-      "priority": 16,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-017",
-      "title": "Create contact repository with Upsert and List methods",
-      "description": "As a developer, I need repository methods to create/update and list contacts.",
-      "acceptanceCriteria": [
-        "Upsert method: INSERT ... ON CONFLICT (tenant_id, email) DO UPDATE — creates or updates a contact atomically",
-        "List method: returns contacts for a tenant with optional search filter (name or email), offset, and limit, sorted by last_met descending",
-        "GetByEmail method: returns a single contact by (tenantID, email) for lookup",
-        "GetBookings method: returns bookings for a given contact email within a tenant",
-        "Uses q() helper for SQLite/Postgres placeholder conversion",
-        "Build succeeds"
-      ],
-      "priority": 17,
-      "passes": true,
-      "notes": "Create internal/repository/contact.go."
-    },
-    {
-      "id": "US-018",
-      "title": "Create contact service and hook into booking confirmation",
-      "description": "As a system, I need to auto-create/update contacts when bookings are confirmed.",
-      "acceptanceCriteria": [
-        "Contact service with UpsertFromBooking method that extracts name/email/phone/timezone from a booking",
-        "Called from booking service when a booking is confirmed (new or approved)",
-        "If no contact exists: creates with first_met and last_met set to booking start_time, meeting_count = 1",
-        "If contact exists: updates last_met if later, increments meeting_count, fills empty name/phone/timezone",
-        "Contact errors are logged but do not block or fail the booking flow",
-        "Build succeeds"
-      ],
-      "priority": 18,
-      "passes": true,
-      "notes": "Create internal/services/contact.go. Wire into booking service confirmation flow."
-    },
-    {
-      "id": "US-019",
-      "title": "Add contacts list page to dashboard",
-      "description": "As a host, I want a contacts page showing all people I've met with.",
-      "acceptanceCriteria": [
-        "New dashboard page at /dashboard/contacts",
-        "Navigation link added to the dashboard sidebar/nav",
-        "Displays table with columns: Name, Email, Meetings (count), Last Met (relative date)",
-        "Sorted by last_met descending",
-        "Search input filters by name or email (HTMX-powered with hx-get and debounce)",
-        "Empty state message when no contacts exist",
-        "Build succeeds",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 19,
-      "passes": true,
-      "notes": "Create handler, register route, create template. Follow existing dashboard page patterns."
-    },
-    {
-      "id": "US-020",
-      "title": "Add contact meeting history drill-down",
-      "description": "As a host, I want to click a contact to see their meeting history.",
-      "acceptanceCriteria": [
-        "Clicking a contact row expands inline or navigates to show booking history for that contact",
-        "Shows bookings: date, template name, status, duration",
-        "Sorted by date descending",
-        "Build succeeds",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 20,
-      "passes": true,
-      "notes": "Use HTMX hx-get to load a partial with the booking list for the contact."
-    },
-    {
-      "id": "US-021",
-      "title": "Backfill contacts from existing bookings",
-      "description": "As a host, I want existing confirmed bookings to populate contacts so I don't start from zero.",
-      "acceptanceCriteria": [
-        "Backfill mechanism processes all confirmed bookings and creates/updates contact records",
-        "Runs on first access to contacts page if contacts table is empty for the tenant, or as a manual trigger",
-        "Idempotent: running multiple times produces the same result",
-        "Build succeeds"
-      ],
-      "priority": 21,
-      "passes": true,
-      "notes": "Already implemented: BackfillFromBookings in contact service, EnsureBackfilled called from contacts handler on first load, ListConfirmedByTenant in booking repository."
+      "passes": false,
+      "notes": "This replaces the old list-based week view with the strip visualization. Calendar legend is inside week_strip.html (matching mock layout where legend is inside the strip card)."
     }
   ]
 }

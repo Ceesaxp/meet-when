@@ -4821,9 +4821,53 @@ body.modal-open {
     display: grid;
 }
 
-.event-row {
-    border-left: 3px solid var(--cal-color, var(--gray-300));
-    padding-left: 12px;
+.day-detail-table-wrap {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.day-detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.day-detail-table thead tr {
+    background: var(--gray-50);
+    text-align: left;
+}
+
+.day-detail-table th {
+    padding: 10px 14px;
+    font-weight: 500;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+}
+
+.day-detail-table td {
+    padding: 12px 14px;
+}
+
+.day-detail-table tbody tr {
+    border-top: 1px solid var(--gray-100);
+}
+
+.day-detail-table .col-time {
+    width: 150px;
+    white-space: nowrap;
+}
+
+.day-detail-table .col-duration {
+    width: 80px;
+    color: var(--gray-500);
+}
+
+.day-detail-table .col-calendar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 /* ============================================

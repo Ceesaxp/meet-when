@@ -1,28 +1,39 @@
 {{define "day_detail.html"}}
-<div class="event-list">
-    {{if .Events}}
-    {{range .Events}}
-    <div class="event-row" style="--cal-color: {{.CalendarColor}}; margin-bottom: 12px;">
-        <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px;">
-            {{if .IsAllDay}}
-            <span class="badge" style="font-size: 0.7rem;">All Day</span>
-            {{else}}
-            <span style="font-size: 0.8rem; color: var(--gray-500); white-space: nowrap;">
-                {{formatTime .Start}}–{{formatTime .End}}
-            </span>
-            {{end}}
-            <strong style="font-size: 0.9rem;">{{.Title}}</strong>
-        </div>
-        <div style="font-size: 0.75rem; color: var(--gray-500);">
-            {{.CalendarName}}
-            {{if not .IsAllDay}}
-            &middot; {{duration .Start .End}}
-            {{end}}
-        </div>
-    </div>
-    {{end}}
-    {{else}}
-    <p style="color: var(--gray-500); font-size: 0.875rem;">No events.</p>
-    {{end}}
+{{if .Events}}
+<div class="day-detail-table-wrap">
+<table class="day-detail-table">
+    <thead>
+        <tr>
+            <th class="col-time">Time</th>
+            <th class="col-event">Event</th>
+            <th class="col-duration">Duration</th>
+            <th class="col-calendar">Calendar</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Events}}
+        <tr style="box-shadow: inset 3px 0 0 {{.CalendarColor}};">
+            <td class="col-time">
+                {{if .IsAllDay}}
+                <span class="badge" style="font-size: 0.7rem;">All Day</span>
+                {{else}}
+                {{formatTime .Start}} – {{formatTime .End}}
+                {{end}}
+            </td>
+            <td class="col-event">{{if .Title}}{{.Title}}{{else}}(No title){{end}}</td>
+            <td class="col-duration">
+                {{if not .IsAllDay}}{{duration .Start .End}}{{end}}
+            </td>
+            <td class="col-calendar">
+                <span class="calendar-dot" style="background: {{.CalendarColor}};"></span>
+                {{.CalendarName}}
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
 </div>
+{{else}}
+<p style="color: var(--gray-500); font-size: 0.875rem;">No events.</p>
+{{end}}
 {{end}}
