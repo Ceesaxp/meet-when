@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/meet-when/meet-when/internal/models"
@@ -69,6 +70,59 @@ func ComputeVisibleWindow(events []AgendaEvent, dayStart, dayEnd time.Time) (tim
 	}
 
 	return winStart, winEnd
+}
+
+// HourLabel represents a single hour marker for the strip header.
+type HourLabel struct {
+	Label   string  // e.g. "9am", "12pm", "5pm"
+	LeftPct float64 // percentage position within the visible window
+}
+
+// GenerateHourLabels creates hour markers for the strip header, positioned
+// as percentages within the [windowStart, windowEnd] range.
+func GenerateHourLabels(windowStart, windowEnd time.Time) []HourLabel {
+	winDuration := windowEnd.Sub(windowStart).Seconds()
+	if winDuration <= 0 {
+		return nil
+	}
+
+	loc := windowStart.Location()
+	y, m, d := windowStart.Date()
+
+	// Start from the first full hour at or after windowStart.
+	startHour := windowStart.Hour()
+	if windowStart.Minute() > 0 || windowStart.Second() > 0 {
+		startHour++
+	}
+	endHour := windowEnd.Hour()
+
+	labels := make([]HourLabel, 0, endHour-startHour+1)
+	for h := startHour; h <= endHour; h++ {
+		t := time.Date(y, m, d, h, 0, 0, 0, loc)
+		if t.Before(windowStart) || t.After(windowEnd) {
+			continue
+		}
+
+		var label string
+		switch {
+		case h == 0:
+			label = "12am"
+		case h < 12:
+			label = formatHour(h, "am")
+		case h == 12:
+			label = "12pm"
+		default:
+			label = formatHour(h-12, "pm")
+		}
+
+		leftPct := t.Sub(windowStart).Seconds() / winDuration * 100
+		labels = append(labels, HourLabel{Label: label, LeftPct: leftPct})
+	}
+	return labels
+}
+
+func formatHour(h int, suffix string) string {
+	return fmt.Sprintf("%d%s", h, suffix)
 }
 
 // LanesByCalendar converts an AgendaView into one CalendarLane per calendar.

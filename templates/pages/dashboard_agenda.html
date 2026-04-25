@@ -21,17 +21,6 @@
     <a href="/dashboard/agenda?view=week" class="view-tab {{if eq .Data.View "week"}}active{{end}}">This Week</a>
 </div>
 
-{{if .Data.CalendarColors}}
-<div class="calendar-legend">
-    {{range $name, $color := .Data.CalendarColors}}
-    <div class="calendar-legend-item">
-        <span class="calendar-legend-dot" style="background: {{$color}};"></span>
-        <span class="calendar-legend-name">{{$name}}</span>
-    </div>
-    {{end}}
-</div>
-{{end}}
-
 {{if eq .Data.View "week"}}
 <!-- Week view - events grouped by day -->
 <div class="agenda-week">
@@ -44,8 +33,7 @@
         {{if .Events}}
         <div class="events-list">
             {{range .Events}}
-            {{$color := index $.Data.CalendarColors .CalendarName}}
-            <div class="event-item {{if .IsAllDay}}all-day{{end}}" style="{{if $color}}border-left: 3px solid {{$color}};{{end}}">
+            <div class="event-item {{if .IsAllDay}}all-day{{end}}" style="{{if .CalendarColor}}border-left: 3px solid {{.CalendarColor}};{{end}}">
                 <div class="event-time">
                     {{if .IsAllDay}}
                     <span class="all-day-badge">All Day</span>
@@ -57,7 +45,7 @@
                 <div class="event-content">
                     <div class="event-title">{{if .Title}}{{.Title}}{{else}}(No title){{end}}</div>
                     <div class="event-details">
-                        <span class="event-calendar" {{if $color}}style="color: {{$color}};"{{end}}>{{.CalendarName}}</span>
+                        <span class="event-calendar" {{if .CalendarColor}}style="color: {{.CalendarColor}};"{{end}}>{{.CalendarName}}</span>
                     </div>
                 </div>
             </div>

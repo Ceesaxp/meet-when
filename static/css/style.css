@@ -3058,25 +3058,6 @@ body.modal-open {
     border-radius: var(--radius);
 }
 
-.calendar-legend-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.825rem;
-    color: var(--gray-700);
-}
-
-.calendar-legend-dot {
-    display: inline-block;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.calendar-legend-name {
-    font-weight: 500;
-}
 
 /* ============================================
    Agenda / Day Groups
@@ -3200,166 +3181,6 @@ body.modal-open {
     text-align: center;
     color: var(--gray-500);
     font-size: 0.9rem;
-}
-
-/* ============================================
-   Visual Timeline (Today view)
-   ============================================ */
-.timeline-container {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.timeline-allday {
-    background: var(--accent-light);
-    border: 1px solid rgba(232, 93, 64, 0.25);
-    border-radius: var(--radius-md);
-    padding: 12px 16px;
-}
-
-.timeline-allday-label {
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--gray-500);
-    margin-bottom: 8px;
-}
-
-.timeline-allday-event {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 4px 0;
-}
-
-.timeline-allday-title {
-    font-size: 0.875rem;
-    font-weight: 500;
-}
-
-.timeline-scroll {
-    overflow-y: auto;
-    max-height: 640px;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    background: var(--white);
-}
-
-.timeline-grid {
-    position: relative;
-    /* 15 hours (7am–10pm) × 60px/hour at 1px/min */
-    height: 900px;
-    min-width: 300px;
-}
-
-.timeline-hour {
-    position: absolute;
-    left: 0;
-    right: 0;
-    display: flex;
-    align-items: flex-start;
-    pointer-events: none;
-}
-
-.timeline-hour-label {
-    width: 52px;
-    flex-shrink: 0;
-    font-size: 0.7rem;
-    color: var(--gray-400);
-    text-align: right;
-    padding-right: 8px;
-    margin-top: -8px;
-    line-height: 1;
-    user-select: none;
-}
-
-.timeline-hour-line {
-    flex: 1;
-    border-top: 1px solid var(--gray-100);
-}
-
-.timeline-events-area {
-    position: absolute;
-    top: 0;
-    left: 52px;
-    right: 8px;
-    bottom: 0;
-}
-
-.timeline-event {
-    position: absolute;
-    /* left and width are set via inline styles for overlap column handling */
-    background: var(--accent-light);
-    border-left: 3px solid var(--accent);
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-    padding: 4px 8px;
-    overflow: hidden;
-    box-sizing: border-box;
-    transition: filter 0.1s;
-}
-
-.timeline-event:hover {
-    filter: brightness(0.96);
-}
-
-.timeline-event-title {
-    font-weight: 600;
-    font-size: 0.8rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.35;
-    color: var(--black);
-}
-
-.timeline-event-time {
-    font-size: 0.72rem;
-    color: var(--gray-600);
-    line-height: 1.3;
-}
-
-.timeline-current-time {
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: #e53e3e;
-    z-index: 10;
-    pointer-events: none;
-}
-
-.timeline-current-time::before {
-    content: '';
-    position: absolute;
-    left: -4px;
-    top: -4px;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: #e53e3e;
-}
-
-.timeline-outofrange {
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-md);
-    padding: 12px 16px;
-}
-
-.timeline-outofrange-label {
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--gray-400);
-    margin-bottom: 8px;
-}
-
-.timeline-outofrange-time {
-    font-size: 0.8rem;
-    color: var(--gray-500);
 }
 
 /* ============================================
@@ -4089,6 +3910,21 @@ body.modal-open {
 
 .htmx-request.htmx-indicator {
     display: inline-block;
+}
+
+/* Calendar card refresh feedback */
+.calendar-card.htmx-request {
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+}
+
+.calendar-card.htmx-settling {
+    animation: settle-flash 0.6s ease-out;
+}
+
+@keyframes settle-flash {
+    0% { box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.4); }
+    100% { box-shadow: none; }
 }
 
 /* ============================================
@@ -4983,6 +4819,17 @@ body.modal-open {
     width: 16px;
     height: 16px;
     border-radius: 50%;
+    transition: box-shadow 0.15s ease;
+}
+
+/* Selected state: ring around active swatch */
+.color-swatch input[type="radio"]:checked + .swatch-circle {
+    box-shadow: 0 0 0 2px var(--white), 0 0 0 4px var(--gray-700);
+    outline: none;
+}
+
+.color-swatch input[type="radio"]:checked ~ .swatch-name {
+    font-weight: 600;
 }
 
 .swatch-name {

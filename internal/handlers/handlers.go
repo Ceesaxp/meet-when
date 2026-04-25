@@ -81,17 +81,20 @@ func loadTemplates() map[string]*template.Template {
 		templates[pageName] = tmpl
 	}
 
-	// Also load partials as standalone templates for HTMX responses
-	for _, partial := range partialFiles {
-		partialName := filepath.Base(partial)
-
-		tmpl, err := template.New(partialName).Funcs(funcs).ParseFiles(partial)
+	// Also load partials as standalone templates for HTMX responses.
+	// Parse all partials together so they can reference each other via {{template}}.
+	if len(partialFiles) > 0 {
+		partialSet, err := template.New("").Funcs(funcs).ParseFiles(partialFiles...)
 		if err != nil {
-			log.Printf("Error parsing partial %s: %v", partialName, err)
-			continue
+			log.Printf("Error parsing partial set: %v", err)
+		} else {
+			for _, partial := range partialFiles {
+				partialName := filepath.Base(partial)
+				if t := partialSet.Lookup(partialName); t != nil {
+					templates[partialName] = partialSet
+				}
+			}
 		}
-
-		templates[partialName] = tmpl
 	}
 
 	return templates

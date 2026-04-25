@@ -8,7 +8,7 @@
             <span class="badge" style="font-size: 0.7rem;">All Day</span>
             {{else}}
             <span style="font-size: 0.8rem; color: var(--gray-500); white-space: nowrap;">
-                {{formatTimeHHMM .Start}}–{{formatTimeHHMM .End}}
+                {{formatTime .Start}}–{{formatTime .End}}
             </span>
             {{end}}
             <strong style="font-size: 0.9rem;">{{.Title}}</strong>

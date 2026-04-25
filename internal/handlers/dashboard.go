@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -181,8 +180,13 @@ func (h *DashboardHandler) RefreshCalendarSync(w http.ResponseWriter, r *http.Re
 			return
 		}
 
-		// If sync failed, the calendar will have the error in SyncError field
-		h.handlers.renderPartial(w, "calendar_card_partial.html", cal)
+		// Resolve color for the calendar
+		services.AssignColors([]*models.CalendarConnection{cal})
+
+		h.handlers.renderPartial(w, "calendar_card_partial.html", map[string]interface{}{
+			"Calendar": cal,
+			"Palette":  paletteData,
+		})
 		return
 	}
 
@@ -1275,264 +1279,7 @@ type AgendaDayGroup struct {
 	Events []services.AgendaEvent
 }
 
-// Timeline constants
-const (
-	timelineStartHour = 7  // 7 AM
-	timelineEndHour   = 22 // 10 PM (last marker shown at 10pm)
-	pxPerMinute       = 1  // 1 pixel per minute
-	minEventHeightPx  = 30 // minimum event block height in pixels
-)
 
-// TimelineHour is an hour marker on the visual timeline
-type TimelineHour struct {
-	Label string
-	TopPx int
-}
-
-// calendarColorPalette is the ordered list of accent colors assigned to calendars.
-var calendarColorPalette = []string{
-	"#4285F4", // Google blue
-	"#EA4335", // Google red
-	"#34A853", // Google green
-	"#FBBC05", // Google yellow
-	"#9C27B0", // purple
-	"#00ACC1", // cyan
-	"#FF7043", // deep orange
-	"#5C6BC0", // indigo
-}
-
-// buildCalendarColorMap assigns a color from the palette to each unique calendar name.
-func buildCalendarColorMap(events []services.AgendaEvent) map[string]string {
-	colorMap := make(map[string]string)
-	idx := 0
-	for _, e := range events {
-		if _, seen := colorMap[e.CalendarName]; !seen {
-			colorMap[e.CalendarName] = calendarColorPalette[idx%len(calendarColorPalette)]
-			idx++
-		}
-	}
-	return colorMap
-}
-
-// AgendaEventWithPosition is an agenda event with computed pixel position for timeline display.
-// LeftPct and WidthPct are CSS percentage strings used for overlap column layout.
-// EndPx is the actual end position before min-height expansion, used for overlap detection.
-// StartLocal/EndLocal are the times normalised to the host timezone for display.
-type AgendaEventWithPosition struct {
-	services.AgendaEvent
-	TopPx      int
-	HeightPx   int       // painted height (min-clamped)
-	EndPx      int       // actual end px (not clamped), for overlap detection
-	StartLocal time.Time // start in host timezone
-	EndLocal   time.Time // end in host timezone
-	LeftPct    string    // e.g. "0%" or "50%"
-	WidthPct   string    // e.g. "100%" or "50%"
-	Color      string    // hex color assigned to the calendar
-}
-
-// generateTimelineHours creates the hour markers for the visual timeline grid
-func generateTimelineHours() []TimelineHour {
-	hours := make([]TimelineHour, 0, timelineEndHour-timelineStartHour+1)
-	for h := timelineStartHour; h <= timelineEndHour; h++ {
-		var label string
-		switch {
-		case h == 0:
-			label = "12am"
-		case h < 12:
-			label = fmt.Sprintf("%dam", h)
-		case h == 12:
-			label = "12pm"
-		default:
-			label = fmt.Sprintf("%dpm", h-12)
-		}
-		hours = append(hours, TimelineHour{
-			Label: label,
-			TopPx: (h - timelineStartHour) * 60 * pxPerMinute,
-		})
-	}
-	return hours
-}
-
-// assignOverlapColumns assigns left/width CSS percentages so that overlapping events
-// are rendered side-by-side in columns instead of painting on top of each other.
-func assignOverlapColumns(events []AgendaEventWithPosition) {
-	if len(events) == 0 {
-		return
-	}
-
-	// paintedEndPx returns the visual bottom edge of an event, accounting for
-	// the minimum painted height so that two events sharing a column don't
-	// visually overlap even when their actual durations are very short.
-	paintedEndPx := func(e AgendaEventWithPosition) int {
-		end := e.EndPx
-		if e.TopPx+minEventHeightPx > end {
-			end = e.TopPx + minEventHeightPx
-		}
-		return end
-	}
-
-	// Greedily assign each event to the lowest-index column whose last occupant's
-	// painted bottom edge is at or above the new event's top.
-	type colState struct{ paintedEnd int }
-	cols := []colState{}
-	colIdx := make([]int, len(events))
-
-	for i := range events {
-		assigned := false
-		for c := range cols {
-			if events[i].TopPx >= cols[c].paintedEnd {
-				colIdx[i] = c
-				cols[c].paintedEnd = paintedEndPx(events[i])
-				assigned = true
-				break
-			}
-		}
-		if !assigned {
-			colIdx[i] = len(cols)
-			cols = append(cols, colState{paintedEnd: paintedEndPx(events[i])})
-		}
-	}
-
-	// For each event, numCols is the maximum number of concurrently painted events
-	// at any instant during the event's own painted range.
-	//
-	// We check at event i's own start and at the start of every overlapping event
-	// that begins after i (the only moments the count can increase).
-	// The floor is colIdx[i]+1 so the event's own column always fits on-screen.
-	numCols := make([]int, len(events))
-	for i := range events {
-		iTop := events[i].TopPx
-		iBot := paintedEndPx(events[i])
-
-		checkPoints := []int{iTop}
-		for j := range events {
-			if i == j {
-				continue
-			}
-			jTop := events[j].TopPx
-			jBot := paintedEndPx(events[j])
-			if jTop > iTop && jTop < iBot && jBot > iTop {
-				checkPoints = append(checkPoints, jTop)
-			}
-		}
-
-		maxConcurrent := colIdx[i] + 1 // must fit at least event i's own column
-		for _, t := range checkPoints {
-			count := 0
-			for j := range events {
-				jTop := events[j].TopPx
-				jBot := paintedEndPx(events[j])
-				if jTop <= t && jBot > t {
-					count++
-				}
-			}
-			if count > maxConcurrent {
-				maxConcurrent = count
-			}
-		}
-		numCols[i] = maxConcurrent
-	}
-
-	// Write CSS percentage strings back onto each event.
-	for i := range events {
-		n := numCols[i]
-		events[i].LeftPct = fmt.Sprintf("%.4f%%", float64(colIdx[i])/float64(n)*100)
-		events[i].WidthPct = fmt.Sprintf("%.4f%%", 100.0/float64(n))
-	}
-}
-
-// positionEventsForTimeline computes pixel positions for timed events in the visual timeline.
-// today must be in loc (use time.Now().In(loc)).
-//
-// Grid boundaries are expressed as concrete timestamps so that overnight events
-// (e.g. 23:00-09:00) are correctly clamped rather than misclassified by
-// comparing bare clock-minutes (which wrap around midnight).
-//
-// Events completely outside the grid are returned in outOfRange so the template
-// can list them separately.
-func positionEventsForTimeline(events []services.AgendaEvent, loc *time.Location, today time.Time, colorMap map[string]string) (positioned []AgendaEventWithPosition, outOfRange []AgendaEventWithPosition) {
-	gridStart := time.Date(today.Year(), today.Month(), today.Day(), timelineStartHour, 0, 0, 0, loc)
-	gridEnd := time.Date(today.Year(), today.Month(), today.Day(), timelineEndHour, 0, 0, 0, loc)
-	gridHeightPx := (timelineEndHour-timelineStartHour) * 60 * pxPerMinute
-
-	for _, event := range events {
-		if event.IsAllDay {
-			continue
-		}
-
-		color := colorMap[event.CalendarName]
-
-		// Events that don't touch the grid window at all go to out-of-range.
-		if !event.End.After(gridStart) || !event.Start.Before(gridEnd) {
-			outOfRange = append(outOfRange, AgendaEventWithPosition{
-				AgendaEvent: event,
-				StartLocal:  event.Start.In(loc),
-				EndLocal:    event.End.In(loc),
-				LeftPct:     "0%",
-				WidthPct:    "100%",
-				Color:       color,
-			})
-			continue
-		}
-
-		// Clamp to grid boundaries for events that partially overlap the window.
-		clampedStart := event.Start
-		if clampedStart.Before(gridStart) {
-			clampedStart = gridStart
-		}
-		clampedEnd := event.End
-		if clampedEnd.After(gridEnd) {
-			clampedEnd = gridEnd
-		}
-
-		topPx := int(clampedStart.Sub(gridStart).Minutes()) * pxPerMinute
-		realHeightPx := int(clampedEnd.Sub(clampedStart).Minutes()) * pxPerMinute
-		paintedHeightPx := realHeightPx
-		if paintedHeightPx < minEventHeightPx {
-			paintedHeightPx = minEventHeightPx
-		}
-		// Guard: painted block must not overflow the grid.
-		if topPx+paintedHeightPx > gridHeightPx {
-			paintedHeightPx = gridHeightPx - topPx
-		}
-
-		positioned = append(positioned, AgendaEventWithPosition{
-			AgendaEvent: event,
-			TopPx:       topPx,
-			HeightPx:    paintedHeightPx,
-			EndPx:       topPx + realHeightPx, // actual end for overlap detection
-			StartLocal:  event.Start.In(loc),
-			EndLocal:    event.End.In(loc),
-			LeftPct:     "0%",
-			WidthPct:    "100%",
-			Color:       color,
-		})
-	}
-
-	assignOverlapColumns(positioned)
-	return positioned, outOfRange
-}
-
-// filterAllDayEvents returns only all-day events from the slice
-func filterAllDayEvents(events []services.AgendaEvent) []services.AgendaEvent {
-	var allDay []services.AgendaEvent
-	for _, e := range events {
-		if e.IsAllDay {
-			allDay = append(allDay, e)
-		}
-	}
-	return allDay
-}
-
-// currentTimePixel returns the pixel offset from the top of the timeline for the
-// current time, or -1 when the current time falls outside the displayed range.
-func currentTimePixel(now time.Time) int {
-	h, m, _ := now.Clock()
-	if h < timelineStartHour || h >= timelineEndHour {
-		return -1
-	}
-	return (h-timelineStartHour)*60*pxPerMinute + m*pxPerMinute
-}
 
 // Agenda renders the agenda view with today's or this week's events
 func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
@@ -1558,37 +1305,31 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 		view = "today"
 	}
 
-	var startDate, endDate time.Time
 	var dayGroups []AgendaDayGroup
 
 	// today-view fields populated by AgendaService.GetDay
+	var agendaEvents []services.AgendaEvent
 	var agendaCalendars []*models.CalendarConnection
 	var lanes []services.CalendarLane
 	var windowStart, windowEnd time.Time
+	var hourLabels []services.HourLabel
 
 	if view == "week" {
 		// This Week: Monday to Sunday of current week
-		// Go's time.Weekday: Sunday=0, Monday=1, ..., Saturday=6
-		// We want to start on Monday
 		weekday := now.Weekday()
 		daysFromMonday := int(weekday) - 1
 		if weekday == time.Sunday {
-			daysFromMonday = 6 // Sunday is the end of the week
+			daysFromMonday = 6
 		}
 		monday := time.Date(now.Year(), now.Month(), now.Day()-daysFromMonday, 0, 0, 0, 0, loc)
-		sunday := monday.AddDate(0, 0, 7) // End of Sunday (start of next Monday)
+		sunday := monday.AddDate(0, 0, 7)
 
-		startDate = monday
-		endDate = sunday
-
-		// Fetch events for the week
-		weekEvents, fetchErr := h.handlers.services.Calendar.GetAgendaEvents(r.Context(), host.Host.ID, startDate, endDate)
+		weekEvents, fetchErr := h.handlers.services.Calendar.GetAgendaEvents(r.Context(), host.Host.ID, monday, sunday)
 		if fetchErr != nil {
 			log.Printf("Error fetching agenda events: %v", fetchErr)
 			weekEvents = []services.AgendaEvent{}
 		}
 
-		// Group events by day
 		dayGroups = groupEventsByDay(weekEvents, monday, loc)
 	} else {
 		// Today: use AgendaService for palette-aware view composition.
@@ -1596,53 +1337,12 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 		if agendaErr != nil {
 			log.Printf("Error fetching today agenda: %v", agendaErr)
 		} else {
-			startDate = agendaView.DayStart
-			endDate = agendaView.DayEnd
+			agendaEvents = agendaView.Events
 			agendaCalendars = agendaView.Calendars
 			lanes = services.LanesByCalendar(agendaView)
 			windowStart, windowEnd = services.ComputeVisibleWindow(agendaView.Events, agendaView.DayStart, agendaView.DayEnd)
+			hourLabels = services.GenerateHourLabels(windowStart, windowEnd)
 		}
-	}
-
-	// Fetch events for the current window (week or today fallback).
-	events, err := h.handlers.services.Calendar.GetAgendaEvents(r.Context(), host.Host.ID, startDate, endDate)
-	if err != nil {
-		log.Printf("Error fetching agenda events: %v", err)
-		events = []services.AgendaEvent{}
-	}
-
-	// Build calendar color map from all fetched events (covers both views)
-	colorMap := buildCalendarColorMap(events)
-	// For week view, also include events in day groups
-	if view == "week" {
-		for _, g := range dayGroups {
-			for name, color := range buildCalendarColorMap(g.Events) {
-				if _, exists := colorMap[name]; !exists {
-					colorMap[name] = color
-				}
-			}
-		}
-	}
-
-	// Compute timeline positioning for today view (kept for existing template compat).
-	var positionedEvents []AgendaEventWithPosition
-	var allDayEvents []services.AgendaEvent
-	var outOfRangeEvents []AgendaEventWithPosition
-	currentTimePx := -1 // -1 means "don't show"
-	if view == "today" {
-		positionedEvents, outOfRangeEvents = positionEventsForTimeline(events, loc, now, colorMap)
-		allDayEvents = filterAllDayEvents(events)
-		currentTimePx = currentTimePixel(now)
-	}
-
-	// For the today strip, prefer events from AgendaView (palette-colored).
-	todayEvents := events
-	if view == "today" && len(agendaCalendars) > 0 {
-		todayCalEvents := make([]services.AgendaEvent, 0, len(events))
-		for _, e := range events {
-			todayCalEvents = append(todayCalEvents, e)
-		}
-		todayEvents = todayCalEvents
 	}
 
 	h.handlers.render(w, "dashboard_agenda.html", PageData{
@@ -1652,21 +1352,16 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 		ActiveNav:    "agenda",
 		PendingCount: h.getPendingCount(r, host.Host.ID),
 		Data: map[string]interface{}{
-			"Events":           todayEvents,
-			"PositionedEvents": positionedEvents,
-			"AllDayEvents":     allDayEvents,
-			"OutOfRangeEvents": outOfRangeEvents,
-			"TimelineHours":    generateTimelineHours(),
-			"DayGroups":        dayGroups,
-			"View":             view,
-			"Today":            now,
-			"Timezone":         host.Host.Timezone,
-			"CurrentTimePx":    currentTimePx,
-			"CalendarColors":   colorMap,
-			"Calendars":        agendaCalendars,
-			"Lanes":            lanes,
-			"WindowStart":      windowStart,
-			"WindowEnd":        windowEnd,
+			"Events":      agendaEvents,
+			"DayGroups":   dayGroups,
+			"View":        view,
+			"Today":       now,
+			"Timezone":    host.Host.Timezone,
+			"Calendars":   agendaCalendars,
+			"Lanes":       lanes,
+			"WindowStart": windowStart,
+			"WindowEnd":   windowEnd,
+			"HourLabels":  hourLabels,
 		},
 	})
 }

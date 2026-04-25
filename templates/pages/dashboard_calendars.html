@@ -74,7 +74,9 @@
             <button type="button" class="btn-sm"
                     hx-post="/dashboard/calendars/{{.ID}}/refresh"
                     hx-target="#calendar-card-{{.ID}}"
-                    hx-swap="outerHTML">
+                    hx-swap="outerHTML settle:600ms"
+                    hx-disabled-elt="this"
+                    hx-indicator="closest .calendar-card">
                 Refresh
             </button>
             {{if not .IsDefault}}
