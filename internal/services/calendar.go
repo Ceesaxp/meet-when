@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -85,6 +86,21 @@ func (s *CalendarService) ConnectGoogleCalendar(ctx context.Context, input Googl
 		calendar.IsDefault = true
 	}
 
+	// Assign a palette color to the new calendar and persist it.
+	// Only update calendar.Color in memory after the DB write succeeds so that
+	// the returned struct stays consistent with the persisted state.
+	AssignColors(calendars)
+	for _, cal := range calendars {
+		if cal.ID == calendar.ID {
+			if err := s.repos.Calendar.UpdateColor(ctx, input.HostID, calendar.ID, cal.Color); err != nil {
+				log.Printf("[CALENDAR] failed to persist color for calendar %s: %v", calendar.ID, err)
+			} else {
+				calendar.Color = cal.Color
+			}
+			break
+		}
+	}
+
 	return calendar, nil
 }
 
@@ -133,6 +149,21 @@ func (s *CalendarService) ConnectCalDAV(ctx context.Context, input CalDAVConnect
 	if len(calendars) == 1 {
 		_ = s.repos.Calendar.SetDefault(ctx, input.HostID, calendar.ID)
 		calendar.IsDefault = true
+	}
+
+	// Assign a palette color to the new calendar and persist it.
+	// Only update calendar.Color in memory after the DB write succeeds so that
+	// the returned struct stays consistent with the persisted state.
+	AssignColors(calendars)
+	for _, cal := range calendars {
+		if cal.ID == calendar.ID {
+			if err := s.repos.Calendar.UpdateColor(ctx, input.HostID, calendar.ID, cal.Color); err != nil {
+				log.Printf("[CALENDAR] failed to persist color for calendar %s: %v", calendar.ID, err)
+			} else {
+				calendar.Color = cal.Color
+			}
+			break
+		}
 	}
 
 	return calendar, nil
@@ -1147,11 +1178,14 @@ func (s *CalendarService) deleteCalDAVEvent(ctx context.Context, cal *models.Cal
 
 // AgendaEvent represents a calendar event for the agenda view
 type AgendaEvent struct {
-	Title        string    `json:"title"`
-	Start        time.Time `json:"start"`
-	End          time.Time `json:"end"`
-	CalendarName string    `json:"calendar_name"`
-	IsAllDay     bool      `json:"is_all_day"`
+	ID            string    `json:"id"`
+	CalendarID    string    `json:"calendar_id"`
+	CalendarColor string    `json:"calendar_color"`
+	Title         string    `json:"title"`
+	Start         time.Time `json:"start"`
+	End           time.Time `json:"end"`
+	CalendarName  string    `json:"calendar_name"`
+	IsAllDay      bool      `json:"is_all_day"`
 }
 
 // GetAgendaEvents returns events from all connected calendars for a host within the given time range
@@ -1160,7 +1194,12 @@ func (s *CalendarService) GetAgendaEvents(ctx context.Context, hostID string, st
 	if err != nil {
 		return nil, err
 	}
+	return s.GetAgendaEventsWithCalendars(ctx, calendars, nil, startDate, endDate)
+}
 
+// GetAgendaEventsWithCalendars fetches events for the provided calendars without reloading from DB.
+// host is accepted for future use (e.g. timezone) and may be nil.
+func (s *CalendarService) GetAgendaEventsWithCalendars(ctx context.Context, calendars []*models.CalendarConnection, host *models.Host, start, end time.Time) ([]AgendaEvent, error) {
 	var allEvents []AgendaEvent
 
 	for _, cal := range calendars {
@@ -1169,9 +1208,9 @@ func (s *CalendarService) GetAgendaEvents(ctx context.Context, hostID string, st
 
 		switch cal.Provider {
 		case models.CalendarProviderGoogle:
-			events, fetchErr = s.getGoogleAgendaEvents(ctx, cal, startDate, endDate)
+			events, fetchErr = s.getGoogleAgendaEvents(ctx, cal, start, end)
 		case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
-			events, fetchErr = s.getCalDAVAgendaEvents(ctx, cal, startDate, endDate)
+			events, fetchErr = s.getCalDAVAgendaEvents(ctx, cal, start, end)
 		}
 
 		if fetchErr != nil {
@@ -1189,15 +1228,11 @@ func (s *CalendarService) GetAgendaEvents(ctx context.Context, hostID string, st
 	return allEvents, nil
 }
 
-// sortAgendaEvents sorts events by start time
+// sortAgendaEvents sorts events by start time ascending.
 func sortAgendaEvents(events []AgendaEvent) {
-	for i := 0; i < len(events); i++ {
-		for j := i + 1; j < len(events); j++ {
-			if events[j].Start.Before(events[i].Start) {
-				events[i], events[j] = events[j], events[i]
-			}
-		}
-	}
+	slices.SortFunc(events, func(a, b AgendaEvent) int {
+		return a.Start.Compare(b.Start)
+	})
 }
 
 // getGoogleAgendaEvents fetches events from Google Calendar for the agenda view
@@ -1237,6 +1272,7 @@ func (s *CalendarService) getGoogleAgendaEvents(ctx context.Context, cal *models
 
 	var result struct {
 		Items []struct {
+			ID      string `json:"id"`
 			Summary string `json:"summary"`
 			Start   struct {
 				DateTime string `json:"dateTime"`
@@ -1267,12 +1303,19 @@ func (s *CalendarService) getGoogleAgendaEvents(ctx context.Context, cal *models
 			endTime, _ = time.Parse(time.RFC3339, item.End.DateTime)
 		}
 
+		calColor := cal.Color
+		if calColor == "" {
+			calColor = "#5F5E5A"
+		}
 		events = append(events, AgendaEvent{
-			Title:        item.Summary,
-			Start:        startTime,
-			End:          endTime,
-			CalendarName: cal.Name,
-			IsAllDay:     isAllDay,
+			ID:            item.ID,
+			CalendarID:    cal.ID,
+			CalendarColor: calColor,
+			Title:         item.Summary,
+			Start:         startTime,
+			End:           endTime,
+			CalendarName:  cal.Name,
+			IsAllDay:      isAllDay,
 		})
 	}
 
@@ -1327,19 +1370,23 @@ func (s *CalendarService) getCalDAVAgendaEvents(ctx context.Context, cal *models
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
+	calColor := cal.Color
+	if calColor == "" {
+		calColor = "#5F5E5A"
+	}
 	// Extract agenda events from VCALENDAR data in the response
-	events := parseCalDAVAgendaResponse(string(body), cal.Name, start, end)
+	events := parseCalDAVAgendaResponse(string(body), cal.Name, cal.ID, calColor, start, end)
 	return events, nil
 }
 
 // parseCalDAVAgendaResponse extracts agenda events from CalDAV XML response containing VCALENDAR data
-func parseCalDAVAgendaResponse(body string, calendarName string, rangeStart, rangeEnd time.Time) []AgendaEvent {
+func parseCalDAVAgendaResponse(body string, calendarName string, calendarID string, calendarColor string, rangeStart, rangeEnd time.Time) []AgendaEvent {
 	var events []AgendaEvent
 
 	calDataParts := extractCalendarData(body)
 
 	for _, icsData := range calDataParts {
-		parsedEvents := parseVEventsForAgenda(icsData, calendarName, rangeStart, rangeEnd)
+		parsedEvents := parseVEventsForAgenda(icsData, calendarName, calendarID, calendarColor, rangeStart, rangeEnd)
 		events = append(events, parsedEvents...)
 	}
 
@@ -1347,7 +1394,7 @@ func parseCalDAVAgendaResponse(body string, calendarName string, rangeStart, ran
 }
 
 // parseVEventsForAgenda extracts VEVENT details for the agenda view from ICS data
-func parseVEventsForAgenda(icsData string, calendarName string, rangeStart, rangeEnd time.Time) []AgendaEvent {
+func parseVEventsForAgenda(icsData string, calendarName string, calendarID string, calendarColor string, rangeStart, rangeEnd time.Time) []AgendaEvent {
 	var events []AgendaEvent
 
 	// Split into lines and unfold
@@ -1355,7 +1402,7 @@ func parseVEventsForAgenda(icsData string, calendarName string, rangeStart, rang
 
 	var inEvent bool
 	var eventStart, eventEnd time.Time
-	var eventTitle string
+	var eventTitle, eventUID string
 	var hasStart, hasEnd bool
 	var isAllDay bool
 
@@ -1370,6 +1417,7 @@ func parseVEventsForAgenda(icsData string, calendarName string, rangeStart, rang
 			eventStart = time.Time{}
 			eventEnd = time.Time{}
 			eventTitle = ""
+			eventUID = ""
 			continue
 		}
 
@@ -1378,11 +1426,14 @@ func parseVEventsForAgenda(icsData string, calendarName string, rangeStart, rang
 				// Check if event overlaps with our query range
 				if eventEnd.After(rangeStart) && eventStart.Before(rangeEnd) {
 					events = append(events, AgendaEvent{
-						Title:        eventTitle,
-						Start:        eventStart,
-						End:          eventEnd,
-						CalendarName: calendarName,
-						IsAllDay:     isAllDay,
+						ID:            eventUID,
+						CalendarID:    calendarID,
+						CalendarColor: calendarColor,
+						Title:         eventTitle,
+						Start:         eventStart,
+						End:           eventEnd,
+						CalendarName:  calendarName,
+						IsAllDay:      isAllDay,
 					})
 				}
 			}
@@ -1392,6 +1443,11 @@ func parseVEventsForAgenda(icsData string, calendarName string, rangeStart, rang
 
 		if !inEvent {
 			continue
+		}
+
+		// Parse UID
+		if strings.HasPrefix(line, "UID:") {
+			eventUID = strings.TrimSpace(line[4:])
 		}
 
 		// Parse SUMMARY (title)

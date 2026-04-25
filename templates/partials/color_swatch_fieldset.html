@@ -1,0 +1,18 @@
+{{define "color_swatch_fieldset.html"}}
+<form hx-post="/dashboard/calendars/{{.CalendarID}}/color" hx-swap="outerHTML">
+    <fieldset class="color-swatches" style="border: none; padding: 0;">
+        {{range .Palette}}
+        <label class="color-swatch">
+            <input type="radio"
+                   name="color"
+                   value="{{.Hex}}"
+                   onchange="this.form.requestSubmit()"
+                   {{if eq .Hex $.CurrentColor}}checked{{end}}
+                   style="position: absolute; opacity: 0; width: 0; height: 0;">
+            <span class="swatch-circle" style="background: {{.Hex}};"></span>
+            <span class="swatch-name">{{.Name}}</span>
+        </label>
+        {{end}}
+    </fieldset>
+</form>
+{{end}}

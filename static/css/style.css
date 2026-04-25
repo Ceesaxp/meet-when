@@ -36,6 +36,17 @@
     --radius-md: 10px;
     --radius-lg: 16px;
     --radius-full: 100px;
+
+    /* Calendar Palette Colors */
+    --cal-blue:   #378ADD;
+    --cal-teal:   #1D9E75;
+    --cal-coral:  #D85A30;
+    --cal-purple: #7F77DD;
+    --cal-green:  #639922;
+    --cal-amber:  #BA7517;
+    --cal-pink:   #D4537E;
+    --cal-red:    #E24B4A;
+    --cal-gray:   #5F5E5A;
 }
 
 /* Reset */
@@ -3034,6 +3045,21 @@ body.modal-open {
 }
 
 /* ============================================
+   Calendar Legend
+   ============================================ */
+.calendar-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+}
+
+
+/* ============================================
    Agenda / Day Groups
    ============================================ */
 .day-group {
@@ -3912,6 +3938,21 @@ body.modal-open {
     display: inline-block;
 }
 
+/* Calendar card refresh feedback */
+.calendar-card.htmx-request {
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+}
+
+.calendar-card.htmx-settling {
+    animation: settle-flash 0.6s ease-out;
+}
+
+@keyframes settle-flash {
+    0% { box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.4); }
+    100% { box-shadow: none; }
+}
+
 /* ============================================
    Utility Classes
    ============================================ */
@@ -4724,4 +4765,99 @@ body.modal-open {
         width: 40px;
         height: 40px;
     }
+}
+
+/* ============================================
+   Calendar Legend Components
+   ============================================ */
+
+.calendar-dot {
+    display: inline-flex;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.calendar-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* ============================================
+   Day Strip Visualization
+   ============================================ */
+
+.strip-container {
+    overflow-x: auto;
+}
+
+.strip-lane {
+    position: relative;
+    border-radius: 4px;
+    background: var(--gray-100);
+    height: 22px;
+    margin-bottom: 2px;
+}
+
+.strip-lane--empty {
+    height: 8px;
+}
+
+.strip-block {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    border-radius: 3px;
+    min-width: 4px;
+    overflow: hidden;
+}
+
+.strip-header {
+    display: grid;
+}
+
+.event-row {
+    border-left: 3px solid var(--cal-color, var(--gray-300));
+    padding-left: 12px;
+}
+
+/* ============================================
+   Color Swatch Picker
+   ============================================ */
+
+.color-swatches {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.color-swatch {
+    cursor: pointer;
+}
+
+.swatch-circle {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    transition: box-shadow 0.15s ease;
+}
+
+/* Selected state: ring around active swatch */
+.color-swatch input[type="radio"]:checked + .swatch-circle {
+    box-shadow: 0 0 0 2px var(--white), 0 0 0 4px var(--gray-700);
+    outline: none;
+}
+
+.color-swatch input[type="radio"]:checked ~ .swatch-name {
+    font-weight: 600;
+}
+
+.swatch-name {
+    font-size: 0.75rem;
 }

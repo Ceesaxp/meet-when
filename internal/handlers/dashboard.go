@@ -74,6 +74,9 @@ func (h *DashboardHandler) Calendars(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error fetching conferences: %v", err)
 	}
 
+	// Assign palette colors so legacy calendars without a stored color get one.
+	services.AssignColors(calendars)
+
 	// Build OAuth URLs
 	googleAuthURL := h.handlers.services.Calendar.GetGoogleAuthURL(host.Host.ID)
 	zoomAuthURL := h.handlers.services.Conferencing.GetZoomAuthURL(host.Host.ID)
@@ -89,6 +92,7 @@ func (h *DashboardHandler) Calendars(w http.ResponseWriter, r *http.Request) {
 			"Conferencing":  conferencing,
 			"GoogleAuthURL": googleAuthURL,
 			"ZoomAuthURL":   zoomAuthURL,
+			"Palette":       paletteData,
 		},
 	})
 }
@@ -177,8 +181,13 @@ func (h *DashboardHandler) RefreshCalendarSync(w http.ResponseWriter, r *http.Re
 			return
 		}
 
-		// If sync failed, the calendar will have the error in SyncError field
-		h.handlers.renderPartial(w, "calendar_card_partial.html", cal)
+		// Resolve color for the calendar
+		services.AssignColors([]*models.CalendarConnection{cal})
+
+		h.handlers.renderPartial(w, "calendar_card_partial.html", map[string]interface{}{
+			"Calendar": cal,
+			"Palette":  paletteData,
+		})
 		return
 	}
 
@@ -204,6 +213,93 @@ func (h *DashboardHandler) SetDefaultCalendar(w http.ResponseWriter, r *http.Req
 	_ = h.handlers.services.Calendar.SetDefaultCalendar(r.Context(), host.Host.ID, calendarID)
 
 	h.handlers.redirect(w, r, "/dashboard/calendars")
+}
+
+// AgendaDayPartial handles GET /dashboard/agenda/day-detail and returns the
+// day_detail.html partial as an HTML fragment for HTMX innerHTML swap.
+func (h *DashboardHandler) AgendaDayPartial(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Parse optional date query param; default to today.
+	dateStr := r.URL.Query().Get("date")
+	var date time.Time
+	if dateStr != "" {
+		var parseErr error
+		date, parseErr = time.Parse("2006-01-02", dateStr)
+		if parseErr != nil {
+			http.Error(w, "invalid date", http.StatusBadRequest)
+			return
+		}
+	} else {
+		date = time.Now()
+	}
+
+	view, err := h.handlers.services.Agenda.GetDay(r.Context(), host.Host.ID, date)
+	if err != nil {
+		log.Printf("[AGENDA] AgendaDayPartial error: %v", err)
+		http.Error(w, "failed to load agenda", http.StatusInternalServerError)
+		return
+	}
+
+	h.handlers.renderPartial(w, "day_detail.html", map[string]interface{}{
+		"Events": view.Events,
+	})
+}
+
+// paletteData returns the ordered palette slice used by color picker templates.
+var paletteData = []map[string]string{
+	{"Hex": "#378ADD", "Name": "Blue"},
+	{"Hex": "#1D9E75", "Name": "Teal"},
+	{"Hex": "#D85A30", "Name": "Coral"},
+	{"Hex": "#7F77DD", "Name": "Purple"},
+	{"Hex": "#639922", "Name": "Green"},
+	{"Hex": "#BA7517", "Name": "Amber"},
+	{"Hex": "#D4537E", "Name": "Pink"},
+	{"Hex": "#E24B4A", "Name": "Red"},
+	{"Hex": "#5F5E5A", "Name": "Gray"},
+}
+
+// UpdateCalendarColor handles POST /dashboard/calendars/{id}/color.
+// It validates the submitted color is a CalendarPalette value, persists it,
+// and returns the updated color swatch fieldset partial for HTMX swap.
+func (h *DashboardHandler) UpdateCalendarColor(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	calendarID := r.PathValue("id")
+	color := r.FormValue("color")
+
+	// Validate that color is one of the 9 palette values.
+	valid := false
+	for _, c := range services.CalendarPalette {
+		if c == color {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		http.Error(w, "invalid color", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.handlers.repos.Calendar.UpdateColor(r.Context(), host.Host.ID, calendarID, color); err != nil {
+		log.Printf("[CALENDAR] UpdateCalendarColor failed for %s: %v", calendarID, err)
+		http.Error(w, "failed to update color", http.StatusInternalServerError)
+		return
+	}
+
+	h.handlers.renderPartial(w, "color_swatch_fieldset.html", map[string]interface{}{
+		"CalendarID":   calendarID,
+		"CurrentColor": color,
+		"Palette":      paletteData,
+	})
 }
 
 // Templates renders the meeting templates list
@@ -1221,6 +1317,8 @@ type AgendaDayGroup struct {
 	Events []services.AgendaEvent
 }
 
+
+
 // Agenda renders the agenda view with today's or this week's events
 func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())
@@ -1245,44 +1343,44 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 		view = "today"
 	}
 
-	var startDate, endDate time.Time
 	var dayGroups []AgendaDayGroup
+
+	// today-view fields populated by AgendaService.GetDay
+	var agendaEvents []services.AgendaEvent
+	var agendaCalendars []*models.CalendarConnection
+	var lanes []services.CalendarLane
+	var windowStart, windowEnd time.Time
+	var hourLabels []services.HourLabel
 
 	if view == "week" {
 		// This Week: Monday to Sunday of current week
-		// Go's time.Weekday: Sunday=0, Monday=1, ..., Saturday=6
-		// We want to start on Monday
 		weekday := now.Weekday()
 		daysFromMonday := int(weekday) - 1
 		if weekday == time.Sunday {
-			daysFromMonday = 6 // Sunday is the end of the week
+			daysFromMonday = 6
 		}
 		monday := time.Date(now.Year(), now.Month(), now.Day()-daysFromMonday, 0, 0, 0, 0, loc)
-		sunday := monday.AddDate(0, 0, 7) // End of Sunday (start of next Monday)
+		sunday := monday.AddDate(0, 0, 7)
 
-		startDate = monday
-		endDate = sunday
-
-		// Fetch events for the week
-		events, fetchErr := h.handlers.services.Calendar.GetAgendaEvents(r.Context(), host.Host.ID, startDate, endDate)
+		weekEvents, fetchErr := h.handlers.services.Calendar.GetAgendaEvents(r.Context(), host.Host.ID, monday, sunday)
 		if fetchErr != nil {
 			log.Printf("Error fetching agenda events: %v", fetchErr)
-			events = []services.AgendaEvent{}
+			weekEvents = []services.AgendaEvent{}
 		}
 
-		// Group events by day
-		dayGroups = groupEventsByDay(events, monday, loc)
+		dayGroups = groupEventsByDay(weekEvents, monday, loc)
 	} else {
-		// Today: 00:00 to 23:59:59 in host's timezone
-		startDate = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-		endDate = startDate.AddDate(0, 0, 1)
-	}
-
-	// Fetch events (for today view or as fallback)
-	events, err := h.handlers.services.Calendar.GetAgendaEvents(r.Context(), host.Host.ID, startDate, endDate)
-	if err != nil {
-		log.Printf("Error fetching agenda events: %v", err)
-		events = []services.AgendaEvent{}
+		// Today: use AgendaService for palette-aware view composition.
+		agendaView, agendaErr := h.handlers.services.Agenda.GetDay(r.Context(), host.Host.ID, now)
+		if agendaErr != nil {
+			log.Printf("Error fetching today agenda: %v", agendaErr)
+		} else {
+			agendaEvents = agendaView.Events
+			agendaCalendars = agendaView.Calendars
+			lanes = services.LanesByCalendar(agendaView)
+			windowStart, windowEnd = services.ComputeVisibleWindow(agendaView.Events, agendaView.DayStart, agendaView.DayEnd)
+			hourLabels = services.GenerateHourLabels(windowStart, windowEnd)
+		}
 	}
 
 	h.handlers.render(w, "dashboard_agenda.html", PageData{
@@ -1292,11 +1390,16 @@ func (h *DashboardHandler) Agenda(w http.ResponseWriter, r *http.Request) {
 		ActiveNav:    "agenda",
 		PendingCount: h.getPendingCount(r, host.Host.ID),
 		Data: map[string]interface{}{
-			"Events":    events,
-			"DayGroups": dayGroups,
-			"View":      view,
-			"Today":     now,
-			"Timezone":  host.Host.Timezone,
+			"Events":      agendaEvents,
+			"DayGroups":   dayGroups,
+			"View":        view,
+			"Today":       now,
+			"Timezone":    host.Host.Timezone,
+			"Calendars":   agendaCalendars,
+			"Lanes":       lanes,
+			"WindowStart": windowStart,
+			"WindowEnd":   windowEnd,
+			"HourLabels":  hourLabels,
 		},
 	})
 }

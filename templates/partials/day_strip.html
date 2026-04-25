@@ -1,0 +1,30 @@
+{{define "day_strip.html"}}
+<div class="strip-container">
+    {{if .Data.Lanes}}
+    <div class="strip-header" style="position: relative; height: 20px; margin-bottom: 4px;">
+        {{/* Hour labels positioned across the window */}}
+        {{range .Data.HourLabels}}
+        <span style="position: absolute; left: {{.LeftPct}}%; font-size: 0.65rem; color: var(--gray-500); transform: translateX(-50%);">{{.Label}}</span>
+        {{end}}
+    </div>
+    {{range .Data.Lanes}}
+    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+        <span style="font-size: 0.65rem; color: var(--gray-500); width: 80px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{.Calendar.Name}}">{{.Calendar.Name}}</span>
+        <div class="strip-lane{{if .Empty}} strip-lane--empty{{end}}" style="flex: 1; position: relative;">
+            {{range .Blocks}}
+            <div class="strip-block"
+                 style="left: {{printf "%.4f" .LeftPct}}%; width: {{printf "%.4f" .WidthPct}}%; background: {{.Color}};"
+                 title="{{.Title}}">
+                {{if gt .WidthPct 8.0}}
+                <span style="font-size: 0.6rem; color: #fff; padding: 0 2px; overflow: hidden; white-space: nowrap; display: block; text-overflow: ellipsis;">{{.Title}}</span>
+                {{end}}
+            </div>
+            {{end}}
+        </div>
+    </div>
+    {{end}}
+    {{else}}
+    <p style="color: var(--gray-500); font-size: 0.875rem;">No calendars connected.</p>
+    {{end}}
+</div>
+{{end}}

@@ -1,0 +1,16 @@
+./audit.go
+./auth.go
+./availability.go
+./booking.go
+./calendar.go
+./calendar_palette.go
+./calendar_sync.go
+./conferencing.go
+./email.go
+./reminder.go
+./services.go
+./session.go
+./template.go
+./timezone.go
+./availability_test.go
+./calendar_palette_test.go

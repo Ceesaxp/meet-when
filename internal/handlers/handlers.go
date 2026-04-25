@@ -85,17 +85,20 @@ func loadTemplates() map[string]*template.Template {
 		templates[pageName] = tmpl
 	}
 
-	// Also load partials as standalone templates for HTMX responses
-	for _, partial := range partialFiles {
-		partialName := filepath.Base(partial)
-
-		tmpl, err := template.New(partialName).Funcs(funcs).ParseFiles(partial)
+	// Also load partials as standalone templates for HTMX responses.
+	// Parse all partials together so they can reference each other via {{template}}.
+	if len(partialFiles) > 0 {
+		partialSet, err := template.New("").Funcs(funcs).ParseFiles(partialFiles...)
 		if err != nil {
-			log.Printf("Error parsing partial %s: %v", partialName, err)
-			continue
+			log.Printf("Error parsing partial set: %v", err)
+		} else {
+			for _, partial := range partialFiles {
+				partialName := filepath.Base(partial)
+				if t := partialSet.Lookup(partialName); t != nil {
+					templates[partialName] = partialSet
+				}
+			}
 		}
-
-		templates[partialName] = tmpl
 	}
 
 	return templates
@@ -272,6 +275,15 @@ func templateFuncs() template.FuncMap {
 				return m
 			}
 			return nil
+		},
+		"dict": func(kvs ...interface{}) map[string]interface{} {
+			m := make(map[string]interface{}, len(kvs)/2)
+			for i := 0; i+1 < len(kvs); i += 2 {
+				if key, ok := kvs[i].(string); ok {
+					m[key] = kvs[i+1]
+				}
+			}
+			return m
 		},
 		"isPast": func(t models.SQLiteTime) bool {
 			return t.Before(time.Now())

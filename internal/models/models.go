@@ -138,6 +138,7 @@ type CalendarConnection struct {
 	CalDAVUsername string `json:"-" db:"caldav_username"`
 	CalDAVPassword string `json:"-" db:"caldav_password"`
 	IsDefault      bool   `json:"is_default" db:"is_default"`
+	Color          string `json:"color" db:"color"`
 	// Sync status tracking
 	LastSyncedAt *SQLiteTime        `json:"last_synced_at" db:"last_synced_at"`
 	SyncStatus   CalendarSyncStatus `json:"sync_status" db:"sync_status"`

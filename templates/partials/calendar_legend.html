@@ -1,0 +1,10 @@
+{{define "calendar_legend.html"}}
+<ul class="calendar-legend">
+    {{range .Data.Calendars}}
+    <li style="display: flex; align-items: center; gap: 4px;">
+        <span class="calendar-dot" style="background-color: {{.Color}};"></span>
+        <span>{{.Name}}</span>
+    </li>
+    {{end}}
+</ul>
+{{end}}

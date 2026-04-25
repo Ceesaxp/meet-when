@@ -33,7 +33,7 @@
         {{if .Events}}
         <div class="events-list">
             {{range .Events}}
-            <div class="event-item {{if .IsAllDay}}all-day{{end}}">
+            <div class="event-item {{if .IsAllDay}}all-day{{end}}" style="{{if .CalendarColor}}border-left: 3px solid {{.CalendarColor}};{{end}}">
                 <div class="event-time">
                     {{if .IsAllDay}}
                     <span class="all-day-badge">All Day</span>
@@ -45,7 +45,7 @@
                 <div class="event-content">
                     <div class="event-title">{{if .Title}}{{.Title}}{{else}}(No title){{end}}</div>
                     <div class="event-details">
-                        <span class="event-calendar">{{.CalendarName}}</span>
+                        <span class="event-calendar" {{if .CalendarColor}}style="color: {{.CalendarColor}};"{{end}}>{{.CalendarName}}</span>
                     </div>
                 </div>
             </div>
@@ -58,59 +58,11 @@
     {{end}}
 </div>
 {{else}}
-<!-- Today view -->
-{{if .Data.Events}}
-<div class="table-container">
-    <table class="table agenda-table">
-        <thead>
-            <tr>
-                <th>Time</th>
-                <th>Event</th>
-                <th>Duration</th>
-                <th>Calendar</th>
-            </tr>
-        </thead>
-        <tbody>
-            {{range .Data.Events}}
-            <tr class="{{if .IsAllDay}}all-day-row{{end}}">
-                <td class="event-time-cell">
-                    {{if .IsAllDay}}
-                    <span class="all-day-badge">All Day</span>
-                    {{else}}
-                    <div class="event-times">
-                        <span class="event-time">{{formatTime .Start}}</span>
-                        <span class="event-time-separator">-</span>
-                        <span class="event-time">{{formatTime .End}}</span>
-                    </div>
-                    {{end}}
-                </td>
-                <td class="event-title-cell">
-                    {{if .Title}}{{.Title}}{{else}}<em class="no-title">(No title)</em>{{end}}
-                </td>
-                <td class="event-duration-cell">
-                    {{if not .IsAllDay}}
-                    {{duration .Start .End}}
-                    {{end}}
-                </td>
-                <td>
-                    <span class="calendar-badge">{{.CalendarName}}</span>
-                </td>
-            </tr>
-            {{end}}
-        </tbody>
-    </table>
+<!-- Today view - Calendar Strip + Event List -->
+{{template "calendar_legend.html" .}}
+{{template "day_strip.html" .}}
+<div id="day-detail">
+    {{template "day_detail.html" .Data}}
 </div>
-{{else}}
-<div class="empty-state">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48" height="48">
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-        <line x1="16" y1="2" x2="16" y2="6"/>
-        <line x1="8" y1="2" x2="8" y2="6"/>
-        <line x1="3" y1="10" x2="21" y2="10"/>
-    </svg>
-    <h3>No events today</h3>
-    <p>Your schedule is clear for today. Enjoy your free time!</p>
-</div>
-{{end}}
 {{end}}
 {{end}}

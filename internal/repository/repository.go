@@ -346,15 +346,15 @@ func (r *CalendarRepository) Create(ctx context.Context, cal *models.CalendarCon
 	query := q(r.driver, `
 		INSERT INTO calendar_connections (id, host_id, provider, name, calendar_id,
 			access_token, refresh_token, token_expiry, caldav_url, caldav_username,
-			caldav_password, is_default, last_synced_at, sync_status, sync_error,
+			caldav_password, is_default, color, last_synced_at, sync_status, sync_error,
 			created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 	`)
 	_, err := r.db.ExecContext(ctx, query,
 		cal.ID, cal.HostID, cal.Provider, cal.Name, cal.CalendarID,
 		cal.AccessToken, cal.RefreshToken, cal.TokenExpiry,
 		cal.CalDAVURL, cal.CalDAVUsername, cal.CalDAVPassword,
-		cal.IsDefault, cal.LastSyncedAt, cal.SyncStatus, cal.SyncError,
+		cal.IsDefault, cal.Color, cal.LastSyncedAt, cal.SyncStatus, cal.SyncError,
 		cal.CreatedAt, cal.UpdatedAt)
 	return err
 }
@@ -363,7 +363,7 @@ func (r *CalendarRepository) GetByID(ctx context.Context, id string) (*models.Ca
 	cal := &models.CalendarConnection{}
 	query := q(r.driver, `
 		SELECT id, host_id, provider, name, calendar_id, access_token, refresh_token,
-		       token_expiry, caldav_url, caldav_username, caldav_password, is_default,
+		       token_expiry, caldav_url, caldav_username, caldav_password, is_default, color,
 		       last_synced_at, COALESCE(sync_status, 'unknown'), COALESCE(sync_error, ''),
 		       created_at, updated_at
 		FROM calendar_connections WHERE id = $1
@@ -372,7 +372,7 @@ func (r *CalendarRepository) GetByID(ctx context.Context, id string) (*models.Ca
 		&cal.ID, &cal.HostID, &cal.Provider, &cal.Name, &cal.CalendarID,
 		&cal.AccessToken, &cal.RefreshToken, &cal.TokenExpiry,
 		&cal.CalDAVURL, &cal.CalDAVUsername, &cal.CalDAVPassword,
-		&cal.IsDefault, &cal.LastSyncedAt, &cal.SyncStatus, &cal.SyncError,
+		&cal.IsDefault, &cal.Color, &cal.LastSyncedAt, &cal.SyncStatus, &cal.SyncError,
 		&cal.CreatedAt, &cal.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -383,7 +383,7 @@ func (r *CalendarRepository) GetByID(ctx context.Context, id string) (*models.Ca
 func (r *CalendarRepository) GetByHostID(ctx context.Context, hostID string) ([]*models.CalendarConnection, error) {
 	query := q(r.driver, `
 		SELECT id, host_id, provider, name, calendar_id, access_token, refresh_token,
-		       token_expiry, caldav_url, caldav_username, caldav_password, is_default,
+		       token_expiry, caldav_url, caldav_username, caldav_password, is_default, color,
 		       last_synced_at, COALESCE(sync_status, 'unknown'), COALESCE(sync_error, ''),
 		       created_at, updated_at
 		FROM calendar_connections WHERE host_id = $1
@@ -406,7 +406,7 @@ func (r *CalendarRepository) GetByHostID(ctx context.Context, hostID string) ([]
 			&cal.ID, &cal.HostID, &cal.Provider, &cal.Name, &cal.CalendarID,
 			&cal.AccessToken, &cal.RefreshToken, &cal.TokenExpiry,
 			&cal.CalDAVURL, &cal.CalDAVUsername, &cal.CalDAVPassword,
-			&cal.IsDefault, &cal.LastSyncedAt, &cal.SyncStatus, &cal.SyncError,
+			&cal.IsDefault, &cal.Color, &cal.LastSyncedAt, &cal.SyncStatus, &cal.SyncError,
 			&cal.CreatedAt, &cal.UpdatedAt)
 		if err != nil {
 			return nil, err
@@ -442,11 +442,32 @@ func (r *CalendarRepository) UpdateSyncStatus(ctx context.Context, calendarID st
 	return err
 }
 
+// UpdateColor updates only the color field for a calendar owned by the given host
+func (r *CalendarRepository) UpdateColor(ctx context.Context, hostID string, calendarID string, color string) error {
+	query := q(r.driver, `
+		UPDATE calendar_connections
+		SET color = $1, updated_at = $2
+		WHERE id = $3 AND host_id = $4
+	`)
+	result, err := r.db.ExecContext(ctx, query, color, models.Now(), calendarID, hostID)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("calendar %s not found or not owned by host %s", calendarID, hostID)
+	}
+	return nil
+}
+
 // GetAll returns all calendar connections across all hosts (for background sync)
 func (r *CalendarRepository) GetAll(ctx context.Context) ([]*models.CalendarConnection, error) {
 	query := q(r.driver, `
 		SELECT id, host_id, provider, name, calendar_id, access_token, refresh_token,
-		       token_expiry, caldav_url, caldav_username, caldav_password, is_default,
+		       token_expiry, caldav_url, caldav_username, caldav_password, is_default, color,
 		       last_synced_at, COALESCE(sync_status, 'unknown'), COALESCE(sync_error, ''),
 		       created_at, updated_at
 		FROM calendar_connections
@@ -469,7 +490,7 @@ func (r *CalendarRepository) GetAll(ctx context.Context) ([]*models.CalendarConn
 			&cal.ID, &cal.HostID, &cal.Provider, &cal.Name, &cal.CalendarID,
 			&cal.AccessToken, &cal.RefreshToken, &cal.TokenExpiry,
 			&cal.CalDAVURL, &cal.CalDAVUsername, &cal.CalDAVPassword,
-			&cal.IsDefault, &cal.LastSyncedAt, &cal.SyncStatus, &cal.SyncError,
+			&cal.IsDefault, &cal.Color, &cal.LastSyncedAt, &cal.SyncStatus, &cal.SyncError,
 			&cal.CreatedAt, &cal.UpdatedAt)
 		if err != nil {
 			return nil, err
