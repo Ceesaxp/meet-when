@@ -115,17 +115,22 @@ func (s *AgendaService) GetWeek(ctx context.Context, hostID string, weekStart ti
 	AssignColors(calendars)
 
 	// Normalize weekStart to 00:00 Monday of the containing week in host
-	// timezone. If weekStart is already a Monday only the time portion is
-	// zeroed; for any other weekday we step back to the preceding Monday so
-	// that callers may safely pass time.Now() or any in-week date.
-	localStart := weekStart.In(loc)
-	weekday := localStart.Weekday()
+	// timezone. Use the UTC date components of weekStart to derive the
+	// calendar date. Date-only values (e.g. from time.Parse("2006-01-02", s))
+	// are midnight UTC; calling .In(loc) on them shifts west-of-UTC hosts into
+	// the previous local day, causing the week calculation to back up by a full
+	// week. Reading the UTC date components and re-constructing local midnight
+	// avoids that shift while still correctly mapping any in-week instant.
+	// Callers may pass time.Now() (UTC) or any time representing the desired
+	// calendar date; the UTC date is used as the timezone-neutral date identity.
+	utcY, utcMo, utcD := weekStart.UTC().Date()
+	localDay := time.Date(utcY, utcMo, utcD, 0, 0, 0, 0, loc)
+	weekday := localDay.Weekday()
 	daysFromMonday := int(weekday) - 1
 	if weekday == time.Sunday {
 		daysFromMonday = 6
 	}
-	y, mo, d := localStart.Date()
-	monday := time.Date(y, mo, d-daysFromMonday, 0, 0, 0, 0, loc)
+	monday := localDay.AddDate(0, 0, -daysFromMonday)
 	nextMonday := monday.AddDate(0, 0, 7)
 
 	events, err := s.calendar.GetAgendaEventsWithCalendars(ctx, calendars, host, monday, nextMonday)
