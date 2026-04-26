@@ -195,7 +195,7 @@
             <div class="booking-detail-section booking-meta">
                 <div class="booking-detail-row">
                     <span class="label">Created</span>
-                    <span class="value text-muted">{{formatDateTime .Booking.CreatedAt}}</span>
+                    <span class="value text-muted">{{formatDateInTZ .Booking.CreatedAt .HostTimezone}}, {{formatTimeInTZ .Booking.CreatedAt .HostTimezone}}</span>
                 </div>
             </div>
             {{else}}

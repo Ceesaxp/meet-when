@@ -45,6 +45,15 @@ func TestBookingStatusTemplate_SignupCTA(t *testing.T) {
 				"formatDateTime": func(t models.SQLiteTime) string {
 					return "2026-01-29 10:00 AM"
 				},
+				"formatDateInTZ": func(t models.SQLiteTime, tz string) string {
+					return "Wednesday, January 29, 2026"
+				},
+				"formatTimeInTZ": func(t models.SQLiteTime, tz string) string {
+					return "10:00 AM"
+				},
+				"tzAbbrev": func(tz string, t models.SQLiteTime) string {
+					return "UTC"
+				},
 			}).ParseFiles("../../templates/pages/booking_status.html")
 			if err != nil {
 				t.Fatalf("Failed to parse template: %v", err)
@@ -153,6 +162,9 @@ func TestBookingStatusTemplate_SignupCTA_ButtonStyle(t *testing.T) {
 		"formatDateTime": func(t models.SQLiteTime) string {
 			return "2026-01-29 10:00 AM"
 		},
+		"formatDateInTZ": func(t models.SQLiteTime, tz string) string { return "Wednesday, January 29, 2026" },
+		"formatTimeInTZ": func(t models.SQLiteTime, tz string) string { return "10:00 AM" },
+		"tzAbbrev":       func(tz string, t models.SQLiteTime) string { return "UTC" },
 	}).ParseFiles("../../templates/pages/booking_status.html")
 	if err != nil {
 		t.Fatalf("Failed to parse template: %v", err)
@@ -212,6 +224,10 @@ func TestBookingStatusTemplate_NoSignupCTA_WhenCancelled(t *testing.T) {
 	tmpl, err := template.New("booking_status.html").Funcs(template.FuncMap{
 		"formatDateTime": func(t models.SQLiteTime) string {
 			return "2026-01-29 10:00 AM"
+		},
+		"formatDateInTZ": func(t models.SQLiteTime, tz string) string { return "Wednesday, January 29, 2026" },
+		"formatTimeInTZ": func(t models.SQLiteTime, tz string) string { return "10:00 AM" },
+		"tzAbbrev": func(tz string, t models.SQLiteTime) string { return "UTC"
 		},
 	}).ParseFiles("../../templates/pages/booking_status.html")
 	if err != nil {

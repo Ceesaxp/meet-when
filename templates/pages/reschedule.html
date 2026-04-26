@@ -46,7 +46,7 @@
                             <line x1="8" y1="2" x2="8" y2="6"/>
                             <line x1="3" y1="10" x2="21" y2="10"/>
                         </svg>
-                        {{formatDateTime .Data.Booking.StartTime}}
+                        {{formatDateInTZ .Data.Booking.StartTime .Data.Booking.InviteeTimezone}}, {{formatTimeInTZ .Data.Booking.StartTime .Data.Booking.InviteeTimezone}} {{tzAbbrev .Data.Booking.InviteeTimezone .Data.Booking.StartTime}}
                     </div>
                     <div class="meta-row">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
@@ -147,7 +147,7 @@
                             </div>
                             <div class="summary-row old-time">
                                 <span class="summary-label">Previous Time</span>
-                                <span class="summary-value">{{formatDateTime .Data.Booking.StartTime}}</span>
+                                <span class="summary-value">{{formatDateInTZ .Data.Booking.StartTime .Data.Booking.InviteeTimezone}}, {{formatTimeInTZ .Data.Booking.StartTime .Data.Booking.InviteeTimezone}} {{tzAbbrev .Data.Booking.InviteeTimezone .Data.Booking.StartTime}}</span>
                             </div>
                             <div class="summary-row new-time">
                                 <span class="summary-label">New Time</span>
