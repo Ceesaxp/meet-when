@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"context"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -14,6 +16,30 @@ import (
 	"github.com/meet-when/meet-when/internal/repository"
 	"github.com/meet-when/meet-when/internal/services"
 )
+
+// loadTestPartials populates the handler's template cache with the partials
+// from ../../templates/partials/. We only need partials for HTMX-style tests;
+// full page templates require layouts and are already covered by other tests.
+func loadTestPartials(t *testing.T, h *Handlers) {
+	t.Helper()
+	partialFiles, err := filepath.Glob("../../templates/partials/*.html")
+	if err != nil || len(partialFiles) == 0 {
+		t.Fatalf("partials glob: err=%v matches=%d", err, len(partialFiles))
+	}
+	if h.templates == nil {
+		h.templates = map[string]*template.Template{}
+	}
+	partialSet, err := template.New("").Funcs(templateFuncs()).ParseFiles(partialFiles...)
+	if err != nil {
+		t.Fatalf("parse partials: %v", err)
+	}
+	for _, f := range partialFiles {
+		name := filepath.Base(f)
+		if partialSet.Lookup(name) != nil {
+			h.templates[name] = partialSet
+		}
+	}
+}
 
 // seedDashboardCalendarFixture creates a tenant + host + connection + a single
 // provider_calendars row, returning the host (with tenant) and the calendar id.
@@ -175,6 +201,140 @@ func TestSetDefaultSubCalendar_PersistsAndRejectsForeignHost(t *testing.T) {
 	h.Dashboard.SetDefaultSubCalendar(w, req)
 	if w.Code != http.StatusNotFound {
 		t.Errorf("expected 404 for foreign host, got %d", w.Code)
+	}
+}
+
+// addConnection seeds an additional calendar_connections row + one writable
+// provider_calendars child for an already-created host. Used by the
+// cross-connection default-move test below.
+func addConnection(t *testing.T, repos *repository.Repositories, hostID, label string) (connID, pcID string) {
+	t.Helper()
+	ctx := context.Background()
+	conn := &models.CalendarConnection{
+		ID: uuid.New().String(), HostID: hostID, Provider: models.CalendarProviderGoogle,
+		Name: label, SyncStatus: models.CalendarSyncStatusUnknown,
+		CreatedAt: models.Now(), UpdatedAt: models.Now(),
+	}
+	if err := repos.Calendar.Create(ctx, conn); err != nil {
+		t.Fatalf("conn: %v", err)
+	}
+	pc, err := repos.ProviderCalendar.UpsertFromProvider(ctx, conn.ID, "primary-"+label, label, "", true, true)
+	if err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	return conn.ID, pc.ID
+}
+
+// TestSetDefaultSubCalendar_OOBRefreshOldConnectionCard guards against a UI
+// regression: when the host promotes a default that lives under a *different*
+// connection than the previous default, BOTH connection cards must end up in
+// the response so HTMX clears the stale "default" badge from the old card.
+// Regression: previously only the new-default card was returned, leaving two
+// cards visibly marked default until a full page reload.
+func TestSetDefaultSubCalendar_OOBRefreshOldConnectionCard(t *testing.T) {
+	_, repos, cleanup := setupTestDatabase(t)
+	defer cleanup()
+
+	host, oldPCID := seedDashboardCalendarFixture(t, repos)
+
+	// Seed a second connection with a writable calendar under the same host.
+	newConnID, newPCID := addConnection(t, repos, host.Host.ID, "secondary")
+
+	// Make the OLD calendar (in the first connection) the current default.
+	if err := repos.Host.SetDefaultCalendar(context.Background(), host.Host.ID, oldPCID); err != nil {
+		t.Fatalf("seed default: %v", err)
+	}
+	// Re-load host so the request-scoped struct sees the seeded default.
+	freshHost, err := repos.Host.GetByID(context.Background(), host.Host.ID)
+	if err != nil {
+		t.Fatalf("reload host: %v", err)
+	}
+	host.Host = freshHost
+
+	h := createTestHandlers(t, repos)
+	loadTestPartials(t, h)
+
+	// Promote the calendar in the SECOND connection.
+	req := pathValueRequest(http.MethodPost, "/dashboard/calendars/sub/"+newPCID+"/default", "id", newPCID, "", host)
+	req.Header.Set("HX-Request", "true")
+	w := httptest.NewRecorder()
+	h.Dashboard.SetDefaultSubCalendar(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+
+	// The new connection's card must be present as the primary swap target
+	// (no hx-swap-oob attribute, since it lands at the hx-target of the form).
+	newCardOpen := `id="calendar-card-` + newConnID + `"`
+	if !strings.Contains(body, newCardOpen) {
+		t.Errorf("new-default connection card missing from response; body=%s", body)
+	}
+
+	// The old connection's card must ALSO be present, marked for OOB swap.
+	oldConnID := ""
+	conns, _ := repos.Calendar.GetByHostID(context.Background(), host.Host.ID)
+	for _, c := range conns {
+		if c.ID != newConnID {
+			oldConnID = c.ID
+			break
+		}
+	}
+	if oldConnID == "" {
+		t.Fatal("could not locate old connection in seeded data")
+	}
+	oldCardOpen := `id="calendar-card-` + oldConnID + `" hx-swap-oob="true"`
+	if !strings.Contains(body, oldCardOpen) {
+		t.Errorf("old connection card missing OOB swap; expected %q in body=%s", oldCardOpen, body)
+	}
+
+	// Sanity: the OOB card should not also be rendered without hx-swap-oob —
+	// otherwise HTMX would try to use it as the primary target.
+	primaryOldCard := `id="calendar-card-` + oldConnID + `">`
+	if strings.Contains(body, primaryOldCard) {
+		t.Errorf("old connection card was emitted both as primary and OOB; body=%s", body)
+	}
+}
+
+// TestSetDefaultSubCalendar_NoOOBWhenSameConnection verifies that promoting a
+// new default under the same connection as the previous default does NOT emit
+// an OOB swap (one card already covers both rows, so a second swap would be
+// redundant and could replace the primary target with itself).
+func TestSetDefaultSubCalendar_NoOOBWhenSameConnection(t *testing.T) {
+	_, repos, cleanup := setupTestDatabase(t)
+	defer cleanup()
+
+	host, oldPCID := seedDashboardCalendarFixture(t, repos)
+
+	// Add a second writable calendar under the SAME connection.
+	conns, _ := repos.Calendar.GetByHostID(context.Background(), host.Host.ID)
+	if len(conns) != 1 {
+		t.Fatalf("expected 1 connection, got %d", len(conns))
+	}
+	newPC, err := repos.ProviderCalendar.UpsertFromProvider(context.Background(), conns[0].ID, "another@example.com", "Another", "", false, true)
+	if err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	// Set old as default.
+	if err := repos.Host.SetDefaultCalendar(context.Background(), host.Host.ID, oldPCID); err != nil {
+		t.Fatalf("seed default: %v", err)
+	}
+	freshHost, _ := repos.Host.GetByID(context.Background(), host.Host.ID)
+	host.Host = freshHost
+
+	h := createTestHandlers(t, repos)
+	loadTestPartials(t, h)
+
+	req := pathValueRequest(http.MethodPost, "/dashboard/calendars/sub/"+newPC.ID+"/default", "id", newPC.ID, "", host)
+	req.Header.Set("HX-Request", "true")
+	w := httptest.NewRecorder()
+	h.Dashboard.SetDefaultSubCalendar(w, req)
+
+	body := w.Body.String()
+	if strings.Contains(body, `hx-swap-oob="true"`) {
+		t.Errorf("did not expect OOB swap when default moves within a single connection; body=%s", body)
 	}
 }
 

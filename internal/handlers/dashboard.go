@@ -268,14 +268,25 @@ func (h *DashboardHandler) ToggleSubCalendarPoll(w http.ResponseWriter, r *http.
 
 // SetDefaultSubCalendar promotes a provider calendar to be the host's
 // fallback default for booking events that don't pick a calendar explicitly
-// (and as the fallback target for pooled-host bookings). Returns the updated
-// connection card partial so the "default" badge moves to the new row.
+// (and as the fallback target for pooled-host bookings).
+//
+// HTMX response: returns the new-default's connection card as the primary
+// swap target. If the previous default lived under a *different* connection,
+// that connection's card is appended with hx-swap-oob="true" so HTMX also
+// removes the now-stale "default" badge there in the same round-trip.
+// Without the OOB swap two cards could visibly show the default badge until
+// a full page reload.
 func (h *DashboardHandler) SetDefaultSubCalendar(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())
 	if host == nil {
 		h.handlers.redirect(w, r, "/auth/login")
 		return
 	}
+
+	// Capture the previous default *before* we mutate it; the request-scoped
+	// host struct holds the value loaded by auth middleware so it pre-dates
+	// this handler's update.
+	prevDefaultID := derefString(host.Host.DefaultCalendarID)
 
 	pcID := r.PathValue("id")
 	pc, err := h.handlers.services.Calendar.GetProviderCalendar(r.Context(), host.Host.ID, pcID)
@@ -295,21 +306,44 @@ func (h *DashboardHandler) SetDefaultSubCalendar(w http.ResponseWriter, r *http.
 	}
 
 	if r.Header.Get("HX-Request") == "true" {
-		conn, calErr := h.handlers.services.Calendar.GetCalendar(r.Context(), pc.ConnectionID)
-		if calErr != nil || conn == nil {
+		// Primary swap: the connection card that now owns the default.
+		newConn, calErr := h.handlers.services.Calendar.GetCalendar(r.Context(), pc.ConnectionID)
+		if calErr != nil || newConn == nil {
 			http.Error(w, "Calendar not found", http.StatusNotFound)
 			return
 		}
-		children, _ := h.handlers.services.Calendar.GetProviderCalendarsForConnection(r.Context(), host.Host.ID, conn.ID)
-		conn.Calendars = children
-		services.AssignColors([]*models.CalendarConnection{conn})
-		services.AssignProviderCalendarColors(conn.Calendars)
+		newChildren, _ := h.handlers.services.Calendar.GetProviderCalendarsForConnection(r.Context(), host.Host.ID, newConn.ID)
+		newConn.Calendars = newChildren
+		services.AssignColors([]*models.CalendarConnection{newConn})
+		services.AssignProviderCalendarColors(newConn.Calendars)
 
 		h.handlers.renderPartial(w, "calendar_card_partial.html", map[string]interface{}{
-			"Calendar":          conn,
+			"Calendar":          newConn,
 			"Palette":           paletteData,
 			"DefaultCalendarID": pcID,
 		})
+
+		// OOB swap: if the previous default lived under a different connection,
+		// append its refreshed card so HTMX also removes the stale badge there.
+		if prevDefaultID != "" && prevDefaultID != pcID {
+			prevPC, _ := h.handlers.services.Calendar.GetProviderCalendar(r.Context(), host.Host.ID, prevDefaultID)
+			if prevPC != nil && prevPC.ConnectionID != pc.ConnectionID {
+				oldConn, oldErr := h.handlers.services.Calendar.GetCalendar(r.Context(), prevPC.ConnectionID)
+				if oldErr == nil && oldConn != nil {
+					oldChildren, _ := h.handlers.services.Calendar.GetProviderCalendarsForConnection(r.Context(), host.Host.ID, oldConn.ID)
+					oldConn.Calendars = oldChildren
+					services.AssignColors([]*models.CalendarConnection{oldConn})
+					services.AssignProviderCalendarColors(oldConn.Calendars)
+
+					h.handlers.renderPartial(w, "calendar_card_partial.html", map[string]interface{}{
+						"Calendar":          oldConn,
+						"Palette":           paletteData,
+						"DefaultCalendarID": pcID,
+						"OOB":               true,
+					})
+				}
+			}
+		}
 		return
 	}
 	h.handlers.redirect(w, r, "/dashboard/calendars")

@@ -84,7 +84,7 @@ func setupServiceTestDB(t *testing.T) (*sql.DB, *repository.Repositories, *Calen
 		t.Fatalf("open db: %v", err)
 	}
 	if err := database.Migrate(db, dbCfg); err != nil {
-		db.Close()
+		_ = db.Close()
 		t.Fatalf("migrate: %v", err)
 	}
 	repos := repository.NewRepositories(db, dbCfg.Driver)
