@@ -75,20 +75,13 @@
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label" for="timezone">Timezone</label>
-                        <select id="timezone" name="timezone" class="form-input">
-                            <option value="UTC">UTC</option>
-                            <option value="America/New_York">Eastern Time</option>
-                            <option value="America/Chicago">Central Time</option>
-                            <option value="America/Denver">Mountain Time</option>
-                            <option value="America/Los_Angeles">Pacific Time</option>
-                            <option value="Europe/London">London</option>
-                            <option value="Europe/Paris">Paris</option>
-                            <option value="Europe/Berlin">Berlin</option>
-                            <option value="Asia/Tokyo">Tokyo</option>
-                            <option value="Asia/Shanghai">Shanghai</option>
-                            <option value="Australia/Sydney">Sydney</option>
-                        </select>
+                        <label class="form-label" for="timezone-search">Timezone</label>
+                        <div class="tz-picker-container">
+                            <input type="text" id="timezone-search" class="form-input tz-picker-input"
+                                   placeholder="Search for a timezone..." autocomplete="off">
+                            <input type="hidden" id="timezone" name="timezone" value="UTC">
+                            <div id="timezone-results" class="tz-picker-dropdown" style="display: none;"></div>
+                        </div>
                     </div>
 
                     <button type="submit" class="btn btn-primary btn-block">Create account</button>
@@ -106,21 +99,28 @@
         </div>
     </main>
 
+    <script src="/static/js/timezone-picker.js"></script>
     <script>
-    (function() {
+    document.addEventListener('DOMContentLoaded', function() {
+        var picker = new TimezonePicker({
+            inputId: 'timezone-search',
+            hiddenInputId: 'timezone',
+            dropdownId: 'timezone-results'
+        });
+        picker.init();
         try {
             var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
             if (tz) {
-                var sel = document.getElementById('timezone');
-                for (var i = 0; i < sel.options.length; i++) {
-                    if (sel.options[i].value === tz) {
-                        sel.selectedIndex = i;
-                        break;
+                var checkLoaded = setInterval(function() {
+                    if (picker.timezones.length > 0) {
+                        clearInterval(checkLoaded);
+                        picker.setTimezone(tz);
                     }
-                }
+                }, 100);
+                setTimeout(function() { clearInterval(checkLoaded); }, 5000);
             }
         } catch(e) {}
-    })();
+    });
     </script>
 </body>
 </html>
