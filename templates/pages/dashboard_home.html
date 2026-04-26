@@ -58,7 +58,12 @@
             <tbody>
                 {{range .Data.Bookings}}
                 <tr>
-                    <td>{{formatDateTime .StartTime}}</td>
+                    <td>
+                        <div class="datetime-cell">
+                            <span class="date">{{formatDateInTZ .StartTime $.Host.Timezone}}</span>
+                            <span class="time">{{formatTimeInTZ .StartTime $.Host.Timezone}} - {{formatTimeInTZ .EndTime $.Host.Timezone}} {{tzAbbrev $.Host.Timezone .StartTime}}</span>
+                        </div>
+                    </td>
                     <td>
                         <div class="guest-info">
                             <span class="guest-name">{{.InviteeName}}</span>

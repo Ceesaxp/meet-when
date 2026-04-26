@@ -112,7 +112,10 @@
                     </div>
                     <div class="detail-content">
                         <span class="detail-label">Date & Time</span>
-                        <span class="detail-value">{{formatDateTime .Data.Booking.StartTime}}</span>
+                        <span class="detail-value">
+                            {{formatDateInTZ .Data.Booking.StartTime .Data.Booking.InviteeTimezone}}<br>
+                            {{formatTimeInTZ .Data.Booking.StartTime .Data.Booking.InviteeTimezone}} - {{formatTimeInTZ .Data.Booking.EndTime .Data.Booking.InviteeTimezone}} {{tzAbbrev .Data.Booking.InviteeTimezone .Data.Booking.StartTime}}
+                        </span>
                     </div>
                 </div>
 
