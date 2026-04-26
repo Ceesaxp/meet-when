@@ -121,6 +121,7 @@ func main() {
 	dashboard.HandleFunc("POST /dashboard/calendars/{id}/color", h.Dashboard.UpdateCalendarColor)
 	dashboard.HandleFunc("POST /dashboard/calendars/sub/{id}/poll", h.Dashboard.ToggleSubCalendarPoll)
 	dashboard.HandleFunc("POST /dashboard/calendars/sub/{id}/color", h.Dashboard.UpdateSubCalendarColor)
+	dashboard.HandleFunc("POST /dashboard/calendars/sub/{id}/default", h.Dashboard.SetDefaultSubCalendar)
 	dashboard.HandleFunc("GET /dashboard/agenda/day-detail", h.Dashboard.AgendaDayPartial)
 
 	// Meeting templates

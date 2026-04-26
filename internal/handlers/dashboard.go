@@ -91,13 +91,24 @@ func (h *DashboardHandler) Calendars(w http.ResponseWriter, r *http.Request) {
 		ActiveNav:    "calendars",
 		PendingCount: h.getPendingCount(r, host.Host.ID),
 		Data: map[string]interface{}{
-			"Calendars":     tree,
-			"Conferencing":  conferencing,
-			"GoogleAuthURL": googleAuthURL,
-			"ZoomAuthURL":   zoomAuthURL,
-			"Palette":       paletteData,
+			"Calendars":         tree,
+			"Conferencing":      conferencing,
+			"GoogleAuthURL":     googleAuthURL,
+			"ZoomAuthURL":       zoomAuthURL,
+			"Palette":           paletteData,
+			"DefaultCalendarID": derefString(host.Host.DefaultCalendarID),
 		},
 	})
+}
+
+// derefString returns the pointed-at string or "" for nil. Used to surface
+// optional FK columns (e.g. hosts.default_calendar_id) into templates without
+// nil-pointer guards on every access.
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // ConnectGoogle initiates Google Calendar OAuth flow
@@ -196,8 +207,9 @@ func (h *DashboardHandler) RefreshCalendarSync(w http.ResponseWriter, r *http.Re
 		services.AssignProviderCalendarColors(conn.Calendars)
 
 		h.handlers.renderPartial(w, "calendar_card_partial.html", map[string]interface{}{
-			"Calendar": conn,
-			"Palette":  paletteData,
+			"Calendar":          conn,
+			"Palette":           paletteData,
+			"DefaultCalendarID": derefString(host.Host.DefaultCalendarID),
 		})
 		return
 	}
@@ -237,9 +249,66 @@ func (h *DashboardHandler) ToggleSubCalendarPoll(w http.ResponseWriter, r *http.
 	}
 
 	if r.Header.Get("HX-Request") == "true" {
+		// Reload the host to surface any default-calendar change made by a
+		// concurrent request; the row template needs the current value.
+		fresh, _ := h.handlers.repos.Host.GetByID(r.Context(), host.Host.ID)
+		def := ""
+		if fresh != nil {
+			def = derefString(fresh.DefaultCalendarID)
+		}
 		h.handlers.renderPartial(w, "sub_calendar_row.html", map[string]interface{}{
-			"Calendar": pc,
-			"Palette":  paletteData,
+			"Calendar":          pc,
+			"Palette":           paletteData,
+			"DefaultCalendarID": def,
+		})
+		return
+	}
+	h.handlers.redirect(w, r, "/dashboard/calendars")
+}
+
+// SetDefaultSubCalendar promotes a provider calendar to be the host's
+// fallback default for booking events that don't pick a calendar explicitly
+// (and as the fallback target for pooled-host bookings). Returns the updated
+// connection card partial so the "default" badge moves to the new row.
+func (h *DashboardHandler) SetDefaultSubCalendar(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	pcID := r.PathValue("id")
+	pc, err := h.handlers.services.Calendar.GetProviderCalendar(r.Context(), host.Host.ID, pcID)
+	if err != nil || pc == nil {
+		http.Error(w, "Calendar not found", http.StatusNotFound)
+		return
+	}
+	if !pc.IsWritable {
+		http.Error(w, "Calendar is read-only", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.handlers.services.Calendar.SetDefaultProviderCalendar(r.Context(), host.Host.ID, pcID); err != nil {
+		log.Printf("[CALENDAR] set default failed for %s: %v", pcID, err)
+		http.Error(w, "Failed to set default", http.StatusInternalServerError)
+		return
+	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		conn, calErr := h.handlers.services.Calendar.GetCalendar(r.Context(), pc.ConnectionID)
+		if calErr != nil || conn == nil {
+			http.Error(w, "Calendar not found", http.StatusNotFound)
+			return
+		}
+		children, _ := h.handlers.services.Calendar.GetProviderCalendarsForConnection(r.Context(), host.Host.ID, conn.ID)
+		conn.Calendars = children
+		services.AssignColors([]*models.CalendarConnection{conn})
+		services.AssignProviderCalendarColors(conn.Calendars)
+
+		h.handlers.renderPartial(w, "calendar_card_partial.html", map[string]interface{}{
+			"Calendar":          conn,
+			"Palette":           paletteData,
+			"DefaultCalendarID": pcID,
 		})
 		return
 	}

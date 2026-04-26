@@ -143,6 +143,75 @@ func TestToggleSubCalendarPoll_RejectsForeignHost(t *testing.T) {
 	}
 }
 
+// TestSetDefaultSubCalendar_PersistsAndRejectsForeignHost covers the new
+// per-sub-calendar default-calendar endpoint: the host's default_calendar_id
+// must be updated to the sub-calendar's id, and the request must be rejected
+// when issued by a foreign host.
+func TestSetDefaultSubCalendar_PersistsAndRejectsForeignHost(t *testing.T) {
+	_, repos, cleanup := setupTestDatabase(t)
+	defer cleanup()
+
+	host, pcID := seedDashboardCalendarFixture(t, repos)
+	h := createTestHandlers(t, repos)
+
+	req := pathValueRequest(http.MethodPost, "/dashboard/calendars/sub/"+pcID+"/default", "id", pcID, "", host)
+	w := httptest.NewRecorder()
+	h.Dashboard.SetDefaultSubCalendar(w, req)
+
+	// Without templates loaded the partial render returns 500 even on success;
+	// regardless, the DB write must have happened.
+	updated, err := repos.Host.GetByID(context.Background(), host.Host.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.DefaultCalendarID == nil || *updated.DefaultCalendarID != pcID {
+		t.Errorf("default_calendar_id not updated: got %v, want %s", updated.DefaultCalendarID, pcID)
+	}
+
+	// Foreign host cannot promote someone else's calendar.
+	other, _ := seedDashboardCalendarFixture(t, repos)
+	req = pathValueRequest(http.MethodPost, "/dashboard/calendars/sub/"+pcID+"/default", "id", pcID, "", other)
+	w = httptest.NewRecorder()
+	h.Dashboard.SetDefaultSubCalendar(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for foreign host, got %d", w.Code)
+	}
+}
+
+// TestSetDefaultSubCalendar_RejectsReadOnly ensures a non-writable calendar
+// can't be promoted to default — pooled-host event creation requires write
+// access on the default.
+func TestSetDefaultSubCalendar_RejectsReadOnly(t *testing.T) {
+	_, repos, cleanup := setupTestDatabase(t)
+	defer cleanup()
+
+	host, _ := seedDashboardCalendarFixture(t, repos)
+	h := createTestHandlers(t, repos)
+
+	// Add a read-only sub-calendar under the same connection.
+	conns, _ := repos.Calendar.GetByHostID(context.Background(), host.Host.ID)
+	if len(conns) == 0 {
+		t.Fatal("no connections seeded")
+	}
+	readonly, err := repos.ProviderCalendar.UpsertFromProvider(context.Background(), conns[0].ID, "ro@example.com", "Read Only", "", false, false /* not writable */)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := pathValueRequest(http.MethodPost, "/dashboard/calendars/sub/"+readonly.ID+"/default", "id", readonly.ID, "", host)
+	w := httptest.NewRecorder()
+	h.Dashboard.SetDefaultSubCalendar(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for read-only calendar, got %d", w.Code)
+	}
+
+	// Default must NOT have been updated.
+	updated, _ := repos.Host.GetByID(context.Background(), host.Host.ID)
+	if updated.DefaultCalendarID != nil && *updated.DefaultCalendarID == readonly.ID {
+		t.Error("default was set to read-only calendar despite rejection")
+	}
+}
+
 // TestUpdateSubCalendarColor_ValidatesPalette ensures only colors from the
 // canonical palette are accepted.
 func TestUpdateSubCalendarColor_ValidatesPalette(t *testing.T) {

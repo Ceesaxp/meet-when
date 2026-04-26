@@ -1,8 +1,12 @@
 {{define "sub_calendar_row.html"}}
+{{$isDefault := and .DefaultCalendarID (eq .DefaultCalendarID .Calendar.ID)}}
 <div class="sub-calendar" id="sub-calendar-{{.Calendar.ID}}">
     <div class="sub-calendar-info">
         <span class="sub-calendar-color" style="display:inline-block; width:12px; height:12px; border-radius:3px; background: {{if .Calendar.Color}}{{.Calendar.Color}}{{else}}#5F5E5A{{end}};"></span>
         <span class="sub-calendar-name">{{.Calendar.Name}}</span>
+        {{if $isDefault}}
+        <span class="badge badge-success" title="Bookings without an explicit calendar fall back to this one">default</span>
+        {{end}}
         {{if not .Calendar.IsWritable}}
         <span class="badge badge-inactive" title="Read-only calendar">read-only</span>
         {{end}}
@@ -10,9 +14,17 @@
         <span class="badge badge-error" title="{{.Calendar.SyncError}}">error</span>
         {{end}}
     </div>
-    <form hx-post="/dashboard/calendars/sub/{{.Calendar.ID}}/poll" hx-target="#sub-calendar-{{.Calendar.ID}}" hx-swap="outerHTML" style="display:inline">
-        <input type="hidden" name="poll_busy" value="{{if .Calendar.PollBusy}}off{{else}}on{{end}}">
-        <button type="submit" class="toggle{{if .Calendar.PollBusy}} active{{end}}" aria-label="{{if .Calendar.PollBusy}}Disable busy-time polling{{else}}Enable busy-time polling{{end}}"></button>
-    </form>
+    <div class="sub-calendar-controls" style="display:flex; align-items:center; gap:8px;">
+        {{template "color_swatch_fieldset.html" (dict "CalendarID" .Calendar.ID "CurrentColor" .Calendar.Color "Palette" .Palette "FormAction" (printf "/dashboard/calendars/sub/%s/color" .Calendar.ID))}}
+        {{if and .Calendar.IsWritable (not $isDefault)}}
+        <form hx-post="/dashboard/calendars/sub/{{.Calendar.ID}}/default" hx-target="#calendar-card-{{.Calendar.ConnectionID}}" hx-swap="outerHTML" style="display:inline">
+            <button type="submit" class="btn-sm" title="Use this calendar for bookings that don't pick one explicitly">Set default</button>
+        </form>
+        {{end}}
+        <form hx-post="/dashboard/calendars/sub/{{.Calendar.ID}}/poll" hx-target="#sub-calendar-{{.Calendar.ID}}" hx-swap="outerHTML" style="display:inline">
+            <input type="hidden" name="poll_busy" value="{{if .Calendar.PollBusy}}off{{else}}on{{end}}">
+            <button type="submit" class="toggle{{if .Calendar.PollBusy}} active{{end}}" aria-label="{{if .Calendar.PollBusy}}Disable busy-time polling{{else}}Enable busy-time polling{{end}}"></button>
+        </form>
+    </div>
 </div>
 {{end}}

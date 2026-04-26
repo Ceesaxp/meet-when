@@ -1,5 +1,8 @@
 {{define "color_swatch_fieldset.html"}}
-<form hx-post="/dashboard/calendars/{{.CalendarID}}/color" hx-swap="outerHTML">
+{{/* FormAction is the optional hx-post target; defaults to the
+     connection-level color route for backwards compatibility, but can be
+     overridden so per-sub-calendar pickers post to /sub/{id}/color. */}}
+<form hx-post="{{if .FormAction}}{{.FormAction}}{{else}}/dashboard/calendars/{{.CalendarID}}/color{{end}}" hx-swap="outerHTML">
     <fieldset class="color-swatches" style="border: none; padding: 0;">
         {{range .Palette}}
         <label class="color-swatch">

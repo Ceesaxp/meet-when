@@ -70,7 +70,7 @@
         {{if .Calendars}}
         <div class="sub-calendars" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--gray-100);">
             {{range .Calendars}}
-            {{template "sub_calendar_row.html" (dict "Calendar" . "Palette" $.Data.Palette)}}
+            {{template "sub_calendar_row.html" (dict "Calendar" . "Palette" $.Data.Palette "DefaultCalendarID" $.Data.DefaultCalendarID)}}
             {{end}}
         </div>
         {{else}}
