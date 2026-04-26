@@ -109,7 +109,9 @@ func main() {
 	dashboard := http.NewServeMux()
 	dashboard.HandleFunc("GET /dashboard", h.Dashboard.Home)
 
-	// Calendar management
+	// Calendar management. The {id} on the connection-level routes is a
+	// calendar_connections.id; the /sub/{id} routes operate on a
+	// provider_calendars.id (an individual calendar within a connection).
 	dashboard.HandleFunc("GET /dashboard/calendars", h.Dashboard.Calendars)
 	dashboard.HandleFunc("POST /dashboard/calendars/connect/google", h.Dashboard.ConnectGoogle)
 	dashboard.HandleFunc("POST /dashboard/calendars/connect/caldav", h.Dashboard.ConnectCalDAV)
@@ -117,6 +119,8 @@ func main() {
 	dashboard.HandleFunc("POST /dashboard/calendars/{id}/default", h.Dashboard.SetDefaultCalendar)
 	dashboard.HandleFunc("POST /dashboard/calendars/{id}/refresh", h.Dashboard.RefreshCalendarSync)
 	dashboard.HandleFunc("POST /dashboard/calendars/{id}/color", h.Dashboard.UpdateCalendarColor)
+	dashboard.HandleFunc("POST /dashboard/calendars/sub/{id}/poll", h.Dashboard.ToggleSubCalendarPoll)
+	dashboard.HandleFunc("POST /dashboard/calendars/sub/{id}/color", h.Dashboard.UpdateSubCalendarColor)
 	dashboard.HandleFunc("GET /dashboard/agenda/day-detail", h.Dashboard.AgendaDayPartial)
 
 	// Meeting templates

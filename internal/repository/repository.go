@@ -16,6 +16,7 @@ type Repositories struct {
 	Tenant               *TenantRepository
 	Host                 *HostRepository
 	Calendar             *CalendarRepository
+	ProviderCalendar     *ProviderCalendarRepository
 	Conferencing         *ConferencingRepository
 	Template             *TemplateRepository
 	Booking              *BookingRepository
@@ -34,6 +35,7 @@ func NewRepositories(db *sql.DB, driver string) *Repositories {
 		Tenant:               &TenantRepository{db: db, driver: driver},
 		Host:                 &HostRepository{db: db, driver: driver},
 		Calendar:             &CalendarRepository{db: db, driver: driver},
+		ProviderCalendar:     &ProviderCalendarRepository{db: db, driver: driver},
 		Conferencing:         &ConferencingRepository{db: db, driver: driver},
 		Template:             &TemplateRepository{db: db, driver: driver},
 		Booking:              &BookingRepository{db: db, driver: driver},
@@ -240,6 +242,13 @@ func (r *HostRepository) Update(ctx context.Context, host *models.Host) error {
 func (r *HostRepository) UpdatePassword(ctx context.Context, id, passwordHash string) error {
 	query := q(r.driver, `UPDATE hosts SET password_hash = $1 WHERE id = $2`)
 	_, err := r.db.ExecContext(ctx, query, passwordHash, id)
+	return err
+}
+
+// SetDefaultCalendar sets the host's default_calendar_id to a provider_calendars id.
+func (r *HostRepository) SetDefaultCalendar(ctx context.Context, hostID, providerCalendarID string) error {
+	query := q(r.driver, `UPDATE hosts SET default_calendar_id = $1 WHERE id = $2`)
+	_, err := r.db.ExecContext(ctx, query, providerCalendarID, hostID)
 	return err
 }
 

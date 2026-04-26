@@ -1,0 +1,18 @@
+{{define "sub_calendar_row.html"}}
+<div class="sub-calendar" id="sub-calendar-{{.Calendar.ID}}">
+    <div class="sub-calendar-info">
+        <span class="sub-calendar-color" style="display:inline-block; width:12px; height:12px; border-radius:3px; background: {{if .Calendar.Color}}{{.Calendar.Color}}{{else}}#5F5E5A{{end}};"></span>
+        <span class="sub-calendar-name">{{.Calendar.Name}}</span>
+        {{if not .Calendar.IsWritable}}
+        <span class="badge badge-inactive" title="Read-only calendar">read-only</span>
+        {{end}}
+        {{if eq (printf "%s" .Calendar.SyncStatus) "failed"}}
+        <span class="badge badge-error" title="{{.Calendar.SyncError}}">error</span>
+        {{end}}
+    </div>
+    <form hx-post="/dashboard/calendars/sub/{{.Calendar.ID}}/poll" hx-target="#sub-calendar-{{.Calendar.ID}}" hx-swap="outerHTML" style="display:inline">
+        <input type="hidden" name="poll_busy" value="{{if .Calendar.PollBusy}}off{{else}}on{{end}}">
+        <button type="submit" class="toggle{{if .Calendar.PollBusy}} active{{end}}" aria-label="{{if .Calendar.PollBusy}}Disable busy-time polling{{else}}Enable busy-time polling{{end}}"></button>
+    </form>
+</div>
+{{end}}

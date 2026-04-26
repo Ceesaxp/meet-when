@@ -218,11 +218,23 @@
         <div class="form-group">
             <label class="form-label" for="calendar_id">Add Event To</label>
             <select id="calendar_id" name="calendar_id" class="form-select">
-                <option value="">Select a calendar</option>
-                {{range .Data.Calendars}}
-                <option value="{{.ID}}" {{if $.Data.Template}}{{if eq $.Data.Template.CalendarID .ID}}selected{{end}}{{end}}>{{.Name}} ({{.Provider}})</option>
+                <option value="">Don't write to a calendar</option>
+                {{range .Data.CalendarOptions}}
+                {{$conn := .}}
+                {{$selectedID := ""}}
+                {{if $.Data.Template}}{{$selectedID = $.Data.Template.CalendarID}}{{end}}
+                {{if .Calendars}}
+                <optgroup label="{{.Name}} ({{.Provider}})">
+                    {{range .Calendars}}
+                    {{if .IsWritable}}
+                    <option value="{{.ID}}" {{if eq $selectedID .ID}}selected{{end}}>{{.Name}}</option>
+                    {{end}}
+                    {{end}}
+                </optgroup>
+                {{end}}
                 {{end}}
             </select>
+            <p class="form-hint">When a booking is confirmed for this template, the event is written to the selected calendar.</p>
         </div>
     </section>
 
