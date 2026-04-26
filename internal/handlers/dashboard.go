@@ -839,6 +839,7 @@ func (h *DashboardHandler) Bookings(w http.ResponseWriter, r *http.Request) {
 			"ArchivableCount":     archivableCount,
 			"PastArchivableCount": pastArchivableCount,
 			"CalRetryCount":       calRetryCount,
+			"HostTimezone":        host.Host.Timezone,
 		},
 	})
 }
@@ -1246,8 +1247,9 @@ func (h *DashboardHandler) BookingDetails(w http.ResponseWriter, r *http.Request
 	template, _ := h.handlers.services.Template.GetTemplate(r.Context(), host.Host.ID, booking.TemplateID)
 
 	h.handlers.renderPartial(w, "booking_details_partial.html", map[string]interface{}{
-		"Booking":  booking,
-		"Template": template,
+		"Booking":      booking,
+		"Template":     template,
+		"HostTimezone": host.Host.Timezone,
 	})
 }
 

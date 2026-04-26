@@ -120,8 +120,11 @@ function confirmBulkRetryCalendar(count) {
             <tr class="booking-row{{if .IsArchived}} archived{{end}}" id="booking-row-{{.ID}}" onclick="openBookingModal('{{.ID}}')">
                 <td>
                     <div class="datetime-cell">
-                        <span class="date">{{formatDate .StartTime}}</span>
-                        <span class="time">{{formatTime .StartTime}} - {{formatTime .EndTime}}</span>
+                        <span class="date">{{formatDateInTZ .StartTime $.Data.HostTimezone}}</span>
+                        <span class="time">{{formatTimeInTZ .StartTime $.Data.HostTimezone}} - {{formatTimeInTZ .EndTime $.Data.HostTimezone}} {{tzAbbrev $.Data.HostTimezone .StartTime}}</span>
+                        {{if and .InviteeTimezone (ne .InviteeTimezone $.Data.HostTimezone)}}
+                        <span class="time time-guest">{{formatTimeInTZ .StartTime .InviteeTimezone}} - {{formatTimeInTZ .EndTime .InviteeTimezone}} {{tzAbbrev .InviteeTimezone .StartTime}} guest</span>
+                        {{end}}
                     </div>
                 </td>
                 <td>

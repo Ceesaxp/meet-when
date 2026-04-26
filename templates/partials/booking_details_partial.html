@@ -32,11 +32,16 @@
                 </div>
                 <div class="booking-detail-row">
                     <span class="label">Date</span>
-                    <span class="value">{{formatDate .Booking.StartTime}}</span>
+                    <span class="value">{{formatDateInTZ .Booking.StartTime .HostTimezone}}</span>
                 </div>
                 <div class="booking-detail-row">
                     <span class="label">Time</span>
-                    <span class="value">{{formatTime .Booking.StartTime}} - {{formatTime .Booking.EndTime}}</span>
+                    <span class="value">
+                        {{formatTimeInTZ .Booking.StartTime .HostTimezone}} - {{formatTimeInTZ .Booking.EndTime .HostTimezone}} {{tzAbbrev .HostTimezone .Booking.StartTime}}
+                        {{if and .Booking.InviteeTimezone (ne .Booking.InviteeTimezone .HostTimezone)}}
+                        <br><span class="text-muted" style="font-size: 0.85em;">{{formatTimeInTZ .Booking.StartTime .Booking.InviteeTimezone}} - {{formatTimeInTZ .Booking.EndTime .Booking.InviteeTimezone}} {{tzAbbrev .Booking.InviteeTimezone .Booking.StartTime}} (guest's time)</span>
+                        {{end}}
+                    </span>
                 </div>
                 <div class="booking-detail-row">
                     <span class="label">Duration</span>

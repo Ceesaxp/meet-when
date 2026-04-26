@@ -41,6 +41,35 @@ func formatDateTime(t interface{}) string {
 	return toTime(t).Format("Monday, January 2, 2006 at 3:04 PM")
 }
 
+// formatDateInTZ formats a time as a date string in the given timezone.
+func formatDateInTZ(t interface{}, tz string) string {
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		return formatDate(t)
+	}
+	return toTime(t).In(loc).Format("Monday, January 2, 2006")
+}
+
+// formatTimeInTZ formats a time as a time string in the given timezone.
+func formatTimeInTZ(t interface{}, tz string) string {
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		return formatTime(t)
+	}
+	return toTime(t).In(loc).Format("3:04 PM")
+}
+
+// tzAbbrev returns the timezone abbreviation (e.g. "CET", "EST") for a
+// given IANA timezone name at the specified point in time.
+func tzAbbrev(tz string, t interface{}) string {
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		return tz
+	}
+	abbrev, _ := toTime(t).In(loc).Zone()
+	return abbrev
+}
+
 // formatTimeHHMM normalizes a time string to HH:MM format
 // Handles both "HH:MM" (SQLite) and "HH:MM:SS" (PostgreSQL) formats
 func formatTimeHHMM(s string) string {
