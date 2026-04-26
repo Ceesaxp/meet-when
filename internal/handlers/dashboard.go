@@ -65,7 +65,7 @@ func (h *DashboardHandler) Calendars(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	calendars, err := h.handlers.services.Calendar.GetCalendars(r.Context(), host.Host.ID)
+	tree, err := h.handlers.services.Calendar.GetCalendarTree(r.Context(), host.Host.ID)
 	if err != nil {
 		log.Printf("Error fetching calendars: %v", err)
 	}
@@ -74,8 +74,11 @@ func (h *DashboardHandler) Calendars(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error fetching conferences: %v", err)
 	}
 
-	// Assign palette colors so legacy calendars without a stored color get one.
-	services.AssignColors(calendars)
+	// Assign palette colors so legacy connections without a stored color get one.
+	services.AssignColors(tree)
+	for _, conn := range tree {
+		services.AssignProviderCalendarColors(conn.Calendars)
+	}
 
 	// Build OAuth URLs
 	googleAuthURL := h.handlers.services.Calendar.GetGoogleAuthURL(host.Host.ID)
@@ -88,13 +91,24 @@ func (h *DashboardHandler) Calendars(w http.ResponseWriter, r *http.Request) {
 		ActiveNav:    "calendars",
 		PendingCount: h.getPendingCount(r, host.Host.ID),
 		Data: map[string]interface{}{
-			"Calendars":     calendars,
-			"Conferencing":  conferencing,
-			"GoogleAuthURL": googleAuthURL,
-			"ZoomAuthURL":   zoomAuthURL,
-			"Palette":       paletteData,
+			"Calendars":         tree,
+			"Conferencing":      conferencing,
+			"GoogleAuthURL":     googleAuthURL,
+			"ZoomAuthURL":       zoomAuthURL,
+			"Palette":           paletteData,
+			"DefaultCalendarID": derefString(host.Host.DefaultCalendarID),
 		},
 	})
+}
+
+// derefString returns the pointed-at string or "" for nil. Used to surface
+// optional FK columns (e.g. hosts.default_calendar_id) into templates without
+// nil-pointer guards on every access.
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // ConnectGoogle initiates Google Calendar OAuth flow
@@ -161,7 +175,9 @@ func (h *DashboardHandler) DisconnectCalendar(w http.ResponseWriter, r *http.Req
 	h.handlers.redirect(w, r, "/dashboard/calendars")
 }
 
-// RefreshCalendarSync manually triggers a sync check for a calendar
+// RefreshCalendarSync manually triggers a sync check for a connection. It both
+// re-enumerates the connection's provider calendars and tests connectivity by
+// fetching busy times for each one.
 func (h *DashboardHandler) RefreshCalendarSync(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())
 	if host == nil {
@@ -169,31 +185,37 @@ func (h *DashboardHandler) RefreshCalendarSync(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	calendarID := r.PathValue("id")
-	err := h.handlers.services.Calendar.RefreshCalendarSync(r.Context(), host.Host.ID, calendarID)
+	connectionID := r.PathValue("id")
 
-	// For HTMX requests, return the updated calendar card partial
+	// Re-enumerate calendars first so newly added provider calendars surface.
+	if _, err := h.handlers.services.Calendar.RefreshConnectionCalendarList(r.Context(), host.Host.ID, connectionID); err != nil {
+		log.Printf("[CALENDAR] re-list failed for %s: %v", connectionID, err)
+	}
+
+	err := h.handlers.services.Calendar.RefreshCalendarSync(r.Context(), host.Host.ID, connectionID)
+
 	if r.Header.Get("HX-Request") == "true" {
-		// Get the updated calendar data
-		cal, calErr := h.handlers.services.Calendar.GetCalendar(r.Context(), calendarID)
-		if calErr != nil || cal == nil {
+		conn, calErr := h.handlers.services.Calendar.GetCalendar(r.Context(), connectionID)
+		if calErr != nil || conn == nil {
 			http.Error(w, "Calendar not found", http.StatusNotFound)
 			return
 		}
+		children, _ := h.handlers.services.Calendar.GetProviderCalendarsForConnection(r.Context(), host.Host.ID, connectionID)
+		conn.Calendars = children
 
-		// Resolve color for the calendar
-		services.AssignColors([]*models.CalendarConnection{cal})
+		services.AssignColors([]*models.CalendarConnection{conn})
+		services.AssignProviderCalendarColors(conn.Calendars)
 
 		h.handlers.renderPartial(w, "calendar_card_partial.html", map[string]interface{}{
-			"Calendar": cal,
-			"Palette":  paletteData,
+			"Calendar":          conn,
+			"Palette":           paletteData,
+			"DefaultCalendarID": derefString(host.Host.DefaultCalendarID),
 		})
 		return
 	}
 
-	// For regular requests, redirect as before
 	if err != nil {
-		log.Printf("Calendar sync refresh failed for %s: %v", calendarID, err)
+		log.Printf("Calendar sync refresh failed for %s: %v", connectionID, err)
 		h.handlers.redirect(w, r, "/dashboard/calendars?error=sync_failed")
 		return
 	}
@@ -201,7 +223,174 @@ func (h *DashboardHandler) RefreshCalendarSync(w http.ResponseWriter, r *http.Re
 	h.handlers.redirect(w, r, "/dashboard/calendars?success=sync_complete")
 }
 
-// SetDefaultCalendar sets a calendar as default
+// ToggleSubCalendarPoll toggles whether a provider calendar contributes its
+// busy times to availability. The form value `poll_busy` is "on" / "off".
+// Returns the updated sub-calendar row partial for HTMX.
+func (h *DashboardHandler) ToggleSubCalendarPoll(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	pcID := r.PathValue("id")
+	pollBusy := r.FormValue("poll_busy") == "on" || r.FormValue("poll_busy") == "true"
+
+	if err := h.handlers.services.Calendar.SetProviderCalendarPollBusy(r.Context(), host.Host.ID, pcID, pollBusy); err != nil {
+		log.Printf("[CALENDAR] toggle poll_busy failed for %s: %v", pcID, err)
+		http.Error(w, "Calendar not found", http.StatusNotFound)
+		return
+	}
+
+	pc, _ := h.handlers.services.Calendar.GetProviderCalendar(r.Context(), host.Host.ID, pcID)
+	if pc == nil {
+		http.Error(w, "Calendar not found", http.StatusNotFound)
+		return
+	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		// Reload the host to surface any default-calendar change made by a
+		// concurrent request; the row template needs the current value.
+		fresh, _ := h.handlers.repos.Host.GetByID(r.Context(), host.Host.ID)
+		def := ""
+		if fresh != nil {
+			def = derefString(fresh.DefaultCalendarID)
+		}
+		h.handlers.renderPartial(w, "sub_calendar_row.html", map[string]interface{}{
+			"Calendar":          pc,
+			"Palette":           paletteData,
+			"DefaultCalendarID": def,
+		})
+		return
+	}
+	h.handlers.redirect(w, r, "/dashboard/calendars")
+}
+
+// SetDefaultSubCalendar promotes a provider calendar to be the host's
+// fallback default for booking events that don't pick a calendar explicitly
+// (and as the fallback target for pooled-host bookings).
+//
+// HTMX response: returns the new-default's connection card as the primary
+// swap target. If the previous default lived under a *different* connection,
+// that connection's card is appended with hx-swap-oob="true" so HTMX also
+// removes the now-stale "default" badge there in the same round-trip.
+// Without the OOB swap two cards could visibly show the default badge until
+// a full page reload.
+func (h *DashboardHandler) SetDefaultSubCalendar(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	// Capture the previous default *before* we mutate it; the request-scoped
+	// host struct holds the value loaded by auth middleware so it pre-dates
+	// this handler's update.
+	prevDefaultID := derefString(host.Host.DefaultCalendarID)
+
+	pcID := r.PathValue("id")
+	pc, err := h.handlers.services.Calendar.GetProviderCalendar(r.Context(), host.Host.ID, pcID)
+	if err != nil || pc == nil {
+		http.Error(w, "Calendar not found", http.StatusNotFound)
+		return
+	}
+	if !pc.IsWritable {
+		http.Error(w, "Calendar is read-only", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.handlers.services.Calendar.SetDefaultProviderCalendar(r.Context(), host.Host.ID, pcID); err != nil {
+		log.Printf("[CALENDAR] set default failed for %s: %v", pcID, err)
+		http.Error(w, "Failed to set default", http.StatusInternalServerError)
+		return
+	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		// Primary swap: the connection card that now owns the default.
+		newConn, calErr := h.handlers.services.Calendar.GetCalendar(r.Context(), pc.ConnectionID)
+		if calErr != nil || newConn == nil {
+			http.Error(w, "Calendar not found", http.StatusNotFound)
+			return
+		}
+		newChildren, _ := h.handlers.services.Calendar.GetProviderCalendarsForConnection(r.Context(), host.Host.ID, newConn.ID)
+		newConn.Calendars = newChildren
+		services.AssignColors([]*models.CalendarConnection{newConn})
+		services.AssignProviderCalendarColors(newConn.Calendars)
+
+		h.handlers.renderPartial(w, "calendar_card_partial.html", map[string]interface{}{
+			"Calendar":          newConn,
+			"Palette":           paletteData,
+			"DefaultCalendarID": pcID,
+		})
+
+		// OOB swap: if the previous default lived under a different connection,
+		// append its refreshed card so HTMX also removes the stale badge there.
+		if prevDefaultID != "" && prevDefaultID != pcID {
+			prevPC, _ := h.handlers.services.Calendar.GetProviderCalendar(r.Context(), host.Host.ID, prevDefaultID)
+			if prevPC != nil && prevPC.ConnectionID != pc.ConnectionID {
+				oldConn, oldErr := h.handlers.services.Calendar.GetCalendar(r.Context(), prevPC.ConnectionID)
+				if oldErr == nil && oldConn != nil {
+					oldChildren, _ := h.handlers.services.Calendar.GetProviderCalendarsForConnection(r.Context(), host.Host.ID, oldConn.ID)
+					oldConn.Calendars = oldChildren
+					services.AssignColors([]*models.CalendarConnection{oldConn})
+					services.AssignProviderCalendarColors(oldConn.Calendars)
+
+					h.handlers.renderPartial(w, "calendar_card_partial.html", map[string]interface{}{
+						"Calendar":          oldConn,
+						"Palette":           paletteData,
+						"DefaultCalendarID": pcID,
+						"OOB":               true,
+					})
+				}
+			}
+		}
+		return
+	}
+	h.handlers.redirect(w, r, "/dashboard/calendars")
+}
+
+// UpdateSubCalendarColor updates a provider calendar's color and returns the
+// updated swatch fieldset for HTMX swap.
+func (h *DashboardHandler) UpdateSubCalendarColor(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	pcID := r.PathValue("id")
+	color := r.FormValue("color")
+
+	valid := false
+	for _, c := range services.CalendarPalette {
+		if c == color {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		http.Error(w, "invalid color", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.handlers.repos.ProviderCalendar.UpdateColor(r.Context(), host.Host.ID, pcID, color); err != nil {
+		log.Printf("[CALENDAR] sub-calendar color update failed for %s: %v", pcID, err)
+		http.Error(w, "failed to update color", http.StatusInternalServerError)
+		return
+	}
+
+	h.handlers.renderPartial(w, "color_swatch_fieldset.html", map[string]interface{}{
+		"CalendarID":   pcID,
+		"CurrentColor": color,
+		"Palette":      paletteData,
+		"FormAction":   "/dashboard/calendars/sub/" + pcID + "/color",
+	})
+}
+
+// SetDefaultCalendar sets a provider calendar as the host's fallback default.
+// The id may either be a provider_calendars.id (preferred) or a calendar
+// connection id, in which case we fall back to that connection's primary
+// calendar — this preserves backwards compatibility with older URLs.
 func (h *DashboardHandler) SetDefaultCalendar(w http.ResponseWriter, r *http.Request) {
 	host := middleware.GetHost(r.Context())
 	if host == nil {
@@ -209,8 +398,32 @@ func (h *DashboardHandler) SetDefaultCalendar(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	calendarID := r.PathValue("id")
-	_ = h.handlers.services.Calendar.SetDefaultCalendar(r.Context(), host.Host.ID, calendarID)
+	id := r.PathValue("id")
+
+	// Try as a provider_calendars.id first.
+	pc, err := h.handlers.services.Calendar.GetProviderCalendar(r.Context(), host.Host.ID, id)
+	if err == nil && pc != nil {
+		_ = h.handlers.services.Calendar.SetDefaultProviderCalendar(r.Context(), host.Host.ID, pc.ID)
+		h.handlers.redirect(w, r, "/dashboard/calendars")
+		return
+	}
+
+	// Otherwise treat as a connection id and pick its primary calendar.
+	conn, err := h.handlers.services.Calendar.GetCalendar(r.Context(), id)
+	if err == nil && conn != nil && conn.HostID == host.Host.ID {
+		children, _ := h.handlers.services.Calendar.GetCalendarTree(r.Context(), host.Host.ID)
+		for _, c := range children {
+			if c.ID != conn.ID {
+				continue
+			}
+			for _, child := range c.Calendars {
+				if child.IsPrimary {
+					_ = h.handlers.services.Calendar.SetDefaultProviderCalendar(r.Context(), host.Host.ID, child.ID)
+					break
+				}
+			}
+		}
+	}
 
 	h.handlers.redirect(w, r, "/dashboard/calendars")
 }
@@ -335,7 +548,7 @@ func (h *DashboardHandler) NewTemplatePage(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	calendars, _ := h.handlers.services.Calendar.GetCalendars(r.Context(), host.Host.ID)
+	calendarOptions, _ := h.handlers.services.Calendar.GetCalendarTree(r.Context(), host.Host.ID)
 
 	h.handlers.render(w, "dashboard_template_form.html", PageData{
 		Title:        "New Meeting Template",
@@ -344,9 +557,9 @@ func (h *DashboardHandler) NewTemplatePage(w http.ResponseWriter, r *http.Reques
 		ActiveNav:    "templates",
 		PendingCount: h.getPendingCount(r, host.Host.ID),
 		Data: map[string]interface{}{
-			"Template":  nil,
-			"Calendars": calendars,
-			"IsNew":     true,
+			"Template":        nil,
+			"CalendarOptions": calendarOptions,
+			"IsNew":           true,
 		},
 	})
 }
@@ -415,7 +628,7 @@ func (h *DashboardHandler) CreateTemplate(w http.ResponseWriter, r *http.Request
 
 	_, err := h.handlers.services.Template.CreateTemplate(r.Context(), input)
 	if err != nil {
-		calendars, _ := h.handlers.services.Calendar.GetCalendars(r.Context(), host.Host.ID)
+		calendarOptions, _ := h.handlers.services.Calendar.GetCalendarTree(r.Context(), host.Host.ID)
 		h.handlers.render(w, "dashboard_template_form.html", PageData{
 			Title:        "New Meeting Template",
 			Host:         host.Host,
@@ -424,9 +637,9 @@ func (h *DashboardHandler) CreateTemplate(w http.ResponseWriter, r *http.Request
 			PendingCount: h.getPendingCount(r, host.Host.ID),
 			Flash:        &FlashMessage{Type: "error", Message: "Failed to create template: " + err.Error()},
 			Data: map[string]interface{}{
-				"Template":  nil,
-				"Calendars": calendars,
-				"IsNew":     true,
+				"Template":        nil,
+				"CalendarOptions": calendarOptions,
+				"IsNew":           true,
 			},
 		})
 		return
@@ -450,7 +663,7 @@ func (h *DashboardHandler) EditTemplatePage(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	calendars, _ := h.handlers.services.Calendar.GetCalendars(r.Context(), host.Host.ID)
+	calendarOptions, _ := h.handlers.services.Calendar.GetCalendarTree(r.Context(), host.Host.ID)
 
 	// Load pooled hosts for this template
 	pooledHosts, _ := h.handlers.services.Template.GetPooledHosts(r.Context(), templateID)
@@ -466,11 +679,11 @@ func (h *DashboardHandler) EditTemplatePage(w http.ResponseWriter, r *http.Reque
 		ActiveNav:    "templates",
 		PendingCount: h.getPendingCount(r, host.Host.ID),
 		Data: map[string]interface{}{
-			"Template":    template,
-			"Calendars":   calendars,
-			"IsNew":       false,
-			"PooledHosts": pooledHosts,
-			"TenantHosts": tenantHosts,
+			"Template":        template,
+			"CalendarOptions": calendarOptions,
+			"IsNew":           false,
+			"PooledHosts":     pooledHosts,
+			"TenantHosts":     tenantHosts,
 		},
 	})
 }
@@ -828,14 +1041,14 @@ func (h *DashboardHandler) Bookings(w http.ResponseWriter, r *http.Request) {
 		PendingCount: len(pendingBookings),
 		Flash:        flash,
 		Data: map[string]interface{}{
-			"Bookings":        bookings,
-			"Templates":       templateMap,
-			"Filter":          filter,
-			"ShowArchived":    showArchived,
-			"AllCount":        len(allBookings),
-			"PendingCount":    len(pendingBookings),
-			"ConfirmedCount":  len(confirmedBookings),
-			"CancelledCount":  len(cancelledBookings),
+			"Bookings":            bookings,
+			"Templates":           templateMap,
+			"Filter":              filter,
+			"ShowArchived":        showArchived,
+			"AllCount":            len(allBookings),
+			"PendingCount":        len(pendingBookings),
+			"ConfirmedCount":      len(confirmedBookings),
+			"CancelledCount":      len(cancelledBookings),
 			"ArchivableCount":     archivableCount,
 			"PastArchivableCount": pastArchivableCount,
 			"CalRetryCount":       calRetryCount,

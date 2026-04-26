@@ -21,6 +21,59 @@ var CalendarPalette = []string{
 	"#5F5E5A",
 }
 
+// AssignProviderCalendarColors assigns palette colors to provider calendars
+// that have no color set. Mirrors AssignColors but operates on the
+// per-provider-calendar slice.
+func AssignProviderCalendarColors(calendars []*models.ProviderCalendar) {
+	if len(calendars) == 0 {
+		return
+	}
+
+	slices.SortFunc(calendars, func(a, b *models.ProviderCalendar) int {
+		if c := cmp.Compare(a.CreatedAt.Time.Unix(), b.CreatedAt.Time.Unix()); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.ID, b.ID)
+	})
+
+	usedColors := make(map[string]bool, len(CalendarPalette))
+	for _, cal := range calendars {
+		if cal.Color != "" {
+			usedColors[strings.ToUpper(cal.Color)] = true
+		}
+	}
+
+	assignQueue := make([]string, 0, len(CalendarPalette))
+	for _, c := range CalendarPalette {
+		if !usedColors[c] {
+			assignQueue = append(assignQueue, c)
+		}
+	}
+
+	paletteSet := make(map[string]bool, len(CalendarPalette))
+	for _, c := range CalendarPalette {
+		paletteSet[c] = true
+	}
+
+	idx := 0
+	paletteColoredSoFar := 0
+	for _, cal := range calendars {
+		if cal.Color != "" {
+			if paletteSet[strings.ToUpper(cal.Color)] {
+				paletteColoredSoFar++
+			}
+			continue
+		}
+		if idx < len(assignQueue) {
+			cal.Color = assignQueue[idx]
+		} else {
+			cal.Color = CalendarPalette[paletteColoredSoFar%len(CalendarPalette)]
+		}
+		paletteColoredSoFar++
+		idx++
+	}
+}
+
 // AssignColors assigns palette colors to calendars that have no color set.
 // Input is sorted by CreatedAt ASC before assignment so results are stable
 // regardless of the order the slice was passed in.

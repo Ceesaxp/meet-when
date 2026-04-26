@@ -123,7 +123,13 @@ const (
 	CalendarSyncStatusFailed  CalendarSyncStatus = "failed"
 )
 
-// CalendarConnection represents a connected calendar
+// CalendarConnection represents an account-level binding to a calendar provider
+// (Google OAuth account, CalDAV server). The actual calendars enumerated under
+// this connection are stored in ProviderCalendar.
+//
+// CalendarID/Color/LastSyncedAt/SyncStatus/SyncError remain on this struct only
+// to keep the legacy primary-calendar columns readable; new code should resolve
+// these per-calendar via ProviderCalendar instead.
 type CalendarConnection struct {
 	ID           string           `json:"id" db:"id"`
 	HostID       string           `json:"host_id" db:"host_id"`
@@ -145,6 +151,27 @@ type CalendarConnection struct {
 	SyncError    string             `json:"sync_error" db:"sync_error"`
 	CreatedAt    SQLiteTime         `json:"created_at" db:"created_at"`
 	UpdatedAt    SQLiteTime         `json:"updated_at" db:"updated_at"`
+	// Populated by service layer when loading account+calendar trees, not persisted.
+	Calendars []*ProviderCalendar `json:"calendars,omitempty" db:"-"`
+}
+
+// ProviderCalendar represents a single calendar enumerated under a
+// CalendarConnection (e.g. one of the user's Google calendars, or one CalDAV
+// collection). Templates and pooled-host event writes target a ProviderCalendar.
+type ProviderCalendar struct {
+	ID                 string             `json:"id" db:"id"`
+	ConnectionID       string             `json:"connection_id" db:"connection_id"`
+	ProviderCalendarID string             `json:"provider_calendar_id" db:"provider_calendar_id"`
+	Name               string             `json:"name" db:"name"`
+	Color              string             `json:"color" db:"color"`
+	IsPrimary          bool               `json:"is_primary" db:"is_primary"`
+	IsWritable         bool               `json:"is_writable" db:"is_writable"`
+	PollBusy           bool               `json:"poll_busy" db:"poll_busy"`
+	LastSyncedAt       *SQLiteTime        `json:"last_synced_at" db:"last_synced_at"`
+	SyncStatus         CalendarSyncStatus `json:"sync_status" db:"sync_status"`
+	SyncError          string             `json:"sync_error" db:"sync_error"`
+	CreatedAt          SQLiteTime         `json:"created_at" db:"created_at"`
+	UpdatedAt          SQLiteTime         `json:"updated_at" db:"updated_at"`
 }
 
 // ConferencingProvider represents supported conferencing providers

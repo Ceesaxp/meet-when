@@ -45,7 +45,8 @@ type GoogleCalendarConnectInput struct {
 	RedirectURI string
 }
 
-// ConnectGoogleCalendar connects a Google Calendar using OAuth
+// ConnectGoogleCalendar connects a Google Calendar using OAuth and enumerates
+// the calendars under the account into provider_calendars.
 func (s *CalendarService) ConnectGoogleCalendar(ctx context.Context, input GoogleCalendarConnectInput) (*models.CalendarConnection, error) {
 	// Exchange auth code for tokens
 	tokens, err := s.exchangeGoogleAuthCode(input.AuthCode, input.RedirectURI)
@@ -53,21 +54,17 @@ func (s *CalendarService) ConnectGoogleCalendar(ctx context.Context, input Googl
 		return nil, fmt.Errorf("failed to exchange auth code: %w", err)
 	}
 
-	// Get calendar list to find primary calendar
-	calendarInfo, err := s.getGoogleCalendarInfo(tokens.AccessToken)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get calendar info: %w", err)
-	}
-
 	now := models.Now()
 	expiry := models.NewSQLiteTime(time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second))
 
-	calendar := &models.CalendarConnection{
+	// Pick a primary now for the legacy CalendarConnection.calendar_id field. We
+	// will overwrite it once the calendar list comes back, but it satisfies the
+	// NOT-NULL-ish expectations of older readers in the meantime.
+	connection := &models.CalendarConnection{
 		ID:           uuid.New().String(),
 		HostID:       input.HostID,
 		Provider:     models.CalendarProviderGoogle,
-		Name:         calendarInfo.Name,
-		CalendarID:   calendarInfo.ID,
+		Name:         "Google Calendar",
 		AccessToken:  tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
 		TokenExpiry:  &expiry,
@@ -75,33 +72,26 @@ func (s *CalendarService) ConnectGoogleCalendar(ctx context.Context, input Googl
 		UpdatedAt:    now,
 	}
 
-	if err := s.repos.Calendar.Create(ctx, calendar); err != nil {
+	if err := s.repos.Calendar.Create(ctx, connection); err != nil {
 		return nil, err
 	}
 
-	// Set as default if first calendar
-	calendars, _ := s.repos.Calendar.GetByHostID(ctx, input.HostID)
-	if len(calendars) == 1 {
-		_ = s.repos.Calendar.SetDefault(ctx, input.HostID, calendar.ID)
-		calendar.IsDefault = true
+	// Enumerate the user's calendars from Google CalendarList and persist them
+	// as provider_calendars rows. Failures here leave the connection without
+	// child calendars; the user can hit Refresh on the dashboard to retry.
+	if _, err := s.refreshGoogleCalendarList(ctx, connection); err != nil {
+		log.Printf("[CALENDAR] initial Google calendar list failed for connection %s: %v", connection.ID, err)
 	}
 
-	// Assign a palette color to the new calendar and persist it.
-	// Only update calendar.Color in memory after the DB write succeeds so that
-	// the returned struct stays consistent with the persisted state.
-	AssignColors(calendars)
-	for _, cal := range calendars {
-		if cal.ID == calendar.ID {
-			if err := s.repos.Calendar.UpdateColor(ctx, input.HostID, calendar.ID, cal.Color); err != nil {
-				log.Printf("[CALENDAR] failed to persist color for calendar %s: %v", calendar.ID, err)
-			} else {
-				calendar.Color = cal.Color
-			}
-			break
-		}
+	// Resolve the account display name (the user's primary email) so the
+	// dashboard can show "Google Calendar — sarah@example.com".
+	if primary, _ := s.primaryProviderCalendar(ctx, connection.ID); primary != nil {
+		connection.Name = primary.Name
+		connection.CalendarID = primary.ProviderCalendarID
+		_ = s.repos.Calendar.Update(ctx, connection)
 	}
 
-	return calendar, nil
+	return connection, nil
 }
 
 // CalDAVConnectInput represents input for connecting a CalDAV calendar
@@ -114,125 +104,249 @@ type CalDAVConnectInput struct {
 	Provider models.CalendarProvider // Optional: defaults to CalendarProviderCalDAV
 }
 
-// ConnectCalDAV connects a CalDAV calendar
+// ConnectCalDAV connects a CalDAV (or iCloud) account and discovers its
+// calendars via PROPFIND. The supplied URL may be either a calendar collection
+// URL or a discovery endpoint (e.g. https://caldav.icloud.com/) — we resolve
+// the principal and calendar-home-set automatically.
 func (s *CalendarService) ConnectCalDAV(ctx context.Context, input CalDAVConnectInput) (*models.CalendarConnection, error) {
-	// Validate CalDAV connection
-	if err := s.validateCalDAVConnection(input.URL, input.Username, input.Password); err != nil {
-		return nil, fmt.Errorf("failed to validate CalDAV connection: %w", err)
-	}
-
 	// Default to CalDAV provider if not specified
 	provider := input.Provider
 	if provider == "" {
 		provider = models.CalendarProviderCalDAV
 	}
 
+	// Default URL for iCloud if blank
+	caldavURL := strings.TrimSpace(input.URL)
+	if caldavURL == "" && provider == models.CalendarProviderICloud {
+		caldavURL = "https://caldav.icloud.com/"
+	}
+
+	if err := s.validateCalDAVConnection(caldavURL, input.Username, input.Password); err != nil {
+		return nil, fmt.Errorf("failed to validate CalDAV connection: %w", err)
+	}
+
 	now := models.Now()
-	calendar := &models.CalendarConnection{
+	displayName := strings.TrimSpace(input.Name)
+	if displayName == "" {
+		if provider == models.CalendarProviderICloud {
+			displayName = "iCloud Calendar"
+		} else {
+			displayName = "CalDAV Calendar"
+		}
+	}
+
+	connection := &models.CalendarConnection{
 		ID:             uuid.New().String(),
 		HostID:         input.HostID,
 		Provider:       provider,
-		Name:           input.Name,
-		CalDAVURL:      input.URL,
+		Name:           displayName,
+		CalDAVURL:      caldavURL,
 		CalDAVUsername: input.Username,
 		CalDAVPassword: input.Password, // Should be encrypted in production
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
 
-	if err := s.repos.Calendar.Create(ctx, calendar); err != nil {
+	if err := s.repos.Calendar.Create(ctx, connection); err != nil {
 		return nil, err
 	}
 
-	// Set as default if first calendar
-	calendars, _ := s.repos.Calendar.GetByHostID(ctx, input.HostID)
-	if len(calendars) == 1 {
-		_ = s.repos.Calendar.SetDefault(ctx, input.HostID, calendar.ID)
-		calendar.IsDefault = true
+	if _, err := s.refreshCalDAVCalendarList(ctx, connection); err != nil {
+		log.Printf("[CALENDAR] initial CalDAV calendar list failed for connection %s: %v", connection.ID, err)
 	}
 
-	// Assign a palette color to the new calendar and persist it.
-	// Only update calendar.Color in memory after the DB write succeeds so that
-	// the returned struct stays consistent with the persisted state.
-	AssignColors(calendars)
-	for _, cal := range calendars {
-		if cal.ID == calendar.ID {
-			if err := s.repos.Calendar.UpdateColor(ctx, input.HostID, calendar.ID, cal.Color); err != nil {
-				log.Printf("[CALENDAR] failed to persist color for calendar %s: %v", calendar.ID, err)
-			} else {
-				calendar.Color = cal.Color
-			}
-			break
-		}
+	if primary, _ := s.primaryProviderCalendar(ctx, connection.ID); primary != nil {
+		connection.CalendarID = primary.ProviderCalendarID
+		_ = s.repos.Calendar.Update(ctx, connection)
 	}
 
-	return calendar, nil
+	return connection, nil
 }
 
-// DisconnectCalendar removes a calendar connection
-func (s *CalendarService) DisconnectCalendar(ctx context.Context, hostID, calendarID string) error {
-	cal, err := s.repos.Calendar.GetByID(ctx, calendarID)
+// DisconnectCalendar removes a connection (and cascades to its provider_calendars).
+func (s *CalendarService) DisconnectCalendar(ctx context.Context, hostID, connectionID string) error {
+	cal, err := s.repos.Calendar.GetByID(ctx, connectionID)
 	if err != nil || cal == nil || cal.HostID != hostID {
 		return ErrCalendarNotFound
 	}
 
-	return s.repos.Calendar.Delete(ctx, calendarID)
+	return s.repos.Calendar.Delete(ctx, connectionID)
 }
 
-// SetDefaultCalendar sets a calendar as the default
-func (s *CalendarService) SetDefaultCalendar(ctx context.Context, hostID, calendarID string) error {
-	cal, err := s.repos.Calendar.GetByID(ctx, calendarID)
-	if err != nil || cal == nil || cal.HostID != hostID {
+// SetDefaultProviderCalendar sets a specific provider calendar as the host's
+// default (used as a fallback when a template has no explicit calendar).
+func (s *CalendarService) SetDefaultProviderCalendar(ctx context.Context, hostID, providerCalendarID string) error {
+	pc, err := s.repos.ProviderCalendar.GetByID(ctx, providerCalendarID)
+	if err != nil {
+		return err
+	}
+	if pc == nil {
 		return ErrCalendarNotFound
 	}
-
-	return s.repos.Calendar.SetDefault(ctx, hostID, calendarID)
+	conn, err := s.repos.Calendar.GetByID(ctx, pc.ConnectionID)
+	if err != nil || conn == nil || conn.HostID != hostID {
+		return ErrCalendarNotFound
+	}
+	return s.repos.Host.SetDefaultCalendar(ctx, hostID, providerCalendarID)
 }
 
-// GetCalendars returns all calendars for a host
+// GetCalendars returns all connections for a host (without their child calendars).
 func (s *CalendarService) GetCalendars(ctx context.Context, hostID string) ([]*models.CalendarConnection, error) {
 	return s.repos.Calendar.GetByHostID(ctx, hostID)
 }
 
-// GetCalendar returns a single calendar by ID
-func (s *CalendarService) GetCalendar(ctx context.Context, calendarID string) (*models.CalendarConnection, error) {
-	return s.repos.Calendar.GetByID(ctx, calendarID)
+// GetCalendarTree returns connections each populated with their child
+// provider_calendars. Used by the dashboard.
+func (s *CalendarService) GetCalendarTree(ctx context.Context, hostID string) ([]*models.CalendarConnection, error) {
+	connections, err := s.repos.Calendar.GetByHostID(ctx, hostID)
+	if err != nil {
+		return nil, err
+	}
+	for _, conn := range connections {
+		children, err := s.repos.ProviderCalendar.GetByConnectionID(ctx, conn.ID)
+		if err != nil {
+			return nil, err
+		}
+		conn.Calendars = children
+	}
+	return connections, nil
 }
 
-// RefreshCalendarSync performs a sync check on a calendar and updates its sync status
-func (s *CalendarService) RefreshCalendarSync(ctx context.Context, hostID, calendarID string) error {
-	cal, err := s.repos.Calendar.GetByID(ctx, calendarID)
+// GetProviderCalendarsForHost returns every provider calendar belonging to the host.
+func (s *CalendarService) GetProviderCalendarsForHost(ctx context.Context, hostID string) ([]*models.ProviderCalendar, error) {
+	return s.repos.ProviderCalendar.GetByHostID(ctx, hostID)
+}
+
+// GetProviderCalendarsForConnection returns the provider calendars under a
+// specific connection, scoped to ownership.
+func (s *CalendarService) GetProviderCalendarsForConnection(ctx context.Context, hostID, connectionID string) ([]*models.ProviderCalendar, error) {
+	conn, err := s.repos.Calendar.GetByID(ctx, connectionID)
+	if err != nil {
+		return nil, err
+	}
+	if conn == nil || conn.HostID != hostID {
+		return nil, ErrCalendarNotFound
+	}
+	return s.repos.ProviderCalendar.GetByConnectionID(ctx, connectionID)
+}
+
+// GetWritableProviderCalendarsForHost returns the host's provider calendars
+// that are writable (i.e. eligible to be selected as a template's event-write
+// target).
+func (s *CalendarService) GetWritableProviderCalendarsForHost(ctx context.Context, hostID string) ([]*models.ProviderCalendar, error) {
+	all, err := s.repos.ProviderCalendar.GetByHostID(ctx, hostID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*models.ProviderCalendar, 0, len(all))
+	for _, pc := range all {
+		if pc.IsWritable {
+			out = append(out, pc)
+		}
+	}
+	return out, nil
+}
+
+// GetCalendar returns a single connection by ID.
+func (s *CalendarService) GetCalendar(ctx context.Context, connectionID string) (*models.CalendarConnection, error) {
+	return s.repos.Calendar.GetByID(ctx, connectionID)
+}
+
+// GetProviderCalendar returns a single provider calendar by ID, scoped to the host.
+func (s *CalendarService) GetProviderCalendar(ctx context.Context, hostID, providerCalendarID string) (*models.ProviderCalendar, error) {
+	pc, err := s.repos.ProviderCalendar.GetByID(ctx, providerCalendarID)
+	if err != nil {
+		return nil, err
+	}
+	if pc == nil {
+		return nil, nil
+	}
+	conn, err := s.repos.Calendar.GetByID(ctx, pc.ConnectionID)
+	if err != nil || conn == nil || conn.HostID != hostID {
+		return nil, ErrCalendarNotFound
+	}
+	return pc, nil
+}
+
+// SetProviderCalendarPollBusy toggles whether a calendar is consulted for busy
+// times when computing availability.
+func (s *CalendarService) SetProviderCalendarPollBusy(ctx context.Context, hostID, providerCalendarID string, pollBusy bool) error {
+	return s.repos.ProviderCalendar.UpdatePollBusy(ctx, hostID, providerCalendarID, pollBusy)
+}
+
+// RefreshConnectionCalendarList re-enumerates the calendars for a connection.
+// Useful both at first connect time and when the user clicks "Refresh" so newly
+// added calendars at the provider show up in our UI.
+func (s *CalendarService) RefreshConnectionCalendarList(ctx context.Context, hostID, connectionID string) ([]*models.ProviderCalendar, error) {
+	conn, err := s.repos.Calendar.GetByID(ctx, connectionID)
+	if err != nil || conn == nil || conn.HostID != hostID {
+		return nil, ErrCalendarNotFound
+	}
+	switch conn.Provider {
+	case models.CalendarProviderGoogle:
+		return s.refreshGoogleCalendarList(ctx, conn)
+	case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
+		return s.refreshCalDAVCalendarList(ctx, conn)
+	}
+	return nil, nil
+}
+
+// RefreshCalendarSync performs a sync check on every provider_calendar under
+// the connection and aggregates results.
+func (s *CalendarService) RefreshCalendarSync(ctx context.Context, hostID, connectionID string) error {
+	conn, err := s.repos.Calendar.GetByID(ctx, connectionID)
 	if err != nil {
 		return err
 	}
-	if cal == nil || cal.HostID != hostID {
+	if conn == nil || conn.HostID != hostID {
 		return ErrCalendarNotFound
 	}
 
-	// Try to fetch busy times for a short range to test the connection
+	calendars, err := s.repos.ProviderCalendar.GetByConnectionID(ctx, connectionID)
+	if err != nil {
+		return err
+	}
+
 	start := time.Now()
 	end := start.Add(24 * time.Hour)
 
-	var syncErr error
-	switch cal.Provider {
-	case models.CalendarProviderGoogle:
-		_, syncErr = s.getGoogleBusyTimes(ctx, cal, start, end)
-	case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
-		_, syncErr = s.getCalDAVBusyTimes(ctx, cal, start, end)
+	var firstErr error
+	for _, pc := range calendars {
+		if syncErr := s.syncProviderCalendar(ctx, conn, pc, start, end); syncErr != nil && firstErr == nil {
+			firstErr = syncErr
+		}
 	}
 
-	now := models.Now()
-	if syncErr != nil {
-		// Sync failed - update status
-		errMsg := syncErr.Error()
-		if errors.Is(syncErr, ErrCalendarAuth) {
+	// Mirror the worst-case status onto the legacy calendar_connections row so
+	// that older readers (e.g. dashboard pre-refresh state) reflect failures.
+	if firstErr != nil {
+		errMsg := firstErr.Error()
+		if errors.Is(firstErr, ErrCalendarAuth) {
 			errMsg = "Authentication failed. Please reconnect your calendar."
 		}
-		return s.repos.Calendar.UpdateSyncStatus(ctx, calendarID, models.CalendarSyncStatusFailed, errMsg, nil)
+		_ = s.repos.Calendar.UpdateSyncStatus(ctx, connectionID, models.CalendarSyncStatusFailed, errMsg, nil)
+		return firstErr
 	}
+	now := models.Now()
+	_ = s.repos.Calendar.UpdateSyncStatus(ctx, connectionID, models.CalendarSyncStatusSynced, "", &now)
+	return nil
+}
 
-	// Sync succeeded
-	return s.repos.Calendar.UpdateSyncStatus(ctx, calendarID, models.CalendarSyncStatusSynced, "", &now)
+// syncProviderCalendar tests connectivity to a single calendar and records the
+// outcome on its provider_calendars row.
+func (s *CalendarService) syncProviderCalendar(ctx context.Context, conn *models.CalendarConnection, pc *models.ProviderCalendar, start, end time.Time) error {
+	_, err := s.busyTimesForProviderCalendar(ctx, conn, pc, start, end)
+	now := models.Now()
+	if err != nil {
+		errMsg := err.Error()
+		if errors.Is(err, ErrCalendarAuth) {
+			errMsg = "Authentication failed. Please reconnect your calendar."
+		}
+		_ = s.repos.ProviderCalendar.UpdateSyncStatus(ctx, pc.ID, models.CalendarSyncStatusFailed, errMsg, nil)
+		return err
+	}
+	_ = s.repos.ProviderCalendar.UpdateSyncStatus(ctx, pc.ID, models.CalendarSyncStatusSynced, "", &now)
+	return nil
 }
 
 // UpdateSyncStatus is a helper to update calendar sync status (used by GetBusyTimes tracking)
@@ -281,104 +395,243 @@ func (s *CalendarService) GetAllCalendars(ctx context.Context) ([]*models.Calend
 	return s.repos.Calendar.GetAll(ctx)
 }
 
-// GetBusyTimes returns busy times from all connected calendars
+// GetBusyTimes returns busy times across every provider_calendar belonging to
+// the host that has poll_busy=true. Calendars under the same connection share
+// credentials, so we group by connection_id; a connection-level auth failure
+// short-circuits all of its calendars.
 func (s *CalendarService) GetBusyTimes(ctx context.Context, hostID string, start, end time.Time) ([]models.TimeSlot, error) {
-	calendars, err := s.repos.Calendar.GetByHostID(ctx, hostID)
+	polled, err := s.repos.ProviderCalendar.GetPolledByHostID(ctx, hostID)
 	if err != nil {
 		return nil, err
+	}
+	if len(polled) == 0 {
+		return nil, nil
+	}
+
+	// Group polled calendars by connection so we issue one auth-bearing request
+	// per provider account rather than per calendar.
+	byConn := make(map[string][]*models.ProviderCalendar)
+	connOrder := make([]string, 0)
+	for _, pc := range polled {
+		if _, ok := byConn[pc.ConnectionID]; !ok {
+			connOrder = append(connOrder, pc.ConnectionID)
+		}
+		byConn[pc.ConnectionID] = append(byConn[pc.ConnectionID], pc)
 	}
 
 	var allBusyTimes []models.TimeSlot
 
-	for _, cal := range calendars {
-		var busyTimes []models.TimeSlot
-		var fetchErr error
-
-		switch cal.Provider {
-		case models.CalendarProviderGoogle:
-			busyTimes, fetchErr = s.getGoogleBusyTimes(ctx, cal, start, end)
-		case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
-			busyTimes, fetchErr = s.getCalDAVBusyTimes(ctx, cal, start, end)
-		}
-
-		if fetchErr != nil {
-			// Track sync failure
-			errMsg := fetchErr.Error()
-			if errors.Is(fetchErr, ErrCalendarAuth) {
-				errMsg = "Authentication failed. Please reconnect your calendar."
-			}
-			_ = s.repos.Calendar.UpdateSyncStatus(ctx, cal.ID, models.CalendarSyncStatusFailed, errMsg, nil)
-			// Log but continue with other calendars
-			log.Printf("Calendar sync failed for %s: %v", cal.ID, fetchErr)
+	for _, connID := range connOrder {
+		conn, err := s.repos.Calendar.GetByID(ctx, connID)
+		if err != nil || conn == nil {
 			continue
 		}
 
-		// Track sync success
+		busy, errs := s.busyTimesForConnection(ctx, conn, byConn[connID], start, end)
 		now := models.Now()
-		_ = s.repos.Calendar.UpdateSyncStatus(ctx, cal.ID, models.CalendarSyncStatusSynced, "", &now)
-
-		allBusyTimes = append(allBusyTimes, busyTimes...)
+		for _, pc := range byConn[connID] {
+			if pcErr, ok := errs[pc.ID]; ok && pcErr != nil {
+				errMsg := pcErr.Error()
+				if errors.Is(pcErr, ErrCalendarAuth) {
+					errMsg = "Authentication failed. Please reconnect your calendar."
+				}
+				_ = s.repos.ProviderCalendar.UpdateSyncStatus(ctx, pc.ID, models.CalendarSyncStatusFailed, errMsg, nil)
+				log.Printf("Calendar sync failed for %s: %v", pc.ID, pcErr)
+			} else {
+				_ = s.repos.ProviderCalendar.UpdateSyncStatus(ctx, pc.ID, models.CalendarSyncStatusSynced, "", &now)
+			}
+		}
+		allBusyTimes = append(allBusyTimes, busy...)
 	}
 
 	return allBusyTimes, nil
 }
 
-// CreateEvent creates a calendar event for a booking
+// busyTimesForConnection fetches busy times for the supplied calendars under a
+// single connection. For Google we issue ONE freeBusy call covering all
+// calendars; for CalDAV we still need one HTTP call per calendar collection.
+//
+// Returns the union of busy times and a per-calendar error map.
+func (s *CalendarService) busyTimesForConnection(ctx context.Context, conn *models.CalendarConnection, calendars []*models.ProviderCalendar, start, end time.Time) ([]models.TimeSlot, map[string]error) {
+	errs := make(map[string]error, len(calendars))
+	if len(calendars) == 0 {
+		return nil, errs
+	}
+
+	switch conn.Provider {
+	case models.CalendarProviderGoogle:
+		ids := make([]string, 0, len(calendars))
+		for _, pc := range calendars {
+			if pc.ProviderCalendarID != "" {
+				ids = append(ids, pc.ProviderCalendarID)
+			}
+		}
+		busyByID, err := s.getGoogleBusyTimesMulti(ctx, conn, ids, start, end)
+		if err != nil {
+			for _, pc := range calendars {
+				errs[pc.ID] = err
+			}
+			return nil, errs
+		}
+		var all []models.TimeSlot
+		for _, pc := range calendars {
+			all = append(all, busyByID[pc.ProviderCalendarID]...)
+		}
+		return all, errs
+	case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
+		var all []models.TimeSlot
+		for _, pc := range calendars {
+			busy, err := s.busyTimesForProviderCalendar(ctx, conn, pc, start, end)
+			if err != nil {
+				errs[pc.ID] = err
+				continue
+			}
+			all = append(all, busy...)
+		}
+		return all, errs
+	}
+	return nil, errs
+}
+
+// getGoogleBusyTimesMulti issues a single freeBusy request covering multiple
+// calendar IDs and returns the busy slots keyed by calendar id.
+func (s *CalendarService) getGoogleBusyTimesMulti(ctx context.Context, conn *models.CalendarConnection, calendarIDs []string, start, end time.Time) (map[string][]models.TimeSlot, error) {
+	if err := s.refreshGoogleToken(conn); err != nil {
+		return nil, err
+	}
+	if len(calendarIDs) == 0 {
+		return map[string][]models.TimeSlot{}, nil
+	}
+
+	type item struct {
+		ID string `json:"id"`
+	}
+	items := make([]item, 0, len(calendarIDs))
+	for _, id := range calendarIDs {
+		items = append(items, item{ID: id})
+	}
+	body, err := json.Marshal(map[string]interface{}{
+		"timeMin": start.Format(time.RFC3339),
+		"timeMax": end.Format(time.RFC3339),
+		"items":   items,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	req, _ := http.NewRequestWithContext(ctx, "POST", "https://www.googleapis.com/calendar/v3/freeBusy", strings.NewReader(string(body)))
+	req.Header.Set("Authorization", "Bearer "+conn.AccessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			log.Printf("Error closing response body: %v", cerr)
+		}
+	}()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, ErrCalendarAuth
+	}
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("freeBusy request failed (%d): %s", resp.StatusCode, string(raw))
+	}
+
+	var result struct {
+		Calendars map[string]struct {
+			Busy []struct {
+				Start string `json:"start"`
+				End   string `json:"end"`
+			} `json:"busy"`
+		} `json:"calendars"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	out := make(map[string][]models.TimeSlot, len(result.Calendars))
+	for id, data := range result.Calendars {
+		slots := make([]models.TimeSlot, 0, len(data.Busy))
+		for _, b := range data.Busy {
+			startTime, _ := time.Parse(time.RFC3339, b.Start)
+			endTime, _ := time.Parse(time.RFC3339, b.End)
+			slots = append(slots, models.TimeSlot{Start: startTime, End: endTime})
+		}
+		out[id] = slots
+	}
+	return out, nil
+}
+
+// CreateEvent creates a calendar event in the template's configured calendar.
+// details.Template.CalendarID is interpreted as a provider_calendars.id.
 func (s *CalendarService) CreateEvent(ctx context.Context, details *BookingWithDetails) (string, error) {
-	if details.Template.CalendarID == "" {
+	return s.CreateEventForHost(ctx, details, details.Template.CalendarID)
+}
+
+// CreateEventForHost creates a calendar event in a specific provider calendar.
+func (s *CalendarService) CreateEventForHost(ctx context.Context, details *BookingWithDetails, providerCalendarID string) (string, error) {
+	if providerCalendarID == "" {
 		return "", nil
 	}
 
-	cal, err := s.repos.Calendar.GetByID(ctx, details.Template.CalendarID)
-	if err != nil || cal == nil {
+	pc, err := s.repos.ProviderCalendar.GetByID(ctx, providerCalendarID)
+	if err != nil {
+		return "", err
+	}
+	if pc == nil {
+		return "", ErrCalendarNotFound
+	}
+	if !pc.IsWritable {
+		return "", fmt.Errorf("calendar %s is not writable", pc.Name)
+	}
+	conn, err := s.repos.Calendar.GetByID(ctx, pc.ConnectionID)
+	if err != nil || conn == nil {
 		return "", ErrCalendarNotFound
 	}
 
-	switch cal.Provider {
+	view := *conn
+	switch conn.Provider {
 	case models.CalendarProviderGoogle:
-		return s.createGoogleEvent(ctx, cal, details)
+		view.CalendarID = pc.ProviderCalendarID
+		return s.createGoogleEvent(ctx, &view, details)
 	case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
-		return s.createCalDAVEvent(ctx, cal, details)
+		if pc.ProviderCalendarID != "" {
+			view.CalDAVURL = pc.ProviderCalendarID
+		}
+		return s.createCalDAVEvent(ctx, &view, details)
 	}
-
 	return "", nil
 }
 
-// CreateEventForHost creates a calendar event for a specific host and calendar (used for pooled hosts)
-func (s *CalendarService) CreateEventForHost(ctx context.Context, details *BookingWithDetails, calendarID string) (string, error) {
-	if calendarID == "" {
-		return "", nil
+// DeleteEvent deletes a calendar event from a provider calendar.
+func (s *CalendarService) DeleteEvent(ctx context.Context, hostID, providerCalendarID, eventID string) error {
+	pc, err := s.repos.ProviderCalendar.GetByID(ctx, providerCalendarID)
+	if err != nil {
+		return err
 	}
-
-	cal, err := s.repos.Calendar.GetByID(ctx, calendarID)
-	if err != nil || cal == nil {
-		return "", ErrCalendarNotFound
+	if pc == nil {
+		return ErrCalendarNotFound
 	}
-
-	switch cal.Provider {
-	case models.CalendarProviderGoogle:
-		return s.createGoogleEvent(ctx, cal, details)
-	case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
-		return s.createCalDAVEvent(ctx, cal, details)
-	}
-
-	return "", nil
-}
-
-// DeleteEvent deletes a calendar event
-func (s *CalendarService) DeleteEvent(ctx context.Context, hostID, calendarID, eventID string) error {
-	cal, err := s.repos.Calendar.GetByID(ctx, calendarID)
-	if err != nil || cal == nil || cal.HostID != hostID {
+	conn, err := s.repos.Calendar.GetByID(ctx, pc.ConnectionID)
+	if err != nil || conn == nil || conn.HostID != hostID {
 		return ErrCalendarNotFound
 	}
 
-	switch cal.Provider {
+	view := *conn
+	switch conn.Provider {
 	case models.CalendarProviderGoogle:
-		return s.deleteGoogleEvent(ctx, cal, eventID)
+		view.CalendarID = pc.ProviderCalendarID
+		return s.deleteGoogleEvent(ctx, &view, eventID)
 	case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
-		return s.deleteCalDAVEvent(ctx, cal, eventID)
+		if pc.ProviderCalendarID != "" {
+			view.CalDAVURL = pc.ProviderCalendarID
+		}
+		return s.deleteCalDAVEvent(ctx, &view, eventID)
 	}
-
 	return nil
 }
 
@@ -400,11 +653,6 @@ type googleTokenResponse struct {
 	RefreshToken string `json:"refresh_token"`
 	ExpiresIn    int    `json:"expires_in"`
 	TokenType    string `json:"token_type"`
-}
-
-type googleCalendarInfo struct {
-	ID   string
-	Name string
 }
 
 func (s *CalendarService) exchangeGoogleAuthCode(code, redirectURI string) (*googleTokenResponse, error) {
@@ -489,9 +737,28 @@ func (s *CalendarService) refreshGoogleToken(cal *models.CalendarConnection) err
 	return s.repos.Calendar.Update(context.Background(), cal)
 }
 
-func (s *CalendarService) getGoogleCalendarInfo(accessToken string) (*googleCalendarInfo, error) {
-	req, _ := http.NewRequest("GET", "https://www.googleapis.com/calendar/v3/calendars/primary", nil)
-	req.Header.Set("Authorization", "Bearer "+accessToken)
+// googleCalendarListItem mirrors the relevant fields of a Google CalendarList
+// resource (https://developers.google.com/calendar/api/v3/reference/calendarList#resource).
+type googleCalendarListItem struct {
+	ID              string `json:"id"`
+	Summary         string `json:"summary"`
+	SummaryOverride string `json:"summaryOverride"`
+	BackgroundColor string `json:"backgroundColor"`
+	Primary         bool   `json:"primary"`
+	AccessRole      string `json:"accessRole"`
+	Deleted         bool   `json:"deleted"`
+	Hidden          bool   `json:"hidden"`
+}
+
+// listGoogleCalendars returns every CalendarList entry for the connected
+// Google account. Hidden and deleted calendars are filtered out.
+func (s *CalendarService) listGoogleCalendars(ctx context.Context, conn *models.CalendarConnection) ([]googleCalendarListItem, error) {
+	if err := s.refreshGoogleToken(conn); err != nil {
+		return nil, err
+	}
+
+	req, _ := http.NewRequestWithContext(ctx, "GET", "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=250", nil)
+	req.Header.Set("Authorization", "Bearer "+conn.AccessToken)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -503,22 +770,122 @@ func (s *CalendarService) getGoogleCalendarInfo(accessToken string) (*googleCale
 		}
 	}()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode == http.StatusUnauthorized {
 		return nil, ErrCalendarAuth
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("calendarList request failed (%d): %s", resp.StatusCode, string(body))
 	}
 
 	var result struct {
-		ID      string `json:"id"`
-		Summary string `json:"summary"`
+		Items []googleCalendarListItem `json:"items"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 
-	return &googleCalendarInfo{
-		ID:   result.ID,
-		Name: result.Summary,
-	}, nil
+	out := make([]googleCalendarListItem, 0, len(result.Items))
+	for _, it := range result.Items {
+		if it.Deleted || it.Hidden {
+			continue
+		}
+		out = append(out, it)
+	}
+	return out, nil
+}
+
+// refreshGoogleCalendarList re-enumerates the connection's calendars from
+// Google and upserts them into provider_calendars. Calendars that have
+// disappeared at the provider are removed.
+func (s *CalendarService) refreshGoogleCalendarList(ctx context.Context, conn *models.CalendarConnection) ([]*models.ProviderCalendar, error) {
+	items, err := s.listGoogleCalendars(ctx, conn)
+	if err != nil {
+		return nil, err
+	}
+
+	var saved []*models.ProviderCalendar
+	keep := make([]string, 0, len(items))
+	for _, it := range items {
+		name := it.SummaryOverride
+		if name == "" {
+			name = it.Summary
+		}
+		isWritable := it.AccessRole == "owner" || it.AccessRole == "writer"
+		pc, err := s.repos.ProviderCalendar.UpsertFromProvider(
+			ctx, conn.ID, it.ID, name, normalizeColor(it.BackgroundColor),
+			it.Primary, isWritable,
+		)
+		if err != nil {
+			return nil, err
+		}
+		saved = append(saved, pc)
+		keep = append(keep, it.ID)
+	}
+
+	if err := s.repos.ProviderCalendar.DeleteMissing(ctx, conn.ID, keep); err != nil {
+		log.Printf("[CALENDAR] DeleteMissing failed for connection %s: %v", conn.ID, err)
+	}
+
+	// Assign palette colors to provider calendars that didn't get a usable
+	// provider-supplied color, keeping prior assignments stable.
+	AssignProviderCalendarColors(saved)
+	for _, pc := range saved {
+		_ = s.repos.ProviderCalendar.UpdateColor(ctx, conn.HostID, pc.ID, pc.Color)
+	}
+
+	return saved, nil
+}
+
+// primaryProviderCalendar returns the connection's primary calendar (or the
+// first one if none flagged primary). Used to populate the legacy
+// CalendarConnection.calendar_id / Name fields.
+func (s *CalendarService) primaryProviderCalendar(ctx context.Context, connectionID string) (*models.ProviderCalendar, error) {
+	calendars, err := s.repos.ProviderCalendar.GetByConnectionID(ctx, connectionID)
+	if err != nil {
+		return nil, err
+	}
+	for _, pc := range calendars {
+		if pc.IsPrimary {
+			return pc, nil
+		}
+	}
+	if len(calendars) > 0 {
+		return calendars[0], nil
+	}
+	return nil, nil
+}
+
+// normalizeColor uppercases a hex color to match the canonical palette form.
+// Empty and malformed values are returned as the empty string so AssignColors
+// can replace them with a palette entry.
+func normalizeColor(c string) string {
+	c = strings.TrimSpace(c)
+	if len(c) != 7 || c[0] != '#' {
+		return ""
+	}
+	return strings.ToUpper(c)
+}
+
+// busyTimesForProviderCalendar fetches busy times from the upstream provider
+// for a single calendar. It dispatches by provider and synthesizes the
+// per-call inputs the legacy single-calendar implementations need.
+func (s *CalendarService) busyTimesForProviderCalendar(ctx context.Context, conn *models.CalendarConnection, pc *models.ProviderCalendar, start, end time.Time) ([]models.TimeSlot, error) {
+	switch conn.Provider {
+	case models.CalendarProviderGoogle:
+		// Use a temporary connection struct overriding CalendarID with this
+		// sub-calendar's id so the existing freebusy implementation can be reused.
+		view := *conn
+		view.CalendarID = pc.ProviderCalendarID
+		return s.getGoogleBusyTimes(ctx, &view, start, end)
+	case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
+		view := *conn
+		if pc.ProviderCalendarID != "" {
+			view.CalDAVURL = pc.ProviderCalendarID
+		}
+		return s.getCalDAVBusyTimes(ctx, &view, start, end)
+	}
+	return nil, nil
 }
 
 func (s *CalendarService) getGoogleBusyTimes(ctx context.Context, cal *models.CalendarConnection, start, end time.Time) ([]models.TimeSlot, error) {
@@ -1188,44 +1555,82 @@ type AgendaEvent struct {
 	IsAllDay      bool      `json:"is_all_day"`
 }
 
-// GetAgendaEvents returns events from all connected calendars for a host within the given time range
+// GetAgendaEvents returns events from all polled provider calendars for a host
+// within the given time range.
 func (s *CalendarService) GetAgendaEvents(ctx context.Context, hostID string, startDate, endDate time.Time) ([]AgendaEvent, error) {
-	calendars, err := s.repos.Calendar.GetByHostID(ctx, hostID)
+	tree, err := s.GetCalendarTree(ctx, hostID)
 	if err != nil {
 		return nil, err
 	}
-	return s.GetAgendaEventsWithCalendars(ctx, calendars, nil, startDate, endDate)
+	return s.GetAgendaEventsWithCalendars(ctx, tree, nil, startDate, endDate)
 }
 
-// GetAgendaEventsWithCalendars fetches events for the provided calendars without reloading from DB.
-// host is accepted for future use (e.g. timezone) and may be nil.
-func (s *CalendarService) GetAgendaEventsWithCalendars(ctx context.Context, calendars []*models.CalendarConnection, host *models.Host, start, end time.Time) ([]AgendaEvent, error) {
+// GetAgendaEventsWithCalendars fetches events for the provided connections (each
+// pre-populated with .Calendars) without reloading from DB. Host is accepted
+// for future use (e.g. timezone) and may be nil.
+//
+// Only provider calendars with poll_busy=true contribute events to the agenda.
+func (s *CalendarService) GetAgendaEventsWithCalendars(ctx context.Context, connections []*models.CalendarConnection, host *models.Host, start, end time.Time) ([]AgendaEvent, error) {
 	var allEvents []AgendaEvent
 
-	for _, cal := range calendars {
-		var events []AgendaEvent
-		var fetchErr error
-
-		switch cal.Provider {
-		case models.CalendarProviderGoogle:
-			events, fetchErr = s.getGoogleAgendaEvents(ctx, cal, start, end)
-		case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
-			events, fetchErr = s.getCalDAVAgendaEvents(ctx, cal, start, end)
+	for _, conn := range connections {
+		for _, pc := range conn.Calendars {
+			if !pc.PollBusy {
+				continue
+			}
+			events, fetchErr := s.agendaEventsForProviderCalendar(ctx, conn, pc, start, end)
+			if fetchErr != nil {
+				log.Printf("Failed to fetch agenda events from calendar %s (%s): %v", pc.Name, pc.ID, fetchErr)
+				continue
+			}
+			allEvents = append(allEvents, events...)
 		}
-
-		if fetchErr != nil {
-			// Log but continue with other calendars (handle errors gracefully)
-			log.Printf("Failed to fetch agenda events from calendar %s (%s): %v", cal.Name, cal.ID, fetchErr)
-			continue
-		}
-
-		allEvents = append(allEvents, events...)
 	}
 
-	// Sort events by start time
 	sortAgendaEvents(allEvents)
-
 	return allEvents, nil
+}
+
+func (s *CalendarService) agendaEventsForProviderCalendar(ctx context.Context, conn *models.CalendarConnection, pc *models.ProviderCalendar, start, end time.Time) ([]AgendaEvent, error) {
+	view := *conn
+	color := pc.Color
+	if color == "" {
+		color = conn.Color
+	}
+	view.Color = color
+	view.Name = pc.Name
+
+	switch conn.Provider {
+	case models.CalendarProviderGoogle:
+		view.CalendarID = pc.ProviderCalendarID
+		events, err := s.getGoogleAgendaEvents(ctx, &view, start, end)
+		if err != nil {
+			return nil, err
+		}
+		// Re-key events to the provider_calendars id so the agenda UI can
+		// resolve color/name from the correct row.
+		for i := range events {
+			events[i].CalendarID = pc.ID
+			events[i].CalendarColor = color
+			events[i].CalendarName = pc.Name
+		}
+		return events, nil
+	case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
+		if pc.ProviderCalendarID != "" {
+			view.CalDAVURL = pc.ProviderCalendarID
+		}
+		events, err := s.getCalDAVAgendaEvents(ctx, &view, start, end)
+		if err != nil {
+			return nil, err
+		}
+		for i := range events {
+			events[i].CalendarID = pc.ID
+			events[i].CalendarColor = color
+			events[i].CalendarName = pc.Name
+		}
+		return events, nil
+	}
+	return nil, nil
 }
 
 // sortAgendaEvents sorts events by start time ascending.

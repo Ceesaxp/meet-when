@@ -800,19 +800,28 @@ func (s *BookingService) createPooledHostCalendarEvents(ctx context.Context, det
 			}
 		}
 
-		// Find the host's default calendar
+		// Find the host's default provider calendar (writable). Falls back to
+		// any writable provider calendar if none is configured.
 		var calendarID string
 		if host.DefaultCalendarID != nil {
 			calendarID = *host.DefaultCalendarID
 		}
 		if calendarID == "" {
-			// Try to find any connected calendar
-			calendars, err := s.repos.Calendar.GetByHostID(ctx, th.HostID)
-			if err != nil || len(calendars) == 0 {
+			pcs, err := s.repos.ProviderCalendar.GetByHostID(ctx, th.HostID)
+			if err != nil {
 				log.Printf("[BOOKING] No calendar found for host %s, skipping event creation", th.HostID)
 				continue
 			}
-			calendarID = calendars[0].ID
+			for _, pc := range pcs {
+				if pc.IsWritable {
+					calendarID = pc.ID
+					break
+				}
+			}
+			if calendarID == "" {
+				log.Printf("[BOOKING] No writable calendar for host %s, skipping event creation", th.HostID)
+				continue
+			}
 		}
 
 		// Create a modified details with this host's info for event creation

@@ -60,7 +60,7 @@ func (s *AgendaService) GetDay(ctx context.Context, hostID string, date time.Tim
 		loc = time.UTC
 	}
 
-	calendars, err := s.repos.Calendar.GetByHostID(ctx, hostID)
+	calendars, err := s.calendar.GetCalendarTree(ctx, hostID)
 	if err != nil {
 		return nil, fmt.Errorf("load calendars: %w", err)
 	}
@@ -107,7 +107,7 @@ func (s *AgendaService) GetWeek(ctx context.Context, hostID string, weekStart ti
 		loc = time.UTC
 	}
 
-	calendars, err := s.repos.Calendar.GetByHostID(ctx, hostID)
+	calendars, err := s.calendar.GetCalendarTree(ctx, hostID)
 	if err != nil {
 		return nil, fmt.Errorf("load calendars: %w", err)
 	}

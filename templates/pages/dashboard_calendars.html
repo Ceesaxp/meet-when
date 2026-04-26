@@ -67,10 +67,17 @@
         </div>
         {{end}}
 
-        <div class="calendar-color-picker">
-            {{template "color_swatch_fieldset.html" (dict "CalendarID" .ID "CurrentColor" .Color "Palette" $.Data.Palette)}}
+        {{if .Calendars}}
+        <div class="sub-calendars" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--gray-100);">
+            {{range .Calendars}}
+            {{template "sub_calendar_row.html" (dict "Calendar" . "Palette" $.Data.Palette "DefaultCalendarID" $.Data.DefaultCalendarID)}}
+            {{end}}
         </div>
-        <div class="calendar-actions">
+        {{else}}
+        <p class="form-hint">No calendars discovered yet. Click Refresh to enumerate this account's calendars.</p>
+        {{end}}
+
+        <div class="calendar-actions" style="margin-top: 16px;">
             <button type="button" class="btn-sm"
                     hx-post="/dashboard/calendars/{{.ID}}/refresh"
                     hx-target="#calendar-card-{{.ID}}"
@@ -79,11 +86,6 @@
                     hx-indicator="closest .calendar-card">
                 Refresh
             </button>
-            {{if not .IsDefault}}
-            <form action="/dashboard/calendars/{{.ID}}/default" method="POST" style="display:inline">
-                <button type="submit" class="btn-sm">Set Default</button>
-            </form>
-            {{end}}
             <form action="/dashboard/calendars/{{.ID}}/disconnect" method="POST" style="display:inline">
                 <button type="submit" class="btn-sm btn-danger" onclick="return confirm('Disconnect this calendar?')">Disconnect</button>
             </form>

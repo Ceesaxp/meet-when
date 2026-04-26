@@ -1,5 +1,5 @@
 {{define "calendar_card_partial.html"}}
-<div class="calendar-card" id="calendar-card-{{.Calendar.ID}}">
+<div class="calendar-card" id="calendar-card-{{.Calendar.ID}}"{{if .OOB}} hx-swap-oob="true"{{end}}>
     <div class="calendar-header">
         <div class="calendar-info">
             <div class="calendar-icon {{if eq (printf "%s" .Calendar.Provider) "google"}}google{{else}}icloud{{end}}">
@@ -53,21 +53,21 @@
     </div>
     {{end}}
 
-    <div class="calendar-color-picker">
-        {{template "color_swatch_fieldset.html" (dict "CalendarID" .Calendar.ID "CurrentColor" .Calendar.Color "Palette" .Palette)}}
+    {{if .Calendar.Calendars}}
+    <div class="sub-calendars" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--gray-100);">
+        {{range .Calendar.Calendars}}
+        {{template "sub_calendar_row.html" (dict "Calendar" . "Palette" $.Palette "DefaultCalendarID" $.DefaultCalendarID)}}
+        {{end}}
     </div>
-    <div class="calendar-actions">
+    {{end}}
+
+    <div class="calendar-actions" style="margin-top: 16px;">
         <button type="button" class="btn-sm"
                 hx-post="/dashboard/calendars/{{.Calendar.ID}}/refresh"
                 hx-target="#calendar-card-{{.Calendar.ID}}"
                 hx-swap="outerHTML">
             Refresh
         </button>
-        {{if not .Calendar.IsDefault}}
-        <form action="/dashboard/calendars/{{.Calendar.ID}}/default" method="POST" style="display:inline">
-            <button type="submit" class="btn-sm">Set Default</button>
-        </form>
-        {{end}}
         <form action="/dashboard/calendars/{{.Calendar.ID}}/disconnect" method="POST" style="display:inline">
             <button type="submit" class="btn-sm btn-danger" onclick="return confirm('Disconnect this calendar?')">Disconnect</button>
         </form>
