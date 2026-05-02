@@ -1,0 +1,92 @@
+{{define "booking_edit_partial.html"}}
+<div class="modal-overlay" onclick="closeBookingModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h2>Edit Booking</h2>
+            <button type="button" class="modal-close" onclick="closeBookingModal()" aria-label="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        <form action="/dashboard/bookings/{{.Booking.ID}}/edit" method="POST">
+            <div class="modal-body">
+                {{if .FormError}}
+                <div class="alert alert-error" style="margin-bottom: 1rem;">
+                    {{if eq .FormError "reauth_required"}}
+                    Could not regenerate the conference link — your conferencing connection needs to be re-authorized. <a href="/dashboard/calendars">Reconnect</a> and try again.
+                    {{else if eq .FormError "update_failed"}}
+                    Sorry, something went wrong saving the changes. Please try again.
+                    {{else}}
+                    {{.FormError}}
+                    {{end}}
+                </div>
+                {{end}}
+
+                <div class="booking-detail-section">
+                    <h3>Meeting</h3>
+                    <div class="booking-detail-row">
+                        <span class="label">Type</span>
+                        <span class="value">{{if .Template}}{{.Template.Name}}{{else}}Unknown{{end}}</span>
+                    </div>
+                    <div class="booking-detail-row">
+                        <span class="label">When</span>
+                        <span class="value">
+                            {{formatDateInTZ .Booking.StartTime .HostTimezone}},
+                            {{formatTimeInTZ .Booking.StartTime .HostTimezone}} - {{formatTimeInTZ .Booking.EndTime .HostTimezone}}
+                            {{tzAbbrev .HostTimezone .Booking.StartTime}}
+                        </span>
+                    </div>
+                    <div class="booking-detail-row">
+                        <span class="label">Guest</span>
+                        <span class="value">{{.Booking.InviteeName}} &lt;{{.Booking.InviteeEmail}}&gt;</span>
+                    </div>
+                </div>
+
+                <div class="booking-detail-section">
+                    <h3>Notes from host</h3>
+                    <p class="text-muted" style="font-size: 0.85em; margin-top: 0;">Visible to attendees in the calendar invitation. Use this to add an agenda or context.</p>
+                    <textarea name="host_notes" rows="4" class="form-control" placeholder="Add a note for the attendees…">{{.HostNotes}}</textarea>
+                </div>
+
+                <div class="booking-detail-section">
+                    <h3>Additional guests</h3>
+                    <p class="text-muted" style="font-size: 0.85em; margin-top: 0;">One email per line. Added guests will receive the updated calendar invitation.</p>
+                    <textarea name="additional_guests" rows="3" class="form-control" placeholder="alice@example.com&#10;bob@example.com">{{.AdditionalGuestsString}}</textarea>
+                </div>
+
+                <div class="booking-detail-section">
+                    <h3>Conference link</h3>
+                    {{if .Booking.ConferenceLink}}
+                    <div class="booking-detail-row">
+                        <span class="label">Current</span>
+                        <a href="{{.Booking.ConferenceLink}}" target="_blank" class="value link">{{.Booking.ConferenceLink}}</a>
+                    </div>
+                    {{else}}
+                    <p class="text-muted" style="font-size: 0.9em;">No conference link is currently attached.</p>
+                    {{end}}
+
+                    {{if or (eq .Template.LocationType "zoom") (eq .Template.LocationType "google_meet")}}
+                    <div class="form-row" style="margin-top: 0.75rem;">
+                        <label style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                            <input type="checkbox" name="regenerate_link" value="1">
+                            Regenerate {{if eq .Template.LocationType "zoom"}}Zoom{{else}}Google Meet{{end}} link
+                        </label>
+                    </div>
+                    {{end}}
+
+                    <div class="form-row" style="margin-top: 0.75rem;">
+                        <label for="conference_link_input" style="display:block; font-size: 0.9em;">Or set a custom link (leave unchanged to keep the current value):</label>
+                        <input type="url" id="conference_link_input" name="conference_link" class="form-control" placeholder="https://…" value="{{.Booking.ConferenceLink}}">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeBookingModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+{{end}}

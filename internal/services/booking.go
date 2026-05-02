@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -348,6 +349,218 @@ func (s *BookingService) deleteAllCalendarEvents(ctx context.Context, booking *m
 			}
 		}
 	}
+}
+
+// UpdateBookingInput captures the host-editable fields of a confirmed booking.
+// Each pointer is nil if that field is not being changed; non-nil means
+// "replace with this value". RegenerateConferenceLink is a separate one-shot
+// action: when true the existing link is replaced by a freshly created one
+// using the template's configured provider (used to recover after a Zoom
+// reauth — see issue #38).
+type UpdateBookingInput struct {
+	HostID                   string
+	TenantID                 string
+	BookingID                string
+	HostNotes                *string
+	AdditionalGuests         *[]string
+	ConferenceLink           *string
+	RegenerateConferenceLink bool
+}
+
+// UpdateBooking applies host edits to an existing confirmed booking and
+// distributes an updated calendar invitation. Returns the (possibly modified)
+// list of fields that actually changed so the audit log and email reflect the
+// real diff. ErrConferencingReauthRequired is returned untouched if the host
+// asked to regenerate a link but the conferencing token is dead — the caller
+// should surface a "reconnect first" message.
+func (s *BookingService) UpdateBooking(ctx context.Context, input UpdateBookingInput) (*BookingWithDetails, []string, error) {
+	booking, err := s.repos.Booking.GetByID(ctx, input.BookingID)
+	if err != nil || booking == nil || booking.HostID != input.HostID {
+		return nil, nil, ErrBookingNotFound
+	}
+	if booking.Status != models.BookingStatusConfirmed {
+		return nil, nil, errors.New("only confirmed bookings can be edited")
+	}
+
+	template, err := s.repos.Template.GetByID(ctx, booking.TemplateID)
+	if err != nil || template == nil {
+		return nil, nil, ErrTemplateNotFound
+	}
+	host, _ := s.repos.Host.GetByID(ctx, booking.HostID)
+	tenant, _ := s.repos.Tenant.GetByID(ctx, input.TenantID)
+	details := &BookingWithDetails{
+		Booking:  booking,
+		Template: template,
+		Host:     host,
+		Tenant:   tenant,
+	}
+
+	var changed []string
+
+	if input.HostNotes != nil {
+		if booking.Answers == nil {
+			booking.Answers = models.JSONMap{}
+		}
+		old, _ := booking.Answers["host_notes"].(string)
+		if old != *input.HostNotes {
+			if *input.HostNotes == "" {
+				delete(booking.Answers, "host_notes")
+			} else {
+				booking.Answers["host_notes"] = *input.HostNotes
+			}
+			changed = append(changed, "notes")
+		}
+	}
+
+	if input.AdditionalGuests != nil {
+		oldList := append([]string(nil), booking.AdditionalGuests...)
+		newList := normalizeGuestList(*input.AdditionalGuests)
+		if !sameStringSlice(oldList, newList) {
+			booking.AdditionalGuests = newList
+			changed = append(changed, "additional guests")
+		}
+	}
+
+	if input.RegenerateConferenceLink {
+		// Clear existing link and re-create using the template's provider.
+		// On reauth-required, we surface the typed error to the handler so the
+		// UI can prompt the host to reconnect — booking state is left intact.
+		link, err := s.conferencing.CreateMeeting(ctx, details)
+		if err != nil {
+			if errors.Is(err, ErrConferencingReauthRequired) {
+				return details, nil, err
+			}
+			return details, nil, fmt.Errorf("regenerate conference link: %w", err)
+		}
+		if link != "" && link != booking.ConferenceLink {
+			booking.ConferenceLink = link
+			changed = append(changed, "conference link")
+			// Successful regeneration clears any prior _conference_error marker.
+			if booking.Answers != nil {
+				delete(booking.Answers, "_conference_error")
+			}
+		}
+	} else if input.ConferenceLink != nil && *input.ConferenceLink != booking.ConferenceLink {
+		booking.ConferenceLink = *input.ConferenceLink
+		changed = append(changed, "conference link")
+		if booking.Answers != nil {
+			delete(booking.Answers, "_conference_error")
+		}
+	}
+
+	if len(changed) == 0 {
+		return details, nil, nil
+	}
+
+	booking.UpdatedAt = models.Now()
+	if err := s.repos.Booking.Update(ctx, booking); err != nil {
+		return details, nil, err
+	}
+
+	// Push the changes to the host's calendar so attendees get an updated
+	// invitation. We try the legacy single-host event first, then fall through
+	// to any pooled-host events so all calendars stay in sync.
+	s.updateAllCalendarEvents(ctx, details, template)
+
+	if tenant != nil && host != nil {
+		s.email.SendBookingUpdated(ctx, details, changed)
+	}
+
+	hostID := input.HostID
+	tenantID := input.TenantID
+	s.auditLog.Log(ctx, tenantID, &hostID, "booking.updated", "booking", booking.ID, models.JSONMap{
+		"changed_fields": changed,
+	}, "")
+
+	return details, changed, nil
+}
+
+// updateAllCalendarEvents patches the calendar event(s) for a booking after a
+// host edit. Mirrors deleteAllCalendarEvents: pooled-host events live in
+// booking_calendar_events; legacy single-host bookings have only
+// booking.CalendarEventID with template.CalendarID as the calendar.
+func (s *BookingService) updateAllCalendarEvents(ctx context.Context, details *BookingWithDetails, template *models.MeetingTemplate) {
+	calEvents, err := s.repos.BookingCalendarEvent.GetByBookingID(ctx, details.Booking.ID)
+	if err != nil {
+		log.Printf("[BOOKING] Error loading calendar events for booking %s: %v", details.Booking.ID, err)
+	}
+
+	if len(calEvents) > 0 {
+		for _, ce := range calEvents {
+			perHost := &BookingWithDetails{
+				Booking:  details.Booking,
+				Template: template,
+				Host:     details.Host,
+				Tenant:   details.Tenant,
+			}
+			// Force the per-host event ID through CalendarEventID so the
+			// PATCH targets the correct event for this calendar.
+			savedID := perHost.Booking.CalendarEventID
+			perHost.Booking.CalendarEventID = ce.EventID
+			newID, err := s.calendar.UpdateEvent(ctx, perHost, ce.CalendarID)
+			perHost.Booking.CalendarEventID = savedID
+			if err != nil {
+				log.Printf("[BOOKING] Error updating calendar event %s for host %s: %v", ce.EventID, ce.HostID, err)
+				continue
+			}
+			if newID != "" && newID != ce.EventID {
+				// CalDAV path replaced the event; persist the new ID.
+				ce.EventID = newID
+				if err := s.repos.BookingCalendarEvent.Update(ctx, ce); err != nil {
+					log.Printf("[BOOKING] Error updating booking_calendar_events record: %v", err)
+				}
+			}
+		}
+		return
+	}
+
+	if details.Booking.CalendarEventID != "" && template.CalendarID != "" {
+		newID, err := s.calendar.UpdateEvent(ctx, details, template.CalendarID)
+		if err != nil {
+			log.Printf("[BOOKING] Error updating legacy calendar event: %v", err)
+			return
+		}
+		if newID != "" && newID != details.Booking.CalendarEventID {
+			details.Booking.CalendarEventID = newID
+			// Persist the swapped ID so reschedule/cancel still find the event.
+			if err := s.repos.Booking.Update(ctx, details.Booking); err != nil {
+				log.Printf("[BOOKING] Error persisting new event ID: %v", err)
+			}
+		}
+	}
+}
+
+func normalizeGuestList(in []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(in))
+	for _, g := range in {
+		g = strings.TrimSpace(g)
+		if g == "" {
+			continue
+		}
+		if !strings.Contains(g, "@") {
+			continue
+		}
+		key := strings.ToLower(g)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, g)
+	}
+	return out
+}
+
+func sameStringSlice(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // CancelBookingByToken cancels a booking using the public token (for invitee cancellation)
@@ -740,6 +953,7 @@ func (s *BookingService) processConfirmedBooking(ctx context.Context, details *B
 		link, err := s.conferencing.CreateMeeting(ctx, details)
 		if err != nil {
 			log.Printf("[BOOKING] Error creating conference link: %v", err)
+			s.recordConferencingFailure(ctx, details, err)
 		} else if link != "" {
 			log.Printf("[BOOKING] Conference link created: %s", link)
 			details.Booking.ConferenceLink = link
@@ -860,5 +1074,37 @@ func (s *BookingService) createPooledHostCalendarEvents(ctx context.Context, det
 				details.Booking.CalendarEventID = eventID
 			}
 		}
+	}
+}
+
+// recordConferencingFailure marks a booking with a conferencing-link failure so
+// the dashboard surfaces it (similar to calendar sync failures), and notifies
+// the host. The booking itself is still confirmed — issue #38 explicitly asks
+// us to "create a booking regardless".
+func (s *BookingService) recordConferencingFailure(ctx context.Context, details *BookingWithDetails, cause error) {
+	if details.Booking.Answers == nil {
+		details.Booking.Answers = models.JSONMap{}
+	}
+	reason := "transient"
+	if errors.Is(cause, ErrConferencingReauthRequired) {
+		reason = "reauth_required"
+	}
+	details.Booking.Answers["_conference_error"] = map[string]any{
+		"provider": string(details.Template.LocationType),
+		"reason":   reason,
+		"message":  cause.Error(),
+		"at":       time.Now().UTC().Format(time.RFC3339),
+	}
+
+	// Load host (may not be populated on details) for the notification email.
+	host := details.Host
+	if host == nil {
+		h, hErr := s.repos.Host.GetByID(ctx, details.Booking.HostID)
+		if hErr == nil {
+			host = h
+		}
+	}
+	if host != nil {
+		s.email.SendConferencingFailed(ctx, host, string(details.Template.LocationType), reason, cause.Error())
 	}
 }

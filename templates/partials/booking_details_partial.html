@@ -205,6 +205,12 @@
             {{end}}
         </div>
         <div class="modal-footer">
+            {{if and .Booking (eq .Booking.Status "confirmed")}}
+            <button type="button" class="btn btn-primary"
+                    hx-get="/dashboard/bookings/{{.Booking.ID}}/edit"
+                    hx-target=".modal-overlay"
+                    hx-swap="outerHTML">Edit</button>
+            {{end}}
             <button type="button" class="btn btn-outline" onclick="closeBookingModal()">Close</button>
         </div>
     </div>
