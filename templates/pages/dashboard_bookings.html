@@ -241,6 +241,18 @@ function openBookingModal(bookingId) {
         });
 }
 
+function openBookingEditModal(bookingId) {
+    fetch('/dashboard/bookings/' + bookingId + '/edit')
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById('booking-modal').innerHTML = html;
+            document.body.classList.add('modal-open');
+        })
+        .catch(error => {
+            console.error('Error loading booking edit form:', error);
+        });
+}
+
 function closeBookingModal(event) {
     if (event && event.target !== event.currentTarget) return;
     document.getElementById('booking-modal').innerHTML = '';
