@@ -3269,6 +3269,115 @@ body.modal-open {
 }
 
 /* ============================================
+   Booking Edit Modal
+   ============================================ */
+.modal-content-wide {
+    max-width: 640px;
+}
+
+.booking-edit-alert {
+    margin-bottom: 20px;
+}
+
+.booking-edit-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+    margin-bottom: 24px;
+    background: var(--gray-100);
+    border-radius: var(--radius-md);
+    flex-wrap: wrap;
+}
+
+.booking-edit-summary-meta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.booking-edit-summary-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.booking-edit-summary-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--black);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.booking-edit-summary-when {
+    font-size: 0.85rem;
+    color: var(--gray-700);
+    white-space: nowrap;
+}
+
+.booking-edit-current-link {
+    word-break: break-all;
+}
+
+.form-section.form-section-last {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.form-input.form-input-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Cascadia Mono", monospace;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.radio-cards.radio-cards-stacked {
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+
+.radio-cards-stacked .radio-card {
+    padding: 12px 14px;
+}
+
+.booking-edit-custom-url {
+    margin-top: 12px;
+    margin-bottom: 0;
+}
+
+.booking-edit-custom-url[hidden] {
+    display: none;
+}
+
+/* Visually-hidden labels (kept for screen readers) */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+@media (max-width: 600px) {
+    .booking-edit-summary {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .booking-edit-summary-when {
+        white-space: normal;
+    }
+}
+
+/* ============================================
    Filter Bar / Filters
    ============================================ */
 .filters {

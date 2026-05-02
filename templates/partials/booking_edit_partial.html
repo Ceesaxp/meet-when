@@ -1,8 +1,8 @@
 {{define "booking_edit_partial.html"}}
 <div class="modal-overlay" onclick="closeBookingModal(event)">
-    <div class="modal-content" onclick="event.stopPropagation()">
+    <div class="modal-content modal-content-wide" onclick="event.stopPropagation()">
         <div class="modal-header">
-            <h2>Edit Booking</h2>
+            <h2>Edit booking</h2>
             <button type="button" class="modal-close" onclick="closeBookingModal()" aria-label="Close">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
                     <line x1="18" y1="6" x2="6" y2="18"/>
@@ -10,83 +10,178 @@
                 </svg>
             </button>
         </div>
-        <form action="/dashboard/bookings/{{.Booking.ID}}/edit" method="POST">
+        <form action="/dashboard/bookings/{{.Booking.ID}}/edit" method="POST" id="booking-edit-form" onsubmit="return bookingEditOnSubmit(this)">
             <div class="modal-body">
                 {{if .FormError}}
-                <div class="alert alert-error" style="margin-bottom: 1rem;">
-                    {{if eq .FormError "reauth_required"}}
-                    Could not regenerate the conference link — your conferencing connection needs to be re-authorized. <a href="/dashboard/calendars">Reconnect</a> and try again.
-                    {{else if eq .FormError "update_failed"}}
-                    Sorry, something went wrong saving the changes. Please try again.
-                    {{else}}
-                    {{.FormError}}
-                    {{end}}
+                <div class="alert alert-error booking-edit-alert">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" aria-hidden="true">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    <div>
+                        {{if eq .FormError "reauth_required"}}
+                        Couldn't regenerate the conference link — your conferencing connection needs to be re-authorized. <a href="/dashboard/calendars">Reconnect</a> and try again.
+                        {{else if eq .FormError "update_failed"}}
+                        Something went wrong saving your changes. Please try again.
+                        {{else if eq .FormError "invalid_form"}}
+                        We couldn't read the form data. Please try again.
+                        {{else}}
+                        {{.FormError}}
+                        {{end}}
+                    </div>
                 </div>
                 {{end}}
 
-                <div class="booking-detail-section">
-                    <h3>Meeting</h3>
-                    <div class="booking-detail-row">
-                        <span class="label">Type</span>
-                        <span class="value">{{if .Template}}{{.Template.Name}}{{else}}Unknown{{end}}</span>
+                <div class="booking-edit-summary">
+                    <div class="booking-edit-summary-meta">
+                        <span class="booking-edit-summary-label">Editing</span>
+                        <span class="booking-edit-summary-title">{{if .Template}}{{.Template.Name}}{{else}}Meeting{{end}} with {{.Booking.InviteeName}}</span>
                     </div>
-                    <div class="booking-detail-row">
-                        <span class="label">When</span>
-                        <span class="value">
-                            {{formatDateInTZ .Booking.StartTime .HostTimezone}},
-                            {{formatTimeInTZ .Booking.StartTime .HostTimezone}} - {{formatTimeInTZ .Booking.EndTime .HostTimezone}}
-                            {{tzAbbrev .HostTimezone .Booking.StartTime}}
-                        </span>
-                    </div>
-                    <div class="booking-detail-row">
-                        <span class="label">Guest</span>
-                        <span class="value">{{.Booking.InviteeName}} &lt;{{.Booking.InviteeEmail}}&gt;</span>
+                    <div class="booking-edit-summary-when">
+                        {{formatDateInTZ .Booking.StartTime .HostTimezone}} ·
+                        {{formatTimeInTZ .Booking.StartTime .HostTimezone}}–{{formatTimeInTZ .Booking.EndTime .HostTimezone}}
+                        {{tzAbbrev .HostTimezone .Booking.StartTime}}
                     </div>
                 </div>
 
-                <div class="booking-detail-section">
-                    <h3>Notes from host</h3>
-                    <p class="text-muted" style="font-size: 0.85em; margin-top: 0;">Visible to attendees in the calendar invitation. Use this to add an agenda or context.</p>
-                    <textarea name="host_notes" rows="4" class="form-control" placeholder="Add a note for the attendees…">{{.HostNotes}}</textarea>
+                <div class="form-section">
+                    <h3>Notes for attendees</h3>
+                    <p class="form-section-description">Added to the calendar invitation under "Notes from host". Useful for an agenda or last-minute context.</p>
+                    <div class="form-group">
+                        <label class="form-label sr-only" for="host_notes">Notes</label>
+                        <textarea id="host_notes" name="host_notes" rows="4" class="form-input" placeholder="What should attendees know before the meeting?">{{.HostNotes}}</textarea>
+                    </div>
                 </div>
 
-                <div class="booking-detail-section">
+                <div class="form-section">
                     <h3>Additional guests</h3>
-                    <p class="text-muted" style="font-size: 0.85em; margin-top: 0;">One email per line. Added guests will receive the updated calendar invitation.</p>
-                    <textarea name="additional_guests" rows="3" class="form-control" placeholder="alice@example.com&#10;bob@example.com">{{.AdditionalGuestsString}}</textarea>
+                    <p class="form-section-description">One email per line. Added guests will receive the updated invitation; removed guests will be uninvited.</p>
+                    <div class="form-group">
+                        <label class="form-label sr-only" for="additional_guests">Additional guests</label>
+                        <textarea id="additional_guests" name="additional_guests" rows="3" class="form-input form-input-mono" placeholder="alice@example.com&#10;bob@example.com">{{.AdditionalGuestsString}}</textarea>
+                    </div>
                 </div>
 
-                <div class="booking-detail-section">
+                <div class="form-section form-section-last">
                     <h3>Conference link</h3>
-                    {{if .Booking.ConferenceLink}}
-                    <div class="booking-detail-row">
-                        <span class="label">Current</span>
-                        <a href="{{.Booking.ConferenceLink}}" target="_blank" class="value link">{{.Booking.ConferenceLink}}</a>
-                    </div>
-                    {{else}}
-                    <p class="text-muted" style="font-size: 0.9em;">No conference link is currently attached.</p>
-                    {{end}}
+                    <p class="form-section-description">
+                        {{if .Booking.ConferenceLink}}
+                        Currently: <a href="{{.Booking.ConferenceLink}}" target="_blank" rel="noopener" class="booking-edit-current-link">{{.Booking.ConferenceLink}}</a>
+                        {{else}}
+                        No conference link is currently attached.
+                        {{end}}
+                    </p>
 
-                    {{if or (eq .Template.LocationType "zoom") (eq .Template.LocationType "google_meet")}}
-                    <div class="form-row" style="margin-top: 0.75rem;">
-                        <label style="display: inline-flex; align-items: center; gap: 0.5rem;">
-                            <input type="checkbox" name="regenerate_link" value="1">
-                            Regenerate {{if eq .Template.LocationType "zoom"}}Zoom{{else}}Google Meet{{end}} link
+                    <div class="radio-cards radio-cards-stacked" role="radiogroup" aria-label="Conference link action">
+                        <label class="radio-card" data-action="keep">
+                            <input type="radio" name="conference_link_action" value="keep" checked>
+                            <span class="radio-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                            </span>
+                            <span class="radio-content">
+                                <span class="radio-label">Keep current link</span>
+                                <span class="radio-description">Don't change the conference link.</span>
+                            </span>
+                        </label>
+
+                        {{if or (eq .Template.LocationType "zoom") (eq .Template.LocationType "google_meet")}}
+                        <label class="radio-card" data-action="regenerate">
+                            <input type="radio" name="conference_link_action" value="regenerate">
+                            <span class="radio-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                                    <polyline points="23 4 23 10 17 10"/>
+                                    <polyline points="1 20 1 14 7 14"/>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                                </svg>
+                            </span>
+                            <span class="radio-content">
+                                <span class="radio-label">Regenerate {{if eq .Template.LocationType "zoom"}}Zoom{{else}}Google Meet{{end}} link</span>
+                                <span class="radio-description">Create a fresh link from your connected {{if eq .Template.LocationType "zoom"}}Zoom{{else}}Google{{end}} account.</span>
+                            </span>
+                        </label>
+                        {{end}}
+
+                        <label class="radio-card" data-action="custom">
+                            <input type="radio" name="conference_link_action" value="custom">
+                            <span class="radio-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                                </svg>
+                            </span>
+                            <span class="radio-content">
+                                <span class="radio-label">Use a custom URL</span>
+                                <span class="radio-description">Paste any meeting URL — Whereby, Teams, an internal bridge, etc.</span>
+                            </span>
                         </label>
                     </div>
-                    {{end}}
 
-                    <div class="form-row" style="margin-top: 0.75rem;">
-                        <label for="conference_link_input" style="display:block; font-size: 0.9em;">Or set a custom link (leave unchanged to keep the current value):</label>
-                        <input type="url" id="conference_link_input" name="conference_link" class="form-control" placeholder="https://…" value="{{.Booking.ConferenceLink}}">
+                    <div class="form-group booking-edit-custom-url" id="conference-link-custom-wrap" hidden>
+                        <label class="form-label" for="conference_link">Custom URL</label>
+                        <input type="url" id="conference_link" name="conference_link" class="form-input" placeholder="https://…" value="{{.Booking.ConferenceLink}}">
+                        <p class="form-hint">Replaces the existing link. Leave blank to clear it.</p>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline" onclick="closeBookingModal()">Cancel</button>
-                <button type="submit" class="btn btn-primary">Save changes</button>
+                <button type="button" class="btn btn-outline" onclick="bookingEditCancel('{{.Booking.ID}}')">Back to details</button>
+                <button type="submit" class="btn btn-primary" id="booking-edit-submit">Save changes</button>
             </div>
         </form>
     </div>
 </div>
+<script>
+(function() {
+    var form = document.getElementById('booking-edit-form');
+    if (!form) return;
+
+    var radios = form.querySelectorAll('input[name="conference_link_action"]');
+    var cards = form.querySelectorAll('.radio-card');
+    var customWrap = document.getElementById('conference-link-custom-wrap');
+    var customInput = document.getElementById('conference_link');
+
+    function syncSelection() {
+        var picked = form.querySelector('input[name="conference_link_action"]:checked');
+        var value = picked ? picked.value : 'keep';
+        cards.forEach(function(card) {
+            var input = card.querySelector('input[type="radio"]');
+            card.classList.toggle('selected', input && input.checked);
+        });
+        if (customWrap) {
+            var showCustom = value === 'custom';
+            customWrap.hidden = !showCustom;
+            if (customInput) {
+                customInput.required = showCustom && false; // never required — empty = clear link
+                if (showCustom) {
+                    setTimeout(function() { customInput.focus(); }, 0);
+                }
+            }
+        }
+    }
+
+    radios.forEach(function(r) { r.addEventListener('change', syncSelection); });
+    syncSelection();
+})();
+
+function bookingEditOnSubmit(form) {
+    var btn = document.getElementById('booking-edit-submit');
+    if (btn) {
+        btn.disabled = true;
+        btn.dataset.originalText = btn.textContent;
+        btn.textContent = 'Saving…';
+    }
+    return true;
+}
+
+function bookingEditCancel(bookingId) {
+    if (typeof openBookingModal === 'function') {
+        openBookingModal(bookingId);
+    } else {
+        closeBookingModal();
+    }
+}
+</script>
 {{end}}

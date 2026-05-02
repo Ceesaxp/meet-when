@@ -1553,21 +1553,22 @@ func (h *DashboardHandler) UpdateBooking(w http.ResponseWriter, r *http.Request)
 	}
 
 	notes := r.FormValue("host_notes")
-	guestsRaw := r.FormValue("additional_guests")
-	guests := splitGuestsField(guestsRaw)
-	regenerate := r.FormValue("regenerate_link") == "1"
+	guests := splitGuestsField(r.FormValue("additional_guests"))
 
 	input := services.UpdateBookingInput{
-		HostID:                   host.Host.ID,
-		TenantID:                 host.Tenant.ID,
-		BookingID:                bookingID,
-		HostNotes:                &notes,
-		AdditionalGuests:         &guests,
-		RegenerateConferenceLink: regenerate,
+		HostID:           host.Host.ID,
+		TenantID:         host.Tenant.ID,
+		BookingID:        bookingID,
+		HostNotes:        &notes,
+		AdditionalGuests: &guests,
 	}
 
-	if v := r.FormValue("conference_link"); r.Form.Has("conference_link") && !regenerate {
-		v = strings.TrimSpace(v)
+	// conference_link_action: keep (default) | regenerate | custom
+	switch r.FormValue("conference_link_action") {
+	case "regenerate":
+		input.RegenerateConferenceLink = true
+	case "custom":
+		v := strings.TrimSpace(r.FormValue("conference_link"))
 		input.ConferenceLink = &v
 	}
 
