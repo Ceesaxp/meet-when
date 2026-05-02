@@ -548,19 +548,19 @@ type ConferencingRepository struct {
 func (r *ConferencingRepository) Create(ctx context.Context, conn *models.ConferencingConnection) error {
 	query := q(r.driver, `
 		INSERT INTO conferencing_connections (id, host_id, provider, access_token,
-			refresh_token, token_expiry, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			refresh_token, token_expiry, last_refresh_error, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`)
 	_, err := r.db.ExecContext(ctx, query,
 		conn.ID, conn.HostID, conn.Provider, conn.AccessToken,
-		conn.RefreshToken, conn.TokenExpiry, conn.CreatedAt, conn.UpdatedAt)
+		conn.RefreshToken, conn.TokenExpiry, conn.LastRefreshError, conn.CreatedAt, conn.UpdatedAt)
 	return err
 }
 
 func (r *ConferencingRepository) GetByHostID(ctx context.Context, hostID string) ([]*models.ConferencingConnection, error) {
 	query := q(r.driver, `
 		SELECT id, host_id, provider, access_token, refresh_token, token_expiry,
-		       created_at, updated_at
+		       last_refresh_error, created_at, updated_at
 		FROM conferencing_connections WHERE host_id = $1
 	`)
 	rows, err := r.db.QueryContext(ctx, query, hostID)
@@ -578,7 +578,7 @@ func (r *ConferencingRepository) GetByHostID(ctx context.Context, hostID string)
 		conn := &models.ConferencingConnection{}
 		err := rows.Scan(
 			&conn.ID, &conn.HostID, &conn.Provider, &conn.AccessToken,
-			&conn.RefreshToken, &conn.TokenExpiry, &conn.CreatedAt, &conn.UpdatedAt)
+			&conn.RefreshToken, &conn.TokenExpiry, &conn.LastRefreshError, &conn.CreatedAt, &conn.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -591,12 +591,12 @@ func (r *ConferencingRepository) GetByHostAndProvider(ctx context.Context, hostI
 	conn := &models.ConferencingConnection{}
 	query := q(r.driver, `
 		SELECT id, host_id, provider, access_token, refresh_token, token_expiry,
-		       created_at, updated_at
+		       last_refresh_error, created_at, updated_at
 		FROM conferencing_connections WHERE host_id = $1 AND provider = $2
 	`)
 	err := r.db.QueryRowContext(ctx, query, hostID, provider).Scan(
 		&conn.ID, &conn.HostID, &conn.Provider, &conn.AccessToken,
-		&conn.RefreshToken, &conn.TokenExpiry, &conn.CreatedAt, &conn.UpdatedAt)
+		&conn.RefreshToken, &conn.TokenExpiry, &conn.LastRefreshError, &conn.CreatedAt, &conn.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -606,11 +606,11 @@ func (r *ConferencingRepository) GetByHostAndProvider(ctx context.Context, hostI
 func (r *ConferencingRepository) Update(ctx context.Context, conn *models.ConferencingConnection) error {
 	query := q(r.driver, `
 		UPDATE conferencing_connections
-		SET access_token = $1, refresh_token = $2, token_expiry = $3
-		WHERE id = $4
+		SET access_token = $1, refresh_token = $2, token_expiry = $3, last_refresh_error = $4
+		WHERE id = $5
 	`)
 	_, err := r.db.ExecContext(ctx, query,
-		conn.AccessToken, conn.RefreshToken, conn.TokenExpiry, conn.ID)
+		conn.AccessToken, conn.RefreshToken, conn.TokenExpiry, conn.LastRefreshError, conn.ID)
 	return err
 }
 
@@ -948,13 +948,15 @@ func (r *BookingRepository) Update(ctx context.Context, booking *models.Booking)
 		UPDATE bookings
 		SET status = $1, conference_link = $2, calendar_event_id = $3,
 		    cancelled_by = $4, cancel_reason = $5, reminder_sent = $6, is_archived = $7,
-		    start_time = $8, end_time = $9, duration = $10, updated_at = $11
-		WHERE id = $12
+		    start_time = $8, end_time = $9, duration = $10,
+		    additional_guests = $11, answers = $12, updated_at = $13
+		WHERE id = $14
 	`)
 	_, err := r.db.ExecContext(ctx, query,
 		booking.Status, booking.ConferenceLink, booking.CalendarEventID,
 		booking.CancelledBy, booking.CancelReason, booking.ReminderSent,
 		booking.IsArchived, booking.StartTime, booking.EndTime, booking.Duration,
+		booking.AdditionalGuests, booking.Answers,
 		booking.UpdatedAt, booking.ID)
 	return err
 }
@@ -1616,5 +1618,14 @@ func (r *BookingCalendarEventRepository) GetByBookingID(ctx context.Context, boo
 func (r *BookingCalendarEventRepository) DeleteByBookingID(ctx context.Context, bookingID string) error {
 	query := q(r.driver, `DELETE FROM booking_calendar_events WHERE booking_id = $1`)
 	_, err := r.db.ExecContext(ctx, query, bookingID)
+	return err
+}
+
+// Update changes the calendar event ID for a booking_calendar_events row.
+// Used after a CalDAV "update" (which is implemented as delete + create) so
+// the new event ID is persisted.
+func (r *BookingCalendarEventRepository) Update(ctx context.Context, e *models.BookingCalendarEvent) error {
+	query := q(r.driver, `UPDATE booking_calendar_events SET event_id = $1, calendar_id = $2 WHERE id = $3`)
+	_, err := r.db.ExecContext(ctx, query, e.EventID, e.CalendarID, e.ID)
 	return err
 }

@@ -2,7 +2,9 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -15,6 +17,13 @@ import (
 	"github.com/meet-when/meet-when/internal/models"
 	"github.com/meet-when/meet-when/internal/repository"
 )
+
+// ErrConferencingReauthRequired indicates that the host's conferencing OAuth
+// token cannot be refreshed (revoked, expired beyond grace, or invalid) and the
+// host must reconnect via the OAuth flow. Callers in the booking path treat
+// this differently from transient errors: the booking still confirms but the
+// host is notified and the connection is flagged for reconnect.
+var ErrConferencingReauthRequired = errors.New("conferencing reauth required")
 
 // ConferencingService handles video conferencing operations
 type ConferencingService struct {
@@ -62,6 +71,8 @@ func (s *ConferencingService) ConnectZoom(ctx context.Context, hostID, authCode,
 		existing.AccessToken = tokens.AccessToken
 		existing.RefreshToken = tokens.RefreshToken
 		existing.TokenExpiry = &expiry
+		// A successful reconnect clears any prior reauth state.
+		existing.LastRefreshError = sql.NullString{}
 		if err := s.repos.Conferencing.Update(ctx, existing); err != nil {
 			return nil, err
 		}
@@ -152,21 +163,50 @@ func (s *ConferencingService) exchangeZoomAuthCode(code, redirectURI string) (*z
 	return &tokens, nil
 }
 
-func (s *ConferencingService) refreshZoomToken(conn *models.ConferencingConnection) error {
-	// Only skip refresh if we have a valid, unexpired token with >5 min remaining
+// zoomTokenError is the OAuth-style error body Zoom returns on token endpoint
+// failures (e.g. {"reason":"Invalid Token!","error":"invalid_grant"}).
+type zoomTokenError struct {
+	Error  string `json:"error"`
+	Reason string `json:"reason"`
+}
+
+// isPermanentTokenError reports whether the Zoom OAuth error code indicates a
+// non-recoverable refresh-token failure (revoked / expired beyond grace /
+// invalid). Transient HTTP/network errors and 5xx responses are NOT permanent.
+func isPermanentTokenError(code string) bool {
+	switch code {
+	case "invalid_grant", "invalid_request", "invalid_client", "unauthorized_client", "unsupported_grant_type":
+		return true
+	}
+	return false
+}
+
+func (s *ConferencingService) refreshZoomToken(ctx context.Context, conn *models.ConferencingConnection) error {
+	// Skip refresh if we already have a valid, unexpired token with >5 min remaining.
 	if conn.TokenExpiry != nil && time.Now().Before(conn.TokenExpiry.Add(-5*time.Minute)) {
 		return nil
 	}
 
+	// If we previously flagged this connection as needing reauth and the token
+	// is also expired, fail fast — refresh would only fail again. The host must
+	// reconnect via OAuth.
+	if conn.NeedsReauth() {
+		return ErrConferencingReauthRequired
+	}
+
 	data := fmt.Sprintf("refresh_token=%s&grant_type=refresh_token", conn.RefreshToken)
 
-	req, _ := http.NewRequest("POST", "https://zoom.us/oauth/token", strings.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://zoom.us/oauth/token", strings.NewReader(data))
+	if err != nil {
+		return err
+	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.SetBasicAuth(s.cfg.OAuth.Zoom.ClientID, s.cfg.OAuth.Zoom.ClientSecret)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		// Network/transport error — transient, do not flag connection.
+		return fmt.Errorf("zoom token refresh transport error: %w", err)
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
@@ -175,7 +215,23 @@ func (s *ConferencingService) refreshZoomToken(conn *models.ConferencingConnecti
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to refresh token")
+		body, _ := io.ReadAll(resp.Body)
+		var oauthErr zoomTokenError
+		_ = json.Unmarshal(body, &oauthErr)
+		// 4xx with a known permanent error code → require reauth.
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 && isPermanentTokenError(oauthErr.Error) {
+			conn.LastRefreshError = sql.NullString{
+				String: fmt.Sprintf("%s: %s", oauthErr.Error, oauthErr.Reason),
+				Valid:  true,
+			}
+			if upErr := s.repos.Conferencing.Update(ctx, conn); upErr != nil {
+				log.Printf("[ZOOM] failed to persist reauth flag for conn=%s: %v", conn.ID, upErr)
+			}
+			log.Printf("[ZOOM] reauth required for host=%s: %s (%s)", conn.HostID, oauthErr.Error, oauthErr.Reason)
+			return ErrConferencingReauthRequired
+		}
+		// Other 4xx (rate limit-ish) and 5xx → transient.
+		return fmt.Errorf("zoom token refresh failed (status=%d): %s", resp.StatusCode, string(body))
 	}
 
 	var tokens zoomTokenResponse
@@ -189,17 +245,18 @@ func (s *ConferencingService) refreshZoomToken(conn *models.ConferencingConnecti
 	}
 	expiry := models.NewSQLiteTime(time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second))
 	conn.TokenExpiry = &expiry
+	conn.LastRefreshError = sql.NullString{} // clear on success
 
-	return s.repos.Conferencing.Update(context.Background(), conn)
+	return s.repos.Conferencing.Update(ctx, conn)
 }
 
 func (s *ConferencingService) createZoomMeeting(ctx context.Context, details *BookingWithDetails) (string, error) {
 	conn, err := s.repos.Conferencing.GetByHostAndProvider(ctx, details.Booking.HostID, models.ConferencingProviderZoom)
 	if err != nil || conn == nil {
-		return "", fmt.Errorf("zoom not connected")
+		return "", ErrConferencingReauthRequired
 	}
 
-	if err := s.refreshZoomToken(conn); err != nil {
+	if err := s.refreshZoomToken(ctx, conn); err != nil {
 		return "", err
 	}
 

@@ -491,6 +491,91 @@ Meet When`,
 	}()
 }
 
+// SendBookingUpdated notifies the invitee (and any additional guests) that the
+// host has edited the booking. Time is unchanged — that path is
+// SendBookingRescheduled. The summary names the changed fields so the
+// recipient knows what to look at.
+func (s *EmailService) SendBookingUpdated(ctx context.Context, details *BookingWithDetails, changedFields []string) {
+	subject := fmt.Sprintf("Updated: %s with %s", details.Template.Name, details.Host.Name)
+
+	inviteeLoc, _ := time.LoadLocation(details.Booking.InviteeTimezone)
+	if inviteeLoc == nil {
+		inviteeLoc = time.UTC
+	}
+	timeFormatted := details.Booking.StartTime.In(inviteeLoc).Format("Monday, January 2, 2006 at 3:04 PM MST")
+
+	location := "To be determined"
+	if details.Template.LocationType == models.ConferencingProviderPhone {
+		if details.Template.CustomLocation != "" {
+			location = "Call " + details.Template.CustomLocation
+		}
+	} else if details.Booking.ConferenceLink != "" {
+		location = details.Booking.ConferenceLink
+	} else if details.Template.CustomLocation != "" {
+		location = details.Template.CustomLocation
+	}
+
+	notes := ""
+	if details.Booking.Answers != nil {
+		if hn, ok := details.Booking.Answers["host_notes"].(string); ok && hn != "" {
+			notes = "\n\nNotes from host:\n" + hn
+		}
+	}
+
+	changes := "the booking"
+	if len(changedFields) > 0 {
+		changes = strings.Join(changedFields, ", ")
+	}
+
+	body := fmt.Sprintf(`Hello %s,
+
+%s has updated %s for your meeting.
+
+Meeting: %s
+With: %s
+When: %s
+Duration: %d minutes
+Location: %s%s
+
+Need to make changes?
+Cancel: %s/booking/%s
+
+Reschedule this meeting:
+%s/m/%s/%s/%s/reschedule/%s
+
+Best regards,
+Meet When`,
+		details.Booking.InviteeName,
+		details.Host.Name,
+		changes,
+		details.Template.Name,
+		details.Host.Name,
+		timeFormatted,
+		details.Booking.Duration,
+		location,
+		notes,
+		s.cfg.Server.BaseURL,
+		details.Booking.Token,
+		s.cfg.Server.BaseURL,
+		details.Tenant.Slug,
+		details.Host.Slug,
+		details.Template.Slug,
+		details.Booking.ID,
+	)
+
+	ics := s.generateICS(details)
+
+	recipients := append([]string{details.Booking.InviteeEmail}, details.Booking.AdditionalGuests...)
+	for _, addr := range recipients {
+		addr := addr
+		go func() {
+			if err := s.sendEmail(addr, subject, body, ics); err != nil {
+				log.Printf("Error sending booking-updated email to %s: %v", addr, err)
+			}
+		}()
+	}
+}
+
 // defaultReminderBody returns the default reminder email body
 func (s *EmailService) defaultReminderBody(data *EmailTemplateData) string {
 	return fmt.Sprintf(`Hello %s,
@@ -753,6 +838,43 @@ func (s *EmailService) sendMailgun(to, subject, body, icsAttachment string) erro
 	// Mailgun API implementation
 	// For MVP, we'll use the SMTP relay which is simpler
 	return s.sendSMTP(to, subject, body, icsAttachment)
+}
+
+// SendConferencingFailed notifies the host that creating a conference link
+// (e.g. a Zoom meeting) failed for a booking — typically because the OAuth
+// token has expired or been revoked. The booking still confirms; the host
+// needs to reconnect (and may use the booking edit flow to regenerate the
+// link once reconnected).
+func (s *EmailService) SendConferencingFailed(ctx context.Context, host *models.Host, provider, reason, errMsg string) {
+	subject := fmt.Sprintf("Action needed: %s link could not be created", provider)
+
+	reconnectHint := ""
+	if reason == "reauth_required" {
+		reconnectHint = fmt.Sprintf("Your %s connection appears to have expired. Reconnect here:\n%s/dashboard/calendars\n\n", provider, s.cfg.Server.BaseURL)
+	}
+
+	body := fmt.Sprintf(`Hello %s,
+
+We could not generate a %s meeting link for a recent booking on your calendar.
+
+%sReason: %s
+
+The booking is still confirmed — the invitee has been notified — but no conference link was attached. After reconnecting %s, you can edit the booking from your dashboard to regenerate the link, which will send an updated invitation to the attendees.
+
+Best regards,
+Meet When`,
+		host.Name,
+		provider,
+		reconnectHint,
+		errMsg,
+		provider,
+	)
+
+	go func() {
+		if err := s.sendEmail(host.Email, subject, body, ""); err != nil {
+			log.Printf("[EMAIL] Error sending conferencing failure notification to %s: %v", host.Email, err)
+		}
+	}()
 }
 
 // SendCalendarSyncFailed notifies the host that their calendar sync has failed

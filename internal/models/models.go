@@ -1,6 +1,7 @@
 package models
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
@@ -186,14 +187,21 @@ const (
 
 // ConferencingConnection represents a connected conferencing provider
 type ConferencingConnection struct {
-	ID           string               `json:"id" db:"id"`
-	HostID       string               `json:"host_id" db:"host_id"`
-	Provider     ConferencingProvider `json:"provider" db:"provider"`
-	AccessToken  string               `json:"-" db:"access_token"`
-	RefreshToken string               `json:"-" db:"refresh_token"`
-	TokenExpiry  *SQLiteTime          `json:"-" db:"token_expiry"`
-	CreatedAt    SQLiteTime           `json:"created_at" db:"created_at"`
-	UpdatedAt    SQLiteTime           `json:"updated_at" db:"updated_at"`
+	ID               string               `json:"id" db:"id"`
+	HostID           string               `json:"host_id" db:"host_id"`
+	Provider         ConferencingProvider `json:"provider" db:"provider"`
+	AccessToken      string               `json:"-" db:"access_token"`
+	RefreshToken     string               `json:"-" db:"refresh_token"`
+	TokenExpiry      *SQLiteTime          `json:"-" db:"token_expiry"`
+	LastRefreshError sql.NullString       `json:"-" db:"last_refresh_error"`
+	CreatedAt        SQLiteTime           `json:"created_at" db:"created_at"`
+	UpdatedAt        SQLiteTime           `json:"updated_at" db:"updated_at"`
+}
+
+// NeedsReauth reports whether this connection has had a non-recoverable token
+// failure and the host must reconnect via the OAuth flow.
+func (c *ConferencingConnection) NeedsReauth() bool {
+	return c.LastRefreshError.Valid && c.LastRefreshError.String != ""
 }
 
 // MeetingTemplate represents a bookable meeting type

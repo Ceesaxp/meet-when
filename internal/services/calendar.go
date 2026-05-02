@@ -607,6 +607,56 @@ func (s *CalendarService) CreateEventForHost(ctx context.Context, details *Booki
 	return "", nil
 }
 
+// UpdateEvent updates an existing calendar event for a booking. If the booking
+// has no recorded event ID (e.g. event creation previously failed), falls back
+// to CreateEventForHost so reconnect-then-edit produces a fresh event.
+//
+// For Google: issues a PATCH so existing attendees keep their RSVP state and
+// get a single "event updated" invitation. For CalDAV: replaces the event via
+// delete + create (CalDAV does not have a clean PATCH primitive in this
+// codebase; the resulting iCal carries the new state to all attendees).
+func (s *CalendarService) UpdateEvent(ctx context.Context, details *BookingWithDetails, providerCalendarID string) (string, error) {
+	if details.Booking.CalendarEventID == "" {
+		return s.CreateEventForHost(ctx, details, providerCalendarID)
+	}
+	if providerCalendarID == "" {
+		return details.Booking.CalendarEventID, nil
+	}
+
+	pc, err := s.repos.ProviderCalendar.GetByID(ctx, providerCalendarID)
+	if err != nil {
+		return "", err
+	}
+	if pc == nil {
+		return "", ErrCalendarNotFound
+	}
+	conn, err := s.repos.Calendar.GetByID(ctx, pc.ConnectionID)
+	if err != nil || conn == nil {
+		return "", ErrCalendarNotFound
+	}
+
+	view := *conn
+	switch conn.Provider {
+	case models.CalendarProviderGoogle:
+		view.CalendarID = pc.ProviderCalendarID
+		return s.updateGoogleEvent(ctx, &view, details)
+	case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
+		if pc.ProviderCalendarID != "" {
+			view.CalDAVURL = pc.ProviderCalendarID
+		}
+		// CalDAV: replace via delete + create.
+		if err := s.deleteCalDAVEvent(ctx, &view, details.Booking.CalendarEventID); err != nil {
+			log.Printf("[CALENDAR] CalDAV delete during update failed: %v", err)
+		}
+		newID, err := s.createCalDAVEvent(ctx, &view, details)
+		if err != nil {
+			return "", err
+		}
+		return newID, nil
+	}
+	return details.Booking.CalendarEventID, nil
+}
+
 // DeleteEvent deletes a calendar event from a provider calendar.
 func (s *CalendarService) DeleteEvent(ctx context.Context, hostID, providerCalendarID, eventID string) error {
 	pc, err := s.repos.ProviderCalendar.GetByID(ctx, providerCalendarID)
@@ -1051,6 +1101,80 @@ func (s *CalendarService) createGoogleEvent(ctx context.Context, cal *models.Cal
 	}
 
 	return result.ID, nil
+}
+
+// updateGoogleEvent PATCHes an existing Google Calendar event. The patch body
+// only includes mutable fields (description, location, attendees) — title and
+// time are left unchanged so this method composes safely with reschedule
+// (which deletes and recreates rather than patches).
+func (s *CalendarService) updateGoogleEvent(ctx context.Context, cal *models.CalendarConnection, details *BookingWithDetails) (string, error) {
+	if err := s.refreshGoogleToken(cal); err != nil {
+		return "", err
+	}
+
+	attendees := []map[string]string{
+		{"email": details.Booking.InviteeEmail},
+	}
+	for _, guest := range details.Booking.AdditionalGuests {
+		if strings.Contains(guest, "@") && len(strings.Split(guest, "@")[0]) > 0 && len(strings.Split(guest, "@")[1]) > 1 {
+			attendees = append(attendees, map[string]string{"email": guest})
+		}
+	}
+
+	description := details.Template.Description
+	if details.Booking.Answers != nil {
+		if agenda, ok := details.Booking.Answers["agenda"].(string); ok && agenda != "" {
+			if description != "" {
+				description += "\n\n"
+			}
+			description += "Agenda:\n" + agenda
+		}
+		if notes, ok := details.Booking.Answers["host_notes"].(string); ok && notes != "" {
+			if description != "" {
+				description += "\n\n"
+			}
+			description += "Notes from host:\n" + notes
+		}
+	}
+	rescheduleURL := fmt.Sprintf("%s/m/%s/%s/%s/reschedule/%s",
+		s.cfg.Server.BaseURL, details.Tenant.Slug, details.Host.Slug, details.Template.Slug, details.Booking.ID)
+	if description != "" {
+		description += "\n\n"
+	}
+	description += "Reschedule this meeting:\n" + rescheduleURL
+
+	patch := map[string]interface{}{
+		"description": description,
+		"attendees":   attendees,
+	}
+	if details.Booking.ConferenceLink != "" {
+		patch["location"] = details.Booking.ConferenceLink
+	}
+
+	body, _ := json.Marshal(patch)
+	patchURL := fmt.Sprintf("https://www.googleapis.com/calendar/v3/calendars/%s/events/%s?sendUpdates=all",
+		url.PathEscape(cal.CalendarID), url.PathEscape(details.Booking.CalendarEventID))
+
+	req, _ := http.NewRequest("PATCH", patchURL, strings.NewReader(string(body)))
+	req.Header.Set("Authorization", "Bearer "+cal.AccessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("failed to update event: %s", string(respBody))
+	}
+
+	return details.Booking.CalendarEventID, nil
 }
 
 func (s *CalendarService) deleteGoogleEvent(ctx context.Context, cal *models.CalendarConnection, eventID string) error {

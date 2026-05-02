@@ -205,8 +205,12 @@
 
     <div class="conferencing-list">
         {{$hasZoom := false}}
+        {{$zoomNeedsReauth := false}}
         {{range .Data.Conferencing}}
-            {{if eq .Provider "zoom"}}{{$hasZoom = true}}{{end}}
+            {{if eq .Provider "zoom"}}
+                {{$hasZoom = true}}
+                {{if .NeedsReauth}}{{$zoomNeedsReauth = true}}{{end}}
+            {{end}}
         {{end}}
 
         <div class="conferencing-card">
@@ -223,15 +227,25 @@
             <div class="conferencing-info">
                 <div class="conferencing-header">
                     <span class="conferencing-name">Zoom</span>
-                    {{if $hasZoom}}
+                    {{if $zoomNeedsReauth}}
+                    <span class="badge badge-warning">Reconnect required</span>
+                    {{else if $hasZoom}}
                     <span class="badge badge-success">Connected</span>
                     {{else}}
                     <span class="badge badge-inactive">Not Connected</span>
                     {{end}}
                 </div>
+                {{if $zoomNeedsReauth}}
+                <p class="conferencing-description">Zoom is unable to refresh tokens for this connection. New bookings on Zoom-typed meeting types will not get a Zoom link until you reconnect.</p>
+                {{end}}
             </div>
             <div class="conferencing-actions">
-                {{if $hasZoom}}
+                {{if $zoomNeedsReauth}}
+                <a href="{{.Data.ZoomAuthURL}}" class="btn-sm btn-primary">Reconnect Zoom</a>
+                <form action="/dashboard/conferencing/zoom/disconnect" method="POST" style="display:inline">
+                    <button type="submit" class="btn-sm btn-danger">Disconnect</button>
+                </form>
+                {{else if $hasZoom}}
                 <form action="/dashboard/conferencing/zoom/disconnect" method="POST">
                     <button type="submit" class="btn-sm btn-danger">Disconnect</button>
                 </form>

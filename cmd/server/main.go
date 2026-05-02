@@ -116,6 +116,7 @@ func main() {
 	dashboard.HandleFunc("POST /dashboard/calendars/connect/google", h.Dashboard.ConnectGoogle)
 	dashboard.HandleFunc("POST /dashboard/calendars/connect/caldav", h.Dashboard.ConnectCalDAV)
 	dashboard.HandleFunc("POST /dashboard/calendars/{id}/disconnect", h.Dashboard.DisconnectCalendar)
+	dashboard.HandleFunc("POST /dashboard/conferencing/{provider}/disconnect", h.Dashboard.DisconnectConferencing)
 	dashboard.HandleFunc("POST /dashboard/calendars/{id}/default", h.Dashboard.SetDefaultCalendar)
 	dashboard.HandleFunc("POST /dashboard/calendars/{id}/refresh", h.Dashboard.RefreshCalendarSync)
 	dashboard.HandleFunc("POST /dashboard/calendars/{id}/color", h.Dashboard.UpdateCalendarColor)
@@ -141,6 +142,8 @@ func main() {
 	// Bookings management
 	dashboard.HandleFunc("GET /dashboard/bookings", h.Dashboard.Bookings)
 	dashboard.HandleFunc("GET /dashboard/bookings/{id}/details", h.Dashboard.BookingDetails)
+	dashboard.HandleFunc("GET /dashboard/bookings/{id}/edit", h.Dashboard.EditBookingForm)
+	dashboard.HandleFunc("POST /dashboard/bookings/{id}/edit", h.Dashboard.UpdateBooking)
 
 	// Agenda view
 	dashboard.HandleFunc("GET /dashboard/agenda", h.Dashboard.Agenda)

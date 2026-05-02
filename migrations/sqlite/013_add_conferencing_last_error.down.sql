@@ -1,0 +1,1 @@
+ALTER TABLE conferencing_connections DROP COLUMN last_refresh_error;

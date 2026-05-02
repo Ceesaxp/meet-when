@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -173,6 +175,36 @@ func (h *DashboardHandler) DisconnectCalendar(w http.ResponseWriter, r *http.Req
 	_ = h.handlers.services.Calendar.DisconnectCalendar(r.Context(), host.Host.ID, calendarID)
 
 	h.handlers.redirect(w, r, "/dashboard/calendars")
+}
+
+// DisconnectConferencing removes a conferencing provider connection (currently Zoom).
+func (h *DashboardHandler) DisconnectConferencing(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	provider := models.ConferencingProvider(r.PathValue("provider"))
+	switch provider {
+	case models.ConferencingProviderZoom:
+		// allowed
+	default:
+		h.handlers.redirect(w, r, "/dashboard/calendars?error=unsupported_provider")
+		return
+	}
+
+	if err := h.handlers.services.Conferencing.DisconnectProvider(r.Context(), host.Host.ID, provider); err != nil {
+		log.Printf("[CONFERENCING] disconnect failed for host=%s provider=%s: %v", host.Host.ID, provider, err)
+		h.handlers.redirect(w, r, "/dashboard/calendars?error=disconnect_failed")
+		return
+	}
+
+	hostID := host.Host.ID
+	h.handlers.services.AuditLog.Log(r.Context(), host.Tenant.ID, &hostID, "conferencing.disconnected", "conferencing", "",
+		models.JSONMap{"provider": string(provider)}, r.RemoteAddr)
+
+	h.handlers.redirect(w, r, "/dashboard/calendars?success=zoom_disconnected")
 }
 
 // RefreshCalendarSync manually triggers a sync check for a connection. It both
@@ -1464,6 +1496,113 @@ func (h *DashboardHandler) BookingDetails(w http.ResponseWriter, r *http.Request
 		"Template":     template,
 		"HostTimezone": host.Host.Timezone,
 	})
+}
+
+// EditBookingForm renders the booking-edit form as a partial. Modal-based;
+// loaded via HTMX from the booking-details modal.
+func (h *DashboardHandler) EditBookingForm(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	bookingID := r.PathValue("id")
+	booking, err := h.handlers.services.Booking.GetBooking(r.Context(), bookingID)
+	if err != nil || booking == nil || booking.HostID != host.Host.ID {
+		http.Error(w, "Booking not found", http.StatusNotFound)
+		return
+	}
+	if booking.Status != models.BookingStatusConfirmed {
+		http.Error(w, "Only confirmed bookings can be edited", http.StatusBadRequest)
+		return
+	}
+
+	template, _ := h.handlers.services.Template.GetTemplate(r.Context(), host.Host.ID, booking.TemplateID)
+
+	hostNotes := ""
+	if booking.Answers != nil {
+		if v, ok := booking.Answers["host_notes"].(string); ok {
+			hostNotes = v
+		}
+	}
+
+	h.handlers.renderPartial(w, "booking_edit_partial.html", map[string]interface{}{
+		"Booking":                booking,
+		"Template":               template,
+		"HostTimezone":           host.Host.Timezone,
+		"HostNotes":              hostNotes,
+		"AdditionalGuestsString": strings.Join(booking.AdditionalGuests, "\n"),
+		"FormError":              r.URL.Query().Get("error"),
+	})
+}
+
+// UpdateBooking applies host edits, redirects back to the bookings list with
+// a flash on success or the edit form with an error on failure.
+func (h *DashboardHandler) UpdateBooking(w http.ResponseWriter, r *http.Request) {
+	host := middleware.GetHost(r.Context())
+	if host == nil {
+		h.handlers.redirect(w, r, "/auth/login")
+		return
+	}
+
+	bookingID := r.PathValue("id")
+	if err := r.ParseForm(); err != nil {
+		h.handlers.redirect(w, r, "/dashboard/bookings/"+bookingID+"/edit?error=invalid_form")
+		return
+	}
+
+	notes := r.FormValue("host_notes")
+	guestsRaw := r.FormValue("additional_guests")
+	guests := splitGuestsField(guestsRaw)
+	regenerate := r.FormValue("regenerate_link") == "1"
+
+	input := services.UpdateBookingInput{
+		HostID:                   host.Host.ID,
+		TenantID:                 host.Tenant.ID,
+		BookingID:                bookingID,
+		HostNotes:                &notes,
+		AdditionalGuests:         &guests,
+		RegenerateConferenceLink: regenerate,
+	}
+
+	if v := r.FormValue("conference_link"); r.Form.Has("conference_link") && !regenerate {
+		v = strings.TrimSpace(v)
+		input.ConferenceLink = &v
+	}
+
+	_, _, err := h.handlers.services.Booking.UpdateBooking(r.Context(), input)
+	if err != nil {
+		log.Printf("[BOOKING] update failed for %s: %v", bookingID, err)
+		flag := "update_failed"
+		if errors.Is(err, services.ErrConferencingReauthRequired) {
+			flag = "reauth_required"
+		}
+		h.handlers.redirect(w, r, "/dashboard/bookings/"+bookingID+"/edit?error="+flag)
+		return
+	}
+
+	h.handlers.redirect(w, r, "/dashboard/bookings?success=updated")
+}
+
+// splitGuestsField parses the textarea contents (one guest per line, optionally
+// comma-separated) into a clean slice. Final filtering/dedupe happens in the
+// service via normalizeGuestList.
+func splitGuestsField(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	// Replace commas with newlines so users can paste either format.
+	raw = strings.ReplaceAll(raw, ",", "\n")
+	lines := strings.Split(raw, "\n")
+	out := make([]string, 0, len(lines))
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if l != "" {
+			out = append(out, l)
+		}
+	}
+	return out
 }
 
 // AuditLogs renders the audit log viewer page (admin only)
