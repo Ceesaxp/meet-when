@@ -376,6 +376,60 @@ type BookingCalendarEvent struct {
 	CreatedAt  SQLiteTime `json:"created_at" db:"created_at"`
 }
 
+// HostedEventStatus represents the status of a hosted event
+type HostedEventStatus string
+
+const (
+	HostedEventStatusScheduled HostedEventStatus = "scheduled"
+	HostedEventStatusCancelled HostedEventStatus = "cancelled"
+)
+
+// HostedEvent represents a host-driven scheduled meeting (the inverse of an
+// invitee-driven Booking). Hosts pick the time and attendees directly.
+type HostedEvent struct {
+	ID             string               `json:"id" db:"id"`
+	TenantID       string               `json:"tenant_id" db:"tenant_id"`
+	HostID         string               `json:"host_id" db:"host_id"`
+	TemplateID     *string              `json:"template_id" db:"template_id"`
+	Title          string               `json:"title" db:"title"`
+	Description    string               `json:"description" db:"description"`
+	StartTime      SQLiteTime           `json:"start_time" db:"start_time"`
+	EndTime        SQLiteTime           `json:"end_time" db:"end_time"`
+	Duration       int                  `json:"duration" db:"duration"`
+	Timezone       string               `json:"timezone" db:"timezone"`
+	LocationType   ConferencingProvider `json:"location_type" db:"location_type"`
+	CustomLocation string               `json:"custom_location" db:"custom_location"`
+	CalendarID     string               `json:"calendar_id" db:"calendar_id"`
+	ConferenceLink string               `json:"conference_link" db:"conference_link"`
+	Status         HostedEventStatus    `json:"status" db:"status"`
+	CancelReason   string               `json:"cancel_reason" db:"cancel_reason"`
+	ReminderSent   bool                 `json:"reminder_sent" db:"reminder_sent"`
+	IsArchived     bool                 `json:"is_archived" db:"is_archived"`
+	CreatedAt      SQLiteTime           `json:"created_at" db:"created_at"`
+	UpdatedAt      SQLiteTime           `json:"updated_at" db:"updated_at"`
+}
+
+// HostedEventAttendee is one attendee on a hosted event.
+type HostedEventAttendee struct {
+	ID            string     `json:"id" db:"id"`
+	HostedEventID string     `json:"hosted_event_id" db:"hosted_event_id"`
+	Email         string     `json:"email" db:"email"`
+	Name          string     `json:"name" db:"name"`
+	ContactID     *string    `json:"contact_id" db:"contact_id"`
+	CreatedAt     SQLiteTime `json:"created_at" db:"created_at"`
+}
+
+// HostedEventCalendarEvent tracks the per-host calendar events created for a
+// hosted event (parallel to BookingCalendarEvent for bookings).
+type HostedEventCalendarEvent struct {
+	ID            string     `json:"id" db:"id"`
+	HostedEventID string     `json:"hosted_event_id" db:"hosted_event_id"`
+	HostID        string     `json:"host_id" db:"host_id"`
+	CalendarID    string     `json:"calendar_id" db:"calendar_id"`
+	EventID       string     `json:"event_id" db:"event_id"`
+	CreatedAt     SQLiteTime `json:"created_at" db:"created_at"`
+}
+
 // Custom JSON types for PostgreSQL arrays and JSONB
 
 // IntSlice is a slice of integers that can be stored as JSONB

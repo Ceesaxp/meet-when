@@ -64,15 +64,15 @@ type CalendarEventSyncer struct {
 	stores   map[ScheduledItemKind]trackingStore
 }
 
-// NewCalendarEventSyncer constructs the syncer. Currently only the booking
-// kind is wired; the hosted-event kind is registered when its tracking
-// repository lands in Phase B.
+// NewCalendarEventSyncer constructs the syncer with both kind dispatchers
+// wired.
 func NewCalendarEventSyncer(repos *repository.Repositories, calendar calendarEventWriter) *CalendarEventSyncer {
 	return &CalendarEventSyncer{
 		repos:    repos,
 		calendar: calendar,
 		stores: map[ScheduledItemKind]trackingStore{
-			ItemKindBooking: &bookingTrackingStore{repo: repos.BookingCalendarEvent},
+			ItemKindBooking:     &bookingTrackingStore{repo: repos.BookingCalendarEvent},
+			ItemKindHostedEvent: &hostedEventTrackingStore{repo: repos.HostedEventCalendarEvent},
 		},
 	}
 }
@@ -268,4 +268,49 @@ func (b *bookingTrackingStore) updateEventID(ctx context.Context, rowID, newEven
 
 func (b *bookingTrackingStore) deleteByItemID(ctx context.Context, itemID string) error {
 	return b.repo.DeleteByBookingID(ctx, itemID)
+}
+
+// hostedEventTrackingStore adapts HostedEventCalendarEventRepository.
+type hostedEventTrackingStore struct {
+	repo *repository.HostedEventCalendarEventRepository
+}
+
+func (h *hostedEventTrackingStore) create(ctx context.Context, itemID, hostID, calendarID, eventID string) error {
+	return h.repo.Create(ctx, &models.HostedEventCalendarEvent{
+		ID:            uuid.New().String(),
+		HostedEventID: itemID,
+		HostID:        hostID,
+		CalendarID:    calendarID,
+		EventID:       eventID,
+		CreatedAt:     models.Now(),
+	})
+}
+
+func (h *hostedEventTrackingStore) listByItemID(ctx context.Context, itemID string) ([]trackingRow, error) {
+	events, err := h.repo.GetByHostedEventID(ctx, itemID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]trackingRow, 0, len(events))
+	for _, e := range events {
+		out = append(out, trackingRow{
+			ID:         e.ID,
+			HostID:     e.HostID,
+			CalendarID: e.CalendarID,
+			EventID:    e.EventID,
+		})
+	}
+	return out, nil
+}
+
+func (h *hostedEventTrackingStore) updateEventID(ctx context.Context, rowID, newEventID, newCalendarID string) error {
+	return h.repo.Update(ctx, &models.HostedEventCalendarEvent{
+		ID:         rowID,
+		EventID:    newEventID,
+		CalendarID: newCalendarID,
+	})
+}
+
+func (h *hostedEventTrackingStore) deleteByItemID(ctx context.Context, itemID string) error {
+	return h.repo.DeleteByHostedEventID(ctx, itemID)
 }

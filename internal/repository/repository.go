@@ -13,39 +13,45 @@ import (
 
 // Repositories holds all repository instances
 type Repositories struct {
-	Tenant               *TenantRepository
-	Host                 *HostRepository
-	Calendar             *CalendarRepository
-	ProviderCalendar     *ProviderCalendarRepository
-	Conferencing         *ConferencingRepository
-	Template             *TemplateRepository
-	Booking              *BookingRepository
-	Session              *SessionRepository
-	WorkingHours         *WorkingHoursRepository
-	AuditLog             *AuditLogRepository
-	SignupConversion     *SignupConversionRepository
-	TemplateHost         *TemplateHostRepository
-	BookingCalendarEvent *BookingCalendarEventRepository
-	Contact              *ContactRepository
+	Tenant                   *TenantRepository
+	Host                     *HostRepository
+	Calendar                 *CalendarRepository
+	ProviderCalendar         *ProviderCalendarRepository
+	Conferencing             *ConferencingRepository
+	Template                 *TemplateRepository
+	Booking                  *BookingRepository
+	Session                  *SessionRepository
+	WorkingHours             *WorkingHoursRepository
+	AuditLog                 *AuditLogRepository
+	SignupConversion         *SignupConversionRepository
+	TemplateHost             *TemplateHostRepository
+	BookingCalendarEvent     *BookingCalendarEventRepository
+	Contact                  *ContactRepository
+	HostedEvent              *HostedEventRepository
+	HostedEventAttendee      *HostedEventAttendeeRepository
+	HostedEventCalendarEvent *HostedEventCalendarEventRepository
 }
 
 // NewRepositories creates all repositories
 func NewRepositories(db *sql.DB, driver string) *Repositories {
 	return &Repositories{
-		Tenant:               &TenantRepository{db: db, driver: driver},
-		Host:                 &HostRepository{db: db, driver: driver},
-		Calendar:             &CalendarRepository{db: db, driver: driver},
-		ProviderCalendar:     &ProviderCalendarRepository{db: db, driver: driver},
-		Conferencing:         &ConferencingRepository{db: db, driver: driver},
-		Template:             &TemplateRepository{db: db, driver: driver},
-		Booking:              &BookingRepository{db: db, driver: driver},
-		Session:              &SessionRepository{db: db, driver: driver},
-		WorkingHours:         &WorkingHoursRepository{db: db, driver: driver},
-		AuditLog:             &AuditLogRepository{db: db, driver: driver},
-		SignupConversion:     &SignupConversionRepository{db: db, driver: driver},
-		TemplateHost:         &TemplateHostRepository{db: db, driver: driver},
-		BookingCalendarEvent: &BookingCalendarEventRepository{db: db, driver: driver},
-		Contact:              &ContactRepository{db: db, driver: driver},
+		Tenant:                   &TenantRepository{db: db, driver: driver},
+		Host:                     &HostRepository{db: db, driver: driver},
+		Calendar:                 &CalendarRepository{db: db, driver: driver},
+		ProviderCalendar:         &ProviderCalendarRepository{db: db, driver: driver},
+		Conferencing:             &ConferencingRepository{db: db, driver: driver},
+		Template:                 &TemplateRepository{db: db, driver: driver},
+		Booking:                  &BookingRepository{db: db, driver: driver},
+		Session:                  &SessionRepository{db: db, driver: driver},
+		WorkingHours:             &WorkingHoursRepository{db: db, driver: driver},
+		AuditLog:                 &AuditLogRepository{db: db, driver: driver},
+		SignupConversion:         &SignupConversionRepository{db: db, driver: driver},
+		TemplateHost:             &TemplateHostRepository{db: db, driver: driver},
+		BookingCalendarEvent:     &BookingCalendarEventRepository{db: db, driver: driver},
+		Contact:                  &ContactRepository{db: db, driver: driver},
+		HostedEvent:              &HostedEventRepository{db: db, driver: driver},
+		HostedEventAttendee:      &HostedEventAttendeeRepository{db: db, driver: driver},
+		HostedEventCalendarEvent: &HostedEventCalendarEventRepository{db: db, driver: driver},
 	}
 }
 
