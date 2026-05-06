@@ -39,18 +39,35 @@ func NewConferencingService(cfg *config.Config, repos *repository.Repositories) 
 	}
 }
 
-// CreateMeeting creates a video conference meeting
+// CreateMeeting creates a video conference meeting for a booking. Kept on
+// the original signature; delegates to the booking-shape-agnostic raw helper
+// for the Zoom path so HostedEventService can reuse the same plumbing.
 func (s *ConferencingService) CreateMeeting(ctx context.Context, details *BookingWithDetails) (string, error) {
 	switch details.Template.LocationType {
 	case models.ConferencingProviderGoogleMeet:
 		// Google Meet is handled by calendar event creation
 		return "", nil
 	case models.ConferencingProviderZoom:
-		return s.createZoomMeeting(ctx, details)
+		topic := details.Template.Name + " with " + details.Booking.InviteeName
+		return s.createZoomMeetingRaw(ctx, details.Booking.HostID, topic, details.Booking.StartTime.Time, details.Booking.Duration)
 	case models.ConferencingProviderPhone:
 		return details.Template.CustomLocation, nil
 	case models.ConferencingProviderCustom:
 		return details.Template.CustomLocation, nil
+	}
+	return "", nil
+}
+
+// CreateMeetingForHostedEvent is the host-driven equivalent of CreateMeeting.
+// Returns the conference link (or "") for the requested location type.
+func (s *ConferencingService) CreateMeetingForHostedEvent(ctx context.Context, hostID, title string, start time.Time, durationMin int, locationType models.ConferencingProvider, customLocation string) (string, error) {
+	switch locationType {
+	case models.ConferencingProviderGoogleMeet:
+		return "", nil
+	case models.ConferencingProviderZoom:
+		return s.createZoomMeetingRaw(ctx, hostID, title, start, durationMin)
+	case models.ConferencingProviderPhone, models.ConferencingProviderCustom:
+		return customLocation, nil
 	}
 	return "", nil
 }
@@ -250,8 +267,10 @@ func (s *ConferencingService) refreshZoomToken(ctx context.Context, conn *models
 	return s.repos.Conferencing.Update(ctx, conn)
 }
 
-func (s *ConferencingService) createZoomMeeting(ctx context.Context, details *BookingWithDetails) (string, error) {
-	conn, err := s.repos.Conferencing.GetByHostAndProvider(ctx, details.Booking.HostID, models.ConferencingProviderZoom)
+// createZoomMeetingRaw is the shape-agnostic Zoom meeting creator. Used by
+// both booking and hosted-event flows. Returns the meeting join URL.
+func (s *ConferencingService) createZoomMeetingRaw(ctx context.Context, hostID, topic string, start time.Time, durationMin int) (string, error) {
+	conn, err := s.repos.Conferencing.GetByHostAndProvider(ctx, hostID, models.ConferencingProviderZoom)
 	if err != nil || conn == nil {
 		return "", ErrConferencingReauthRequired
 	}
@@ -261,10 +280,10 @@ func (s *ConferencingService) createZoomMeeting(ctx context.Context, details *Bo
 	}
 
 	meeting := map[string]interface{}{
-		"topic":      details.Template.Name + " with " + details.Booking.InviteeName,
+		"topic":      topic,
 		"type":       2, // Scheduled meeting
-		"start_time": details.Booking.StartTime.Format("2006-01-02T15:04:05Z"),
-		"duration":   details.Booking.Duration,
+		"start_time": start.UTC().Format("2006-01-02T15:04:05Z"),
+		"duration":   durationMin,
 		"timezone":   "UTC",
 		"settings": map[string]interface{}{
 			"host_video":        true,

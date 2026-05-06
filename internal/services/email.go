@@ -914,6 +914,327 @@ func formatCancelReason(reason string) string {
 	return fmt.Sprintf("Reason: %s", reason)
 }
 
+// hostedEventTime returns the start time formatted in the event's timezone
+// (which is the host's perspective at scheduling time). Hosted-event attendees
+// don't carry a per-attendee tz today, so this is the best display choice.
+func hostedEventTime(event *models.HostedEvent) string {
+	loc, err := time.LoadLocation(event.Timezone)
+	if err != nil || loc == nil {
+		loc = time.UTC
+	}
+	return event.StartTime.In(loc).Format("Monday, January 2, 2006 at 3:04 PM MST")
+}
+
+// hostedEventLocationLabel returns the human-readable location for an event
+// (mirrors the per-LocationType branching in booking emails).
+func hostedEventLocationLabel(event *models.HostedEvent) string {
+	switch event.LocationType {
+	case models.ConferencingProviderPhone:
+		if event.CustomLocation != "" {
+			return "Call " + event.CustomLocation
+		}
+	case models.ConferencingProviderCustom:
+		if event.CustomLocation != "" {
+			return event.CustomLocation
+		}
+	}
+	if event.ConferenceLink != "" {
+		return event.ConferenceLink
+	}
+	if event.CustomLocation != "" {
+		return event.CustomLocation
+	}
+	return "To be determined"
+}
+
+// SendHostedEventInvited sends an invitation to a single attendee. Used both
+// at create time (every attendee) and on update when an attendee is added.
+func (s *EmailService) SendHostedEventInvited(ctx context.Context, event *models.HostedEvent, attendee *models.HostedEventAttendee, host *models.Host, tenant *models.Tenant) {
+	if attendee == nil || attendee.Email == "" {
+		return
+	}
+	subject := fmt.Sprintf("%s invited you: %s", host.Name, event.Title)
+
+	greeting := "Hello"
+	if attendee.Name != "" {
+		greeting = "Hello " + attendee.Name
+	}
+
+	descriptionBlock := ""
+	if event.Description != "" {
+		descriptionBlock = fmt.Sprintf("\n%s\n", event.Description)
+	}
+
+	body := fmt.Sprintf(`%s,
+
+%s has scheduled a meeting with you:
+
+Meeting: %s
+When: %s
+Duration: %d minutes
+Location: %s
+%s
+This event has been added to your calendar. RSVP via your calendar app.
+
+Best regards,
+Meet When`,
+		greeting,
+		host.Name,
+		event.Title,
+		hostedEventTime(event),
+		event.Duration,
+		hostedEventLocationLabel(event),
+		descriptionBlock,
+	)
+
+	ics := s.generateICSForHostedEvent(event, host, attendee, "REQUEST", "CONFIRMED")
+
+	go func() {
+		if err := s.sendEmail(attendee.Email, subject, body, ics); err != nil {
+			log.Printf("[EMAIL] Error sending hosted-event invitation to %s: %v", attendee.Email, err)
+		}
+	}()
+
+	// Notify the host as well, but only for create-time invitations the host
+	// will have a list of all attendees in their calendar — skip a per-host
+	// duplicate to avoid noise. (Mirrors booking flow which sends one host
+	// email per booking, not per guest.)
+	_ = tenant
+}
+
+// SendHostedEventUpdated notifies a retained attendee that material event
+// fields changed (time, title, location, etc.).
+func (s *EmailService) SendHostedEventUpdated(ctx context.Context, event *models.HostedEvent, attendee *models.HostedEventAttendee, host *models.Host, tenant *models.Tenant, changedFields []string) {
+	if attendee == nil || attendee.Email == "" {
+		return
+	}
+	subject := fmt.Sprintf("Updated: %s", event.Title)
+
+	greeting := "Hello"
+	if attendee.Name != "" {
+		greeting = "Hello " + attendee.Name
+	}
+
+	changedSummary := ""
+	if len(changedFields) > 0 {
+		changedSummary = fmt.Sprintf("\nWhat changed: %s\n", strings.Join(changedFields, ", "))
+	}
+
+	body := fmt.Sprintf(`%s,
+
+%s updated a meeting with you:
+
+Meeting: %s
+When: %s
+Duration: %d minutes
+Location: %s
+%s
+Your calendar has been updated automatically.
+
+Best regards,
+Meet When`,
+		greeting,
+		host.Name,
+		event.Title,
+		hostedEventTime(event),
+		event.Duration,
+		hostedEventLocationLabel(event),
+		changedSummary,
+	)
+
+	ics := s.generateICSForHostedEvent(event, host, attendee, "REQUEST", "CONFIRMED")
+
+	go func() {
+		if err := s.sendEmail(attendee.Email, subject, body, ics); err != nil {
+			log.Printf("[EMAIL] Error sending hosted-event update to %s: %v", attendee.Email, err)
+		}
+	}()
+
+	_ = tenant
+}
+
+// SendHostedEventCancelled notifies an attendee that the entire event was
+// cancelled. The ICS is METHOD:CANCEL so calendar clients can remove it.
+func (s *EmailService) SendHostedEventCancelled(ctx context.Context, event *models.HostedEvent, attendee *models.HostedEventAttendee, host *models.Host, tenant *models.Tenant) {
+	if attendee == nil || attendee.Email == "" {
+		return
+	}
+	subject := fmt.Sprintf("Cancelled: %s", event.Title)
+
+	greeting := "Hello"
+	if attendee.Name != "" {
+		greeting = "Hello " + attendee.Name
+	}
+
+	body := fmt.Sprintf(`%s,
+
+%s has cancelled this meeting:
+
+Meeting: %s
+Was scheduled for: %s
+
+%s
+
+The event has been removed from your calendar.
+
+Best regards,
+Meet When`,
+		greeting,
+		host.Name,
+		event.Title,
+		hostedEventTime(event),
+		formatCancelReason(event.CancelReason),
+	)
+
+	ics := s.generateICSForHostedEvent(event, host, attendee, "CANCEL", "CANCELLED")
+
+	go func() {
+		if err := s.sendEmail(attendee.Email, subject, body, ics); err != nil {
+			log.Printf("[EMAIL] Error sending hosted-event cancellation to %s: %v", attendee.Email, err)
+		}
+	}()
+
+	_ = tenant
+}
+
+// SendHostedEventCancelledForAttendee notifies an attendee that they were
+// removed from an event that otherwise still goes ahead.
+func (s *EmailService) SendHostedEventCancelledForAttendee(ctx context.Context, event *models.HostedEvent, attendee *models.HostedEventAttendee, host *models.Host, tenant *models.Tenant) {
+	if attendee == nil || attendee.Email == "" {
+		return
+	}
+	subject := fmt.Sprintf("You were removed from: %s", event.Title)
+
+	greeting := "Hello"
+	if attendee.Name != "" {
+		greeting = "Hello " + attendee.Name
+	}
+
+	body := fmt.Sprintf(`%s,
+
+%s has removed you from this meeting:
+
+Meeting: %s
+Was scheduled for: %s
+
+The event has been removed from your calendar.
+
+Best regards,
+Meet When`,
+		greeting,
+		host.Name,
+		event.Title,
+		hostedEventTime(event),
+	)
+
+	// CANCEL ICS scoped to this attendee — removes only their copy.
+	ics := s.generateICSForHostedEvent(event, host, attendee, "CANCEL", "CANCELLED")
+
+	go func() {
+		if err := s.sendEmail(attendee.Email, subject, body, ics); err != nil {
+			log.Printf("[EMAIL] Error sending hosted-event removal to %s: %v", attendee.Email, err)
+		}
+	}()
+
+	_ = tenant
+}
+
+// SendHostedEventReminder sends a 24-hour reminder to a single attendee.
+func (s *EmailService) SendHostedEventReminder(ctx context.Context, event *models.HostedEvent, attendee *models.HostedEventAttendee, host *models.Host, tenant *models.Tenant) {
+	if attendee == nil || attendee.Email == "" {
+		return
+	}
+	subject := fmt.Sprintf("Reminder: %s tomorrow", event.Title)
+
+	greeting := "Hello"
+	if attendee.Name != "" {
+		greeting = "Hello " + attendee.Name
+	}
+
+	body := fmt.Sprintf(`%s,
+
+This is a reminder of your upcoming meeting with %s:
+
+Meeting: %s
+When: %s
+Duration: %d minutes
+Location: %s
+
+See you tomorrow.
+
+Best regards,
+Meet When`,
+		greeting,
+		host.Name,
+		event.Title,
+		hostedEventTime(event),
+		event.Duration,
+		hostedEventLocationLabel(event),
+	)
+
+	go func() {
+		if err := s.sendEmail(attendee.Email, subject, body, ""); err != nil {
+			log.Printf("[EMAIL] Error sending hosted-event reminder to %s: %v", attendee.Email, err)
+		}
+	}()
+
+	_ = tenant
+}
+
+// generateICSForHostedEvent emits an ICS payload for a hosted event addressed
+// to a single attendee. method is "REQUEST" for invites/updates or "CANCEL"
+// for cancellations; status is "CONFIRMED" or "CANCELLED" accordingly.
+func (s *EmailService) generateICSForHostedEvent(event *models.HostedEvent, host *models.Host, attendee *models.HostedEventAttendee, method, status string) string {
+	location := ""
+	switch event.LocationType {
+	case models.ConferencingProviderPhone:
+		if event.CustomLocation != "" {
+			location = "Call " + event.CustomLocation
+		}
+	default:
+		if event.ConferenceLink != "" {
+			location = event.ConferenceLink
+		} else if event.CustomLocation != "" {
+			location = event.CustomLocation
+		}
+	}
+
+	attendeeName := attendee.Name
+	if attendeeName == "" {
+		attendeeName = attendee.Email
+	}
+
+	return fmt.Sprintf(`BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//MeetWhen//EN
+METHOD:%s
+BEGIN:VEVENT
+UID:%s@meetwhen
+DTSTART:%s
+DTEND:%s
+SUMMARY:%s
+DESCRIPTION:%s
+LOCATION:%s
+ORGANIZER;CN=%s:mailto:%s
+ATTENDEE;CN=%s:mailto:%s
+STATUS:%s
+END:VEVENT
+END:VCALENDAR`,
+		method,
+		event.ID,
+		event.StartTime.UTC().Format("20060102T150405Z"),
+		event.EndTime.UTC().Format("20060102T150405Z"),
+		escapeICS(event.Title),
+		escapeICS(event.Description),
+		escapeICS(location),
+		host.Name,
+		host.Email,
+		attendeeName,
+		attendee.Email,
+		status,
+	)
+}
+
 func escapeICS(s string) string {
 	s = strings.ReplaceAll(s, "\\", "\\\\")
 	s = strings.ReplaceAll(s, ";", "\\;")
