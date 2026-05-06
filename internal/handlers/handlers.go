@@ -23,12 +23,13 @@ type Handlers struct {
 	services  *services.Services
 	templates map[string]*template.Template
 
-	Auth       *AuthHandler
-	Public     *PublicHandler
-	Dashboard  *DashboardHandler
-	Onboarding *OnboardingHandler
-	API        *APIHandler
-	APIV1      *APIV1Handler
+	Auth            *AuthHandler
+	Public          *PublicHandler
+	Dashboard       *DashboardHandler
+	DashboardEvents *DashboardEventsHandler
+	Onboarding      *OnboardingHandler
+	API             *APIHandler
+	APIV1           *APIV1Handler
 }
 
 // New creates all handlers
@@ -46,6 +47,7 @@ func New(cfg *config.Config, svc *services.Services, repos *repository.Repositor
 	h.Auth = &AuthHandler{handlers: h}
 	h.Public = &PublicHandler{handlers: h}
 	h.Dashboard = &DashboardHandler{handlers: h}
+	h.DashboardEvents = &DashboardEventsHandler{handlers: h}
 	h.Onboarding = &OnboardingHandler{handlers: h}
 	h.API = &APIHandler{handlers: h}
 	h.APIV1 = &APIV1Handler{handlers: h}

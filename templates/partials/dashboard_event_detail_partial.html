@@ -1,0 +1,102 @@
+{{define "dashboard_event_detail_partial.html"}}
+<div class="modal-overlay" onclick="closeEventModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h2>Event Details</h2>
+            <button type="button" class="modal-close" onclick="closeEventModal()" aria-label="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="booking-detail-section">
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                        <line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    Meeting
+                </h3>
+                <div class="booking-detail-row">
+                    <span class="label">Title</span>
+                    <span class="value">{{.Event.Title}}</span>
+                </div>
+                <div class="booking-detail-row">
+                    <span class="label">Status</span>
+                    <span class="badge badge-{{if eq (printf "%s" .Event.Status) "scheduled"}}confirmed{{else}}cancelled{{end}}">{{.Event.Status}}</span>
+                </div>
+                <div class="booking-detail-row">
+                    <span class="label">Date</span>
+                    <span class="value">{{formatDateInTZ .Event.StartTime .HostTimezone}}</span>
+                </div>
+                <div class="booking-detail-row">
+                    <span class="label">Time</span>
+                    <span class="value">
+                        {{formatTimeInTZ .Event.StartTime .HostTimezone}} - {{formatTimeInTZ .Event.EndTime .HostTimezone}} {{tzAbbrev .HostTimezone .Event.StartTime}}
+                    </span>
+                </div>
+                <div class="booking-detail-row">
+                    <span class="label">Duration</span>
+                    <span class="value">{{.Event.Duration}} minutes</span>
+                </div>
+                {{if .Event.Description}}
+                <div class="booking-detail-row">
+                    <span class="label">Description</span>
+                    <span class="value" style="white-space: pre-wrap;">{{.Event.Description}}</span>
+                </div>
+                {{end}}
+                {{if .Event.ConferenceLink}}
+                <div class="booking-detail-row">
+                    <span class="label">Meeting Link</span>
+                    <a href="{{.Event.ConferenceLink}}" target="_blank" class="btn-sm btn-primary">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <polygon points="23 7 16 12 23 17 23 7"/>
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                        </svg>
+                        Join Meeting
+                    </a>
+                </div>
+                {{end}}
+                {{if and (eq (printf "%s" .Event.Status) "cancelled") .Event.CancelReason}}
+                <div class="booking-detail-row">
+                    <span class="label">Cancel Reason</span>
+                    <span class="value">{{.Event.CancelReason}}</span>
+                </div>
+                {{end}}
+            </div>
+
+            <div class="booking-detail-section">
+                <h3>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    Attendees ({{len .Attendees}})
+                </h3>
+                {{range .Attendees}}
+                <div class="booking-detail-row">
+                    <span class="label">{{if .Name}}{{.Name}}{{else}}—{{end}}</span>
+                    <a href="mailto:{{.Email}}" class="value link">{{.Email}}</a>
+                </div>
+                {{end}}
+            </div>
+
+            {{if eq (printf "%s" .Event.Status) "scheduled"}}
+            <div class="modal-actions" style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                <a href="/dashboard/events/{{.Event.ID}}/edit" class="btn btn-primary">Edit</a>
+                <form action="/dashboard/events/{{.Event.ID}}/cancel" method="POST" style="display: inline;">
+                    <input type="hidden" name="reason" value="">
+                    <button type="submit" class="btn btn-secondary" onclick="return confirm('Cancel this event? Attendees will be notified.')">Cancel Event</button>
+                </form>
+            </div>
+            {{end}}
+        </div>
+    </div>
+</div>
+{{end}}
