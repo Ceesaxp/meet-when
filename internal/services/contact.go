@@ -59,6 +59,32 @@ func (s *ContactService) UpsertFromBooking(ctx context.Context, details *Booking
 	}
 }
 
+// UpsertFromHostedEventAttendee creates or updates a contact from a hosted-
+// event attendee. The caller is expected to invoke this only for newly added
+// attendees on create / on update — not for retained attendees on edit, so
+// meeting_count and last_met don't get re-incremented from a benign edit.
+// Errors are logged but do not propagate, mirroring UpsertFromBooking.
+func (s *ContactService) UpsertFromHostedEventAttendee(ctx context.Context, tenantID string, email, name string, eventStart models.SQLiteTime) {
+	if tenantID == "" || email == "" {
+		return
+	}
+	now := models.Now()
+	contact := &models.Contact{
+		ID:           uuid.New().String(),
+		TenantID:     tenantID,
+		Name:         name,
+		Email:        email,
+		FirstMet:     &eventStart,
+		LastMet:      &eventStart,
+		MeetingCount: 1,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	if err := s.repos.Contact.Upsert(ctx, contact); err != nil {
+		log.Printf("[CONTACT] Error upserting contact for %s: %v", email, err)
+	}
+}
+
 // BackfillFromBookings creates/updates contacts from all confirmed bookings for a tenant.
 func (s *ContactService) BackfillFromBookings(ctx context.Context, tenantID string) (int, error) {
 	bookings, err := s.repos.Booking.ListConfirmedByTenant(ctx, tenantID)
@@ -146,4 +172,3 @@ func (s *ContactService) EnsureBackfilled(ctx context.Context, tenantID string) 
 	}
 	return nil
 }
-

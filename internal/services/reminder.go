@@ -61,23 +61,28 @@ func (s *ReminderService) run() {
 	}
 }
 
-// checkAndSendReminders finds bookings that need reminders and sends them
+// checkAndSendReminders finds bookings and hosted events that need reminders
+// and sends them. Booking and hosted-event sources are processed in separate
+// sub-funcs so a partial failure in one source does not abort the other.
 func (s *ReminderService) checkAndSendReminders() {
 	ctx := context.Background()
 
-	// Find confirmed bookings starting in the next 24-25 hours that haven't had reminders sent
-	// We use a 1-hour window (24-25 hours) to ensure we don't miss any bookings
-	// and don't send reminders too early
+	// Window: 23-25 hours from now (1-hour cushion either side of "tomorrow"
+	// so we don't miss any items between ticks).
 	now := time.Now().UTC()
-	reminderWindowStart := now.Add(23 * time.Hour) // Start checking 23 hours from now
-	reminderWindowEnd := now.Add(25 * time.Hour)   // Up to 25 hours from now
+	windowStart := now.Add(23 * time.Hour)
+	windowEnd := now.Add(25 * time.Hour)
 
-	bookings, err := s.repos.Booking.GetBookingsNeedingReminder(ctx, reminderWindowStart, reminderWindowEnd)
+	s.processBookingReminders(ctx, windowStart, windowEnd)
+	s.processHostedEventReminders(ctx, windowStart, windowEnd)
+}
+
+func (s *ReminderService) processBookingReminders(ctx context.Context, windowStart, windowEnd time.Time) {
+	bookings, err := s.repos.Booking.GetBookingsNeedingReminder(ctx, windowStart, windowEnd)
 	if err != nil {
 		log.Printf("[REMINDER] Error fetching bookings needing reminders: %v", err)
 		return
 	}
-
 	if len(bookings) == 0 {
 		return
 	}
@@ -85,7 +90,6 @@ func (s *ReminderService) checkAndSendReminders() {
 	log.Printf("[REMINDER] Found %d bookings needing reminders", len(bookings))
 
 	for _, booking := range bookings {
-		// Get related entities
 		template, err := s.repos.Template.GetByID(ctx, booking.TemplateID)
 		if err != nil || template == nil {
 			log.Printf("[REMINDER] Error fetching template %s: %v", booking.TemplateID, err)
@@ -111,15 +115,55 @@ func (s *ReminderService) checkAndSendReminders() {
 			Tenant:   tenant,
 		}
 
-		// Send the reminder email
 		s.email.SendBookingReminder(ctx, details)
 
-		// Mark the reminder as sent
 		if err := s.repos.Booking.MarkReminderSent(ctx, booking.ID); err != nil {
 			log.Printf("[REMINDER] Error marking reminder sent for booking %s: %v", booking.ID, err)
 		} else {
 			log.Printf("[REMINDER] Sent reminder for booking %s (invitee: %s, meeting: %s at %s)",
 				booking.ID, booking.InviteeEmail, template.Name, booking.StartTime.Format(time.RFC3339))
+		}
+	}
+}
+
+func (s *ReminderService) processHostedEventReminders(ctx context.Context, windowStart, windowEnd time.Time) {
+	events, err := s.repos.HostedEvent.GetUpcomingForReminders(ctx, windowStart, windowEnd)
+	if err != nil {
+		log.Printf("[REMINDER] Error fetching hosted events needing reminders: %v", err)
+		return
+	}
+	if len(events) == 0 {
+		return
+	}
+
+	log.Printf("[REMINDER] Found %d hosted events needing reminders", len(events))
+
+	for _, event := range events {
+		host, err := s.repos.Host.GetByID(ctx, event.HostID)
+		if err != nil || host == nil {
+			log.Printf("[REMINDER] Error fetching host %s for hosted event %s: %v", event.HostID, event.ID, err)
+			continue
+		}
+		tenant, err := s.repos.Tenant.GetByID(ctx, event.TenantID)
+		if err != nil || tenant == nil {
+			log.Printf("[REMINDER] Error fetching tenant %s for hosted event %s: %v", event.TenantID, event.ID, err)
+			continue
+		}
+		attendees, err := s.repos.HostedEventAttendee.ListByEvent(ctx, event.ID)
+		if err != nil {
+			log.Printf("[REMINDER] Error loading attendees for hosted event %s: %v", event.ID, err)
+			continue
+		}
+
+		for _, a := range attendees {
+			s.email.SendHostedEventReminder(ctx, event, a, host, tenant)
+		}
+
+		if err := s.repos.HostedEvent.MarkReminderSent(ctx, event.ID); err != nil {
+			log.Printf("[REMINDER] Error marking reminder sent for hosted event %s: %v", event.ID, err)
+		} else {
+			log.Printf("[REMINDER] Sent reminder for hosted event %s (%d attendees, at %s)",
+				event.ID, len(attendees), event.StartTime.Format(time.RFC3339))
 		}
 	}
 }

@@ -21,6 +21,7 @@ type Services struct {
 	Timezone     *TimezoneService
 	Agenda       *AgendaService
 	Contact      *ContactService
+	HostedEvent  *HostedEventService
 }
 
 // New creates all services
@@ -42,6 +43,7 @@ func New(cfg *config.Config, repos *repository.Repositories) *Services {
 
 	timezoneSvc := NewTimezoneService()
 	agendaSvc := NewAgendaService(repos, calendarSvc)
+	hostedEventSvc := NewHostedEventService(cfg, repos, calendarSvc, conferencingSvc, syncerSvc, emailSvc, contactSvc, auditLogSvc)
 
 	return &Services{
 		Auth:         authSvc,
@@ -58,5 +60,6 @@ func New(cfg *config.Config, repos *repository.Repositories) *Services {
 		Timezone:     timezoneSvc,
 		Agenda:       agendaSvc,
 		Contact:      contactSvc,
+		HostedEvent:  hostedEventSvc,
 	}
 }
