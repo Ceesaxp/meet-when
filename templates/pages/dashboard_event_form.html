@@ -1,0 +1,458 @@
+{{define "dashboard_event_form.html"}}
+{{template "dashboard" .}}
+{{end}}
+
+{{define "content"}}
+{{$isNew := .Data.IsNew}}
+{{$event := .Data.Event}}
+{{$attendees := .Data.Attendees}}
+{{$prefill := .Data.Prefill}}
+{{$tz := .Data.HostTimezone}}
+{{$formError := .Data.FormError}}
+
+<div class="page-header">
+    <a href="/dashboard/events" class="back-btn" aria-label="Go back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <line x1="19" y1="12" x2="5" y2="12"/>
+            <polyline points="12 19 5 12 12 5"/>
+        </svg>
+    </a>
+    <div>
+        <h1 class="page-title">{{if $isNew}}Schedule Event{{else}}Edit Event{{end}}</h1>
+    </div>
+</div>
+
+{{if $formError}}
+<div class="alert alert-error" role="alert" style="margin-bottom: 1rem;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    <div>
+        {{if eq $formError "reauth_required"}}
+        Couldn't regenerate the conference link — your conferencing connection needs to be re-authorized. <a href="/dashboard/calendars">Reconnect</a> and try again.
+        {{else if eq $formError "title_required"}}
+        Please enter a title for the event.
+        {{else if eq $formError "at_least_one_attendee"}}
+        Please add at least one attendee.
+        {{else if eq $formError "invalid_attendee_email"}}
+        One of the attendee emails looks invalid. Please check and try again.
+        {{else if eq $formError "invalid_start_time"}}
+        Please pick a valid date and time.
+        {{else if eq $formError "invalid_duration"}}
+        Please pick a valid duration.
+        {{else}}
+        {{$formError}}
+        {{end}}
+    </div>
+</div>
+{{end}}
+
+<form method="POST"
+      action="{{if $isNew}}/dashboard/events{{else}}/dashboard/events/{{$event.ID}}/edit{{end}}"
+      class="template-form"
+      id="event-form">
+
+    {{if $isNew}}
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Start from a template</h2>
+            <p class="section-subtitle">Optional — prefill duration, conferencing, and calendar from one of your meeting types</p>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="template_id">Template</label>
+            <select id="template_id" name="template_id" class="form-select" onchange="onTemplateChange(this)">
+                <option value="">— None —</option>
+                {{range .Data.Templates}}
+                <option value="{{.ID}}"
+                        data-duration="{{index .Durations 0}}"
+                        data-location="{{.LocationType}}"
+                        data-custom-location="{{.CustomLocation}}"
+                        data-calendar="{{.CalendarID}}"
+                        {{if and $prefill (eq .ID $prefill.ID)}}selected{{end}}>
+                    {{.Name}}
+                </option>
+                {{end}}
+            </select>
+        </div>
+    </section>
+    {{end}}
+
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Basics</h2>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="title">Title</label>
+            <input type="text" id="title" name="title" class="form-input" required
+                   value="{{if $event}}{{$event.Title}}{{else if $prefill}}{{$prefill.Name}}{{end}}"
+                   placeholder="e.g., Quarterly review with Acme">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="description">Description</label>
+            <textarea id="description" name="description" class="form-textarea" rows="3"
+                      placeholder="Agenda, links, anything attendees should know.">{{if $event}}{{$event.Description}}{{else if $prefill}}{{$prefill.Description}}{{end}}</textarea>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">When</h2>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" for="start_date">Date</label>
+                <input type="date" id="start_date" name="start_date" class="form-input" required
+                       value="{{if $event}}{{$event.StartTime.Format "2006-01-02"}}{{end}}">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="start_time">Time</label>
+                <input type="time" id="start_time" name="start_time" class="form-input" required
+                       value="{{if $event}}{{$event.StartTime.Format "15:04"}}{{end}}">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label" for="duration">Duration</label>
+                <div class="duration-chips" id="duration-chips" data-name="duration">
+                    {{$dur := 30}}
+                    {{if $event}}{{$dur = $event.Duration}}{{else if $prefill}}{{$dur = (index $prefill.Durations 0)}}{{end}}
+                    <label class="duration-chip{{if eq $dur 15}} selected{{end}}">
+                        <input type="radio" name="duration" value="15" {{if eq $dur 15}}checked{{end}}>15 min
+                    </label>
+                    <label class="duration-chip{{if eq $dur 30}} selected{{end}}">
+                        <input type="radio" name="duration" value="30" {{if eq $dur 30}}checked{{end}}>30 min
+                    </label>
+                    <label class="duration-chip{{if eq $dur 45}} selected{{end}}">
+                        <input type="radio" name="duration" value="45" {{if eq $dur 45}}checked{{end}}>45 min
+                    </label>
+                    <label class="duration-chip{{if eq $dur 60}} selected{{end}}">
+                        <input type="radio" name="duration" value="60" {{if eq $dur 60}}checked{{end}}>60 min
+                    </label>
+                    <label class="duration-chip{{if eq $dur 90}} selected{{end}}">
+                        <input type="radio" name="duration" value="90" {{if eq $dur 90}}checked{{end}}>90 min
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="timezone">Timezone</label>
+                <input type="text" id="timezone" name="timezone" class="form-input"
+                       value="{{if $event}}{{$event.Timezone}}{{else}}{{$tz}}{{end}}"
+                       placeholder="e.g., America/New_York">
+                <p class="form-hint">IANA timezone name. Defaults to your account timezone.</p>
+            </div>
+        </div>
+
+        <div id="conflict-banner"
+             hx-get="/dashboard/events/check-conflicts"
+             hx-trigger="conflict-check from:body"
+             hx-include="#start_date, #start_time, #timezone, [name='duration']:checked, #exclude_event_id"
+             hx-target="this"
+             hx-swap="innerHTML"></div>
+
+        {{if not $isNew}}
+        <input type="hidden" id="exclude_event_id" name="exclude_event_id" value="{{$event.ID}}">
+        {{end}}
+    </section>
+
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Location</h2>
+        </div>
+
+        <div class="radio-cards" id="location-cards">
+            {{$loc := "google_meet"}}
+            {{if $event}}{{$loc = printf "%s" $event.LocationType}}{{else if $prefill}}{{$loc = printf "%s" $prefill.LocationType}}{{end}}
+            <label class="radio-card{{if eq $loc "google_meet"}} selected{{end}}">
+                <input type="radio" name="location_type" value="google_meet" {{if eq $loc "google_meet"}}checked{{end}}>
+                <div class="radio-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <polygon points="23 7 16 12 23 17 23 7"/>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>
+                </div>
+                <div class="radio-content">
+                    <div class="radio-label">Google Meet</div>
+                    <div class="radio-description">Auto-generated link</div>
+                </div>
+            </label>
+            <label class="radio-card{{if eq $loc "zoom"}} selected{{end}}">
+                <input type="radio" name="location_type" value="zoom" {{if eq $loc "zoom"}}checked{{end}}>
+                <div class="radio-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <polygon points="23 7 16 12 23 17 23 7"/>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>
+                </div>
+                <div class="radio-content">
+                    <div class="radio-label">Zoom</div>
+                    <div class="radio-description">Auto-generated link</div>
+                </div>
+            </label>
+            <label class="radio-card{{if eq $loc "phone"}} selected{{end}}">
+                <input type="radio" name="location_type" value="phone" {{if eq $loc "phone"}}checked{{end}}>
+                <div class="radio-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"/>
+                    </svg>
+                </div>
+                <div class="radio-content">
+                    <div class="radio-label">Phone Call</div>
+                    <div class="radio-description">Provide a number</div>
+                </div>
+            </label>
+            <label class="radio-card{{if eq $loc "custom"}} selected{{end}}">
+                <input type="radio" name="location_type" value="custom" {{if eq $loc "custom"}}checked{{end}}>
+                <div class="radio-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                        <circle cx="12" cy="10" r="3"/>
+                    </svg>
+                </div>
+                <div class="radio-content">
+                    <div class="radio-label">Custom</div>
+                    <div class="radio-description">Specify a location</div>
+                </div>
+            </label>
+        </div>
+
+        <div class="form-group" id="custom_location_group" style="{{if or (eq $loc "phone") (eq $loc "custom")}}margin-top: 20px;{{else}}display:none;{{end}}">
+            <label class="form-label" for="custom_location" id="custom_location_label">{{if eq $loc "phone"}}Phone Number{{else}}Location Details{{end}}</label>
+            <input type="text" id="custom_location" name="custom_location" class="form-input"
+                   value="{{if $event}}{{$event.CustomLocation}}{{end}}"
+                   placeholder="{{if eq $loc "phone"}}Enter your phone number{{else}}Address or custom location{{end}}">
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Calendar</h2>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="calendar_id">Add Event To</label>
+            <select id="calendar_id" name="calendar_id" class="form-select">
+                <option value="">Auto (your default writable calendar)</option>
+                {{$selectedCal := ""}}
+                {{if $event}}{{$selectedCal = $event.CalendarID}}{{else if $prefill}}{{$selectedCal = $prefill.CalendarID}}{{end}}
+                {{range .Data.CalendarOptions}}
+                {{if .Calendars}}
+                <optgroup label="{{.Name}} ({{.Provider}})">
+                    {{range .Calendars}}
+                    {{if .IsWritable}}
+                    <option value="{{.ID}}" {{if eq $selectedCal .ID}}selected{{end}}>{{.Name}}</option>
+                    {{end}}
+                    {{end}}
+                </optgroup>
+                {{end}}
+                {{end}}
+            </select>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-header">
+            <h2 class="section-title">Attendees</h2>
+            <p class="section-subtitle">Type to search your contacts, or paste an email + Enter to add as free-form</p>
+        </div>
+
+        <div class="form-group">
+            <div id="attendee-chips" class="attendee-chips">
+                {{range $attendees}}
+                <span class="attendee-chip" data-email="{{.Email}}">
+                    <span class="attendee-chip-name">{{if .Name}}{{.Name}}{{else}}{{.Email}}{{end}}</span>
+                    <button type="button" class="attendee-chip-remove" aria-label="Remove" onclick="removeAttendeeChip(this)">×</button>
+                    <input type="hidden" name="attendee_email" value="{{.Email}}">
+                    <input type="hidden" name="attendee_name" value="{{.Name}}">
+                    <input type="hidden" name="attendee_contact_id" value="{{if .ContactID}}{{.ContactID}}{{end}}">
+                </span>
+                {{end}}
+            </div>
+
+            <div class="attendee-picker">
+                <input type="text"
+                       id="attendee-search"
+                       class="form-input"
+                       placeholder="Search contacts or type an email…"
+                       autocomplete="off"
+                       hx-get="/dashboard/events/attendee-search"
+                       hx-trigger="input changed delay:200ms"
+                       hx-target="#attendee-results"
+                       hx-swap="innerHTML"
+                       hx-include="this"
+                       name="q"
+                       onkeydown="onAttendeeKeyDown(event)">
+                <div id="attendee-results"></div>
+            </div>
+            <p class="form-hint">Press Enter to add a free-form email. Click a result to add a known contact.</p>
+        </div>
+    </section>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">{{if $isNew}}Schedule Event{{else}}Save Changes{{end}}</button>
+        <a href="/dashboard/events" class="btn btn-outline">Cancel</a>
+    </div>
+</form>
+
+<style>
+.attendee-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; }
+.attendee-chip { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.5rem 0.25rem 0.75rem; background: var(--gray-100, #f3f4f6); border: 1px solid var(--gray-200, #e5e7eb); border-radius: 999px; font-size: 0.875rem; }
+.attendee-chip-remove { background: none; border: 0; cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 0.25rem; color: var(--gray-500, #6b7280); }
+.attendee-chip-remove:hover { color: var(--color-danger, #d9534f); }
+.attendee-picker { position: relative; }
+.attendee-picker-results { border: 1px solid var(--gray-200, #e5e7eb); border-radius: 0.5rem; margin-top: 0.25rem; max-height: 240px; overflow-y: auto; background: white; }
+.attendee-picker-result { display: block; width: 100%; text-align: left; padding: 0.5rem 0.75rem; border: 0; background: transparent; cursor: pointer; }
+.attendee-picker-result:hover { background: var(--gray-100, #f3f4f6); }
+.attendee-picker-name { display: block; font-weight: 500; }
+.attendee-picker-email { display: block; font-size: 0.875rem; color: var(--gray-500, #6b7280); }
+.attendee-picker-empty { padding: 0.5rem 0.75rem; font-size: 0.875rem; color: var(--gray-500, #6b7280); }
+</style>
+
+<script>
+// Duration chip selection (radio).
+document.querySelectorAll('#duration-chips input').forEach(function(input) {
+    input.addEventListener('change', function() {
+        document.querySelectorAll('#duration-chips .duration-chip').forEach(function(c) {
+            c.classList.remove('selected');
+        });
+        this.closest('.duration-chip').classList.add('selected');
+        triggerConflictCheck();
+    });
+});
+
+// Location radio cards.
+document.querySelectorAll('#location-cards input').forEach(function(input) {
+    input.addEventListener('change', function() {
+        document.querySelectorAll('#location-cards .radio-card').forEach(function(c) {
+            c.classList.remove('selected');
+        });
+        this.closest('.radio-card').classList.add('selected');
+
+        var customGroup = document.getElementById('custom_location_group');
+        var label = document.getElementById('custom_location_label');
+        var inputEl = document.getElementById('custom_location');
+        if (this.value === 'phone') {
+            customGroup.style.display = 'block';
+            customGroup.style.marginTop = '20px';
+            label.textContent = 'Phone Number';
+            inputEl.placeholder = 'Enter your phone number';
+        } else if (this.value === 'custom') {
+            customGroup.style.display = 'block';
+            customGroup.style.marginTop = '20px';
+            label.textContent = 'Location Details';
+            inputEl.placeholder = 'Address or custom location';
+        } else {
+            customGroup.style.display = 'none';
+        }
+    });
+});
+
+// Date/time/duration changes trigger a conflict check (HTMX listens for this).
+function triggerConflictCheck() {
+    document.body.dispatchEvent(new CustomEvent('conflict-check'));
+}
+['start_date', 'start_time', 'timezone'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('change', triggerConflictCheck);
+});
+
+// Template prefill.
+function onTemplateChange(select) {
+    var opt = select.options[select.selectedIndex];
+    if (!opt || !opt.value) return;
+    var dur = opt.getAttribute('data-duration');
+    var loc = opt.getAttribute('data-location');
+    var customLoc = opt.getAttribute('data-custom-location');
+    var cal = opt.getAttribute('data-calendar');
+    if (dur) {
+        var match = document.querySelector('#duration-chips input[value="' + dur + '"]');
+        if (match) {
+            match.checked = true;
+            match.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    }
+    if (loc) {
+        var locInput = document.querySelector('#location-cards input[value="' + loc + '"]');
+        if (locInput) {
+            locInput.checked = true;
+            locInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    }
+    if (customLoc) {
+        var customLocInput = document.getElementById('custom_location');
+        if (customLocInput) customLocInput.value = customLoc;
+    }
+    if (cal) {
+        var calSelect = document.getElementById('calendar_id');
+        if (calSelect) calSelect.value = cal;
+    }
+}
+
+// Attendee picker.
+function addAttendeeFromContact(button) {
+    addAttendee({
+        email: button.dataset.email,
+        name: button.dataset.name,
+        contactID: button.dataset.contactId,
+    });
+    document.getElementById('attendee-search').value = '';
+    document.getElementById('attendee-results').innerHTML = '';
+}
+
+function addAttendee(att) {
+    var email = (att.email || '').trim().toLowerCase();
+    if (!email) return;
+    var existing = document.querySelector('#attendee-chips .attendee-chip[data-email="' + email + '"]');
+    if (existing) return;
+
+    var chip = document.createElement('span');
+    chip.className = 'attendee-chip';
+    chip.dataset.email = email;
+    chip.innerHTML = '<span class="attendee-chip-name"></span>' +
+        '<button type="button" class="attendee-chip-remove" aria-label="Remove" onclick="removeAttendeeChip(this)">×</button>' +
+        '<input type="hidden" name="attendee_email">' +
+        '<input type="hidden" name="attendee_name">' +
+        '<input type="hidden" name="attendee_contact_id">';
+    chip.querySelector('.attendee-chip-name').textContent = att.name || email;
+    var inputs = chip.querySelectorAll('input[type="hidden"]');
+    inputs[0].value = email;
+    inputs[1].value = att.name || '';
+    inputs[2].value = att.contactID || '';
+
+    document.getElementById('attendee-chips').appendChild(chip);
+}
+
+function removeAttendeeChip(button) {
+    var chip = button.closest('.attendee-chip');
+    if (chip) chip.remove();
+}
+
+function onAttendeeKeyDown(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        var input = event.target;
+        var raw = input.value.trim();
+        if (raw && raw.includes('@') && raw.includes('.')) {
+            addAttendee({ email: raw });
+            input.value = '';
+            document.getElementById('attendee-results').innerHTML = '';
+        }
+    }
+}
+
+// Make sure clicking the picker results doesn't accidentally submit the form.
+document.getElementById('event-form').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && e.target && e.target.id === 'attendee-search') {
+        e.preventDefault();
+    }
+});
+</script>
+{{end}}

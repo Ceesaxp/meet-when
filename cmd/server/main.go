@@ -161,6 +161,22 @@ func main() {
 	dashboard.HandleFunc("GET /dashboard/contacts", h.Dashboard.Contacts)
 	dashboard.HandleFunc("GET /dashboard/contacts/{email}/bookings", h.Dashboard.ContactBookings)
 
+	// Hosted events (host-driven scheduling). HTMX partials for autocomplete
+	// + conflict-warning live under the same prefix so the auth middleware
+	// covers them, and use distinct paths so they don't shadow {id}.
+	dashboard.HandleFunc("GET /dashboard/events", h.DashboardEvents.List)
+	dashboard.HandleFunc("GET /dashboard/events/new", h.DashboardEvents.NewForm)
+	dashboard.HandleFunc("POST /dashboard/events", h.DashboardEvents.Create)
+	dashboard.HandleFunc("GET /dashboard/events/check-conflicts", h.DashboardEvents.CheckConflicts)
+	dashboard.HandleFunc("GET /dashboard/events/attendee-search", h.DashboardEvents.AttendeeSearch)
+	dashboard.HandleFunc("GET /dashboard/events/{id}/details", h.DashboardEvents.Details)
+	dashboard.HandleFunc("GET /dashboard/events/{id}/edit", h.DashboardEvents.EditForm)
+	dashboard.HandleFunc("POST /dashboard/events/{id}/edit", h.DashboardEvents.Update)
+	dashboard.HandleFunc("POST /dashboard/events/{id}/cancel", h.DashboardEvents.Cancel)
+	dashboard.HandleFunc("POST /dashboard/events/{id}/archive", h.DashboardEvents.Archive)
+	dashboard.HandleFunc("POST /dashboard/events/{id}/unarchive", h.DashboardEvents.Unarchive)
+	dashboard.HandleFunc("POST /dashboard/events/{id}/retry-calendar", h.DashboardEvents.RetryCalendar)
+
 	// Settings
 	dashboard.HandleFunc("GET /dashboard/settings", h.Dashboard.Settings)
 	dashboard.HandleFunc("PUT /dashboard/settings", h.Dashboard.UpdateSettings)

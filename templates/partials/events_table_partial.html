@@ -1,0 +1,69 @@
+{{define "events_table_partial.html"}}
+<div class="table-container">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date & Time</th>
+                <th>Title</th>
+                <th>Attendees</th>
+                <th>Duration</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Events}}
+            <tr class="booking-row{{if .IsArchived}} archived{{end}}" id="event-row-{{.ID}}" onclick="openEventModal('{{.ID}}')">
+                <td>
+                    <div class="datetime-cell">
+                        <span class="date">{{formatDateInTZ .StartTime $.HostTimezone}}</span>
+                        <span class="time">{{formatTimeInTZ .StartTime $.HostTimezone}} - {{formatTimeInTZ .EndTime $.HostTimezone}} {{tzAbbrev $.HostTimezone .StartTime}}</span>
+                    </div>
+                </td>
+                <td>
+                    <span class="guest-name">{{.Title}}</span>
+                </td>
+                <td>
+                    <span class="guest-email" id="event-attendees-{{.ID}}">—</span>
+                </td>
+                <td>{{.Duration}} min</td>
+                <td>
+                    <span class="badge badge-{{if eq (printf "%s" .Status) "scheduled"}}confirmed{{else}}cancelled{{end}}">{{.Status}}</span>
+                </td>
+                <td class="actions-cell" onclick="event.stopPropagation()">
+                    <div class="table-actions">
+                        {{if eq (printf "%s" .Status) "scheduled"}}
+                        {{if .ConferenceLink}}
+                        <a href="{{.ConferenceLink}}" target="_blank" class="btn-sm btn-join">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <polygon points="23 7 16 12 23 17 23 7"/>
+                                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                            </svg>
+                            Join
+                        </a>
+                        {{end}}
+                        <a href="/dashboard/events/{{.ID}}/edit" class="btn-sm btn-secondary">Edit</a>
+                        <form action="/dashboard/events/{{.ID}}/cancel" method="POST" style="display:inline">
+                            <input type="hidden" name="reason" value="">
+                            <button type="submit" class="btn-sm btn-cancel" onclick="return confirm('Cancel this event? Attendees will be notified.')">Cancel</button>
+                        </form>
+                        {{end}}
+                        {{if isPast .EndTime}}
+                            {{if .IsArchived}}
+                            <form action="/dashboard/events/{{.ID}}/unarchive" method="POST" style="display:inline">
+                                <button type="submit" class="btn-sm btn-secondary" onclick="return confirm('Unarchive this event?')">Unarchive</button>
+                            </form>
+                            {{else}}
+                            <form action="/dashboard/events/{{.ID}}/archive" method="POST" style="display:inline">
+                                <button type="submit" class="btn-sm btn-secondary" onclick="return confirm('Archive this event?')">Archive</button>
+                            </form>
+                            {{end}}
+                        {{end}}
+                    </div>
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

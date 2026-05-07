@@ -1,0 +1,20 @@
+{{define "event_attendee_picker_results.html"}}
+{{if .Contacts}}
+<div class="attendee-picker-results">
+    {{range .Contacts}}
+    <button type="button" class="attendee-picker-result"
+            data-email="{{.Email}}"
+            data-name="{{.Name}}"
+            data-contact-id="{{.ID}}"
+            onclick="addAttendeeFromContact(this)">
+        <span class="attendee-picker-name">{{.Name}}</span>
+        <span class="attendee-picker-email">{{.Email}}</span>
+    </button>
+    {{end}}
+</div>
+{{else if .Query}}
+<div class="attendee-picker-empty">
+    No matching contacts. Press Enter to add &ldquo;{{.Query}}&rdquo; as a free-form attendee.
+</div>
+{{end}}
+{{end}}

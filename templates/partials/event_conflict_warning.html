@@ -1,0 +1,25 @@
+{{define "event_conflict_warning.html"}}
+{{if .Conflicts}}
+<div class="alert alert-warning" role="alert" style="margin-top: 0.5rem;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" aria-hidden="true">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+    <div>
+        <strong>This time overlaps with {{len .Conflicts}} existing event{{if gt (len .Conflicts) 1}}s{{end}}.</strong>
+        <ul style="margin: 0.25rem 0 0 1.25rem; padding: 0; font-size: 0.875rem;">
+            {{range .Conflicts}}
+            <li>
+                {{formatDateInTZ .Start $.HostTimezone}}
+                {{formatTimeInTZ .Start $.HostTimezone}}
+                – {{formatTimeInTZ .End $.HostTimezone}}
+                {{tzAbbrev $.HostTimezone .Start}}
+            </li>
+            {{end}}
+        </ul>
+        <small>You can still schedule on this slot — this is a soft warning.</small>
+    </div>
+</div>
+{{end}}
+{{end}}
