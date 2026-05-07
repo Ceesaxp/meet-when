@@ -566,61 +566,160 @@ func (s *CalendarService) getGoogleBusyTimesMulti(ctx context.Context, conn *mod
 	return out, nil
 }
 
-// CreateEvent creates a calendar event in the template's configured calendar.
-// details.Template.CalendarID is interpreted as a provider_calendars.id.
+// CalendarEventInput is the provider-agnostic shape of a calendar event the
+// caller wants written. Booking and hosted-event flows both build one of these
+// and hand it to CreateEventForHost / UpdateEvent.
+//
+// Description must be already-composed by the caller — providers render it
+// verbatim. The booking-side adapter (BuildCalendarEventInputForBooking)
+// composes the agenda and reschedule-link suffixes that booking flows need;
+// the hosted-event flow does not.
+type CalendarEventInput struct {
+	Summary            string
+	Description        string
+	Start              time.Time
+	End                time.Time
+	LocationType       models.ConferencingProvider
+	CustomLocation     string
+	ConferenceLink     string
+	Attendees          []string
+	HostName           string
+	HostEmail          string
+	EventID            string // empty for create; set for update
+	MeetIdempotencyKey string // requestId for Google Meet conferenceData.createRequest
+}
+
+// calendarEventWriter is the narrow contract that CalendarEventSyncer depends
+// on. *CalendarService satisfies it; tests inject a fake.
+type calendarEventWriter interface {
+	CreateEventForHost(ctx context.Context, providerCalendarID string, input *CalendarEventInput) (eventID, conferenceLink string, err error)
+	UpdateEvent(ctx context.Context, providerCalendarID string, input *CalendarEventInput) (eventID string, err error)
+	DeleteEvent(ctx context.Context, hostID, providerCalendarID, eventID string) error
+}
+
+// BuildCalendarEventInputForBooking composes a CalendarEventInput from a
+// BookingWithDetails. Description includes the template description, any
+// invitee-supplied agenda, host notes (when surfacing on update), and the
+// reschedule link — i.e. what the previous booking-coupled providers used to
+// build inline.
+func (s *CalendarService) BuildCalendarEventInputForBooking(details *BookingWithDetails) *CalendarEventInput {
+	attendees := make([]string, 0, 1+len(details.Booking.AdditionalGuests))
+	if details.Booking.InviteeEmail != "" {
+		attendees = append(attendees, details.Booking.InviteeEmail)
+	}
+	for _, guest := range details.Booking.AdditionalGuests {
+		if isValidEmail(guest) {
+			attendees = append(attendees, guest)
+		}
+	}
+
+	description := details.Template.Description
+	if details.Booking.Answers != nil {
+		if agenda, ok := details.Booking.Answers["agenda"].(string); ok && agenda != "" {
+			if description != "" {
+				description += "\n\n"
+			}
+			description += "Agenda:\n" + agenda
+		}
+		if notes, ok := details.Booking.Answers["host_notes"].(string); ok && notes != "" {
+			if description != "" {
+				description += "\n\n"
+			}
+			description += "Notes from host:\n" + notes
+		}
+	}
+	rescheduleURL := fmt.Sprintf("%s/m/%s/%s/%s/reschedule/%s",
+		s.cfg.Server.BaseURL, details.Tenant.Slug, details.Host.Slug, details.Template.Slug, details.Booking.ID)
+	if description != "" {
+		description += "\n\n"
+	}
+	description += "Reschedule this meeting:\n" + rescheduleURL
+
+	return &CalendarEventInput{
+		Summary:            details.Template.Name + " with " + details.Booking.InviteeName,
+		Description:        description,
+		Start:              details.Booking.StartTime.Time,
+		End:                details.Booking.EndTime.Time,
+		LocationType:       details.Template.LocationType,
+		CustomLocation:     details.Template.CustomLocation,
+		ConferenceLink:     details.Booking.ConferenceLink,
+		Attendees:          attendees,
+		HostName:           details.Host.Name,
+		HostEmail:          details.Host.Email,
+		EventID:            details.Booking.CalendarEventID,
+		MeetIdempotencyKey: details.Booking.ID,
+	}
+}
+
+// CreateEvent is the booking-side adapter for legacy single-host call sites
+// that still hand over a *BookingWithDetails. Builds an input and delegates.
+// The returned conferenceLink is also written onto details.Booking.ConferenceLink
+// when Google Meet creation surfaces one.
 func (s *CalendarService) CreateEvent(ctx context.Context, details *BookingWithDetails) (string, error) {
-	return s.CreateEventForHost(ctx, details, details.Template.CalendarID)
+	input := s.BuildCalendarEventInputForBooking(details)
+	eventID, conferenceLink, err := s.CreateEventForHost(ctx, details.Template.CalendarID, input)
+	if err != nil {
+		return "", err
+	}
+	if conferenceLink != "" && details.Booking.ConferenceLink == "" {
+		details.Booking.ConferenceLink = conferenceLink
+	}
+	return eventID, nil
 }
 
 // CreateEventForHost creates a calendar event in a specific provider calendar.
-func (s *CalendarService) CreateEventForHost(ctx context.Context, details *BookingWithDetails, providerCalendarID string) (string, error) {
+// Returns (eventID, conferenceLink, error). conferenceLink is non-empty only
+// when Google Meet creation succeeded as part of the create call.
+func (s *CalendarService) CreateEventForHost(ctx context.Context, providerCalendarID string, input *CalendarEventInput) (string, string, error) {
 	if providerCalendarID == "" {
-		return "", nil
+		return "", "", nil
 	}
 
 	pc, err := s.repos.ProviderCalendar.GetByID(ctx, providerCalendarID)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if pc == nil {
-		return "", ErrCalendarNotFound
+		return "", "", ErrCalendarNotFound
 	}
 	if !pc.IsWritable {
-		return "", fmt.Errorf("calendar %s is not writable", pc.Name)
+		return "", "", fmt.Errorf("calendar %s is not writable", pc.Name)
 	}
 	conn, err := s.repos.Calendar.GetByID(ctx, pc.ConnectionID)
 	if err != nil || conn == nil {
-		return "", ErrCalendarNotFound
+		return "", "", ErrCalendarNotFound
 	}
 
 	view := *conn
 	switch conn.Provider {
 	case models.CalendarProviderGoogle:
 		view.CalendarID = pc.ProviderCalendarID
-		return s.createGoogleEvent(ctx, &view, details)
+		return s.createGoogleEvent(ctx, &view, input)
 	case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
 		if pc.ProviderCalendarID != "" {
 			view.CalDAVURL = pc.ProviderCalendarID
 		}
-		return s.createCalDAVEvent(ctx, &view, details)
+		eventID, err := s.createCalDAVEvent(ctx, &view, input)
+		return eventID, "", err
 	}
-	return "", nil
+	return "", "", nil
 }
 
-// UpdateEvent updates an existing calendar event for a booking. If the booking
-// has no recorded event ID (e.g. event creation previously failed), falls back
-// to CreateEventForHost so reconnect-then-edit produces a fresh event.
+// UpdateEvent updates an existing calendar event. If input.EventID is empty
+// (e.g. event creation previously failed), falls back to CreateEventForHost so
+// reconnect-then-edit produces a fresh event — and the new event ID is
+// returned to the caller, which is responsible for persisting it.
 //
-// For Google: issues a PATCH so existing attendees keep their RSVP state and
-// get a single "event updated" invitation. For CalDAV: replaces the event via
-// delete + create (CalDAV does not have a clean PATCH primitive in this
-// codebase; the resulting iCal carries the new state to all attendees).
-func (s *CalendarService) UpdateEvent(ctx context.Context, details *BookingWithDetails, providerCalendarID string) (string, error) {
-	if details.Booking.CalendarEventID == "" {
-		return s.CreateEventForHost(ctx, details, providerCalendarID)
+// For Google: PATCH so existing attendees keep their RSVP state. For CalDAV:
+// replaces the event via delete + create; the new ID is returned and may
+// differ from input.EventID.
+func (s *CalendarService) UpdateEvent(ctx context.Context, providerCalendarID string, input *CalendarEventInput) (string, error) {
+	if input.EventID == "" {
+		eventID, _, err := s.CreateEventForHost(ctx, providerCalendarID, input)
+		return eventID, err
 	}
 	if providerCalendarID == "" {
-		return details.Booking.CalendarEventID, nil
+		return input.EventID, nil
 	}
 
 	pc, err := s.repos.ProviderCalendar.GetByID(ctx, providerCalendarID)
@@ -639,22 +738,21 @@ func (s *CalendarService) UpdateEvent(ctx context.Context, details *BookingWithD
 	switch conn.Provider {
 	case models.CalendarProviderGoogle:
 		view.CalendarID = pc.ProviderCalendarID
-		return s.updateGoogleEvent(ctx, &view, details)
+		return s.updateGoogleEvent(ctx, &view, input)
 	case models.CalendarProviderCalDAV, models.CalendarProviderICloud:
 		if pc.ProviderCalendarID != "" {
 			view.CalDAVURL = pc.ProviderCalendarID
 		}
-		// CalDAV: replace via delete + create.
-		if err := s.deleteCalDAVEvent(ctx, &view, details.Booking.CalendarEventID); err != nil {
+		if err := s.deleteCalDAVEvent(ctx, &view, input.EventID); err != nil {
 			log.Printf("[CALENDAR] CalDAV delete during update failed: %v", err)
 		}
-		newID, err := s.createCalDAVEvent(ctx, &view, details)
+		newID, err := s.createCalDAVEvent(ctx, &view, input)
 		if err != nil {
 			return "", err
 		}
 		return newID, nil
 	}
-	return details.Booking.CalendarEventID, nil
+	return input.EventID, nil
 }
 
 // DeleteEvent deletes a calendar event from a provider calendar.
@@ -992,71 +1090,50 @@ func (s *CalendarService) getGoogleBusyTimes(ctx context.Context, cal *models.Ca
 	return busyTimes, nil
 }
 
-func (s *CalendarService) createGoogleEvent(ctx context.Context, cal *models.CalendarConnection, details *BookingWithDetails) (string, error) {
+func (s *CalendarService) createGoogleEvent(ctx context.Context, cal *models.CalendarConnection, input *CalendarEventInput) (string, string, error) {
 	if err := s.refreshGoogleToken(cal); err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	// Build attendees list, filtering out invalid emails
-	attendees := []map[string]string{
-		{"email": details.Booking.InviteeEmail},
-	}
-	for _, guest := range details.Booking.AdditionalGuests {
-		// Basic email validation - must contain @ and have content on both sides
-		if strings.Contains(guest, "@") && len(strings.Split(guest, "@")[0]) > 0 && len(strings.Split(guest, "@")[1]) > 1 {
-			attendees = append(attendees, map[string]string{"email": guest})
+	attendees := make([]map[string]string, 0, len(input.Attendees))
+	for _, email := range input.Attendees {
+		if isValidEmail(email) {
+			attendees = append(attendees, map[string]string{"email": email})
 		}
 	}
-
-	// Build description with template description and agenda if provided
-	description := details.Template.Description
-	if details.Booking.Answers != nil {
-		if agenda, ok := details.Booking.Answers["agenda"].(string); ok && agenda != "" {
-			if description != "" {
-				description += "\n\n"
-			}
-			description += "Agenda:\n" + agenda
-		}
-	}
-
-	// Add reschedule link
-	rescheduleURL := fmt.Sprintf("%s/m/%s/%s/%s/reschedule/%s",
-		s.cfg.Server.BaseURL, details.Tenant.Slug, details.Host.Slug, details.Template.Slug, details.Booking.ID)
-	if description != "" {
-		description += "\n\n"
-	}
-	description += "Reschedule this meeting:\n" + rescheduleURL
 
 	event := map[string]interface{}{
-		"summary":     details.Template.Name + " with " + details.Booking.InviteeName,
-		"description": description,
+		"summary":     input.Summary,
+		"description": input.Description,
 		"start": map[string]string{
-			"dateTime": details.Booking.StartTime.Format(time.RFC3339),
+			"dateTime": input.Start.Format(time.RFC3339),
 			"timeZone": "UTC",
 		},
 		"end": map[string]string{
-			"dateTime": details.Booking.EndTime.Format(time.RFC3339),
+			"dateTime": input.End.Format(time.RFC3339),
 			"timeZone": "UTC",
 		},
 		"attendees": attendees,
 	}
 
-	// Add location based on location type
-	if details.Template.LocationType == models.ConferencingProviderPhone {
-		if details.Template.CustomLocation != "" {
-			event["location"] = "Call " + details.Template.CustomLocation
+	if input.LocationType == models.ConferencingProviderPhone {
+		if input.CustomLocation != "" {
+			event["location"] = "Call " + input.CustomLocation
 		}
-	} else if details.Booking.ConferenceLink != "" {
-		event["location"] = details.Booking.ConferenceLink
-	} else if details.Template.CustomLocation != "" {
-		event["location"] = details.Template.CustomLocation
+	} else if input.ConferenceLink != "" {
+		event["location"] = input.ConferenceLink
+	} else if input.CustomLocation != "" {
+		event["location"] = input.CustomLocation
 	}
 
-	// Add Google Meet if that's the location type and no link exists
-	if details.Template.LocationType == models.ConferencingProviderGoogleMeet && details.Booking.ConferenceLink == "" {
+	if input.LocationType == models.ConferencingProviderGoogleMeet && input.ConferenceLink == "" {
+		key := input.MeetIdempotencyKey
+		if key == "" {
+			key = uuid.New().String()
+		}
 		event["conferenceData"] = map[string]interface{}{
 			"createRequest": map[string]string{
-				"requestId": details.Booking.ID,
+				"requestId": key,
 			},
 		}
 	}
@@ -1070,7 +1147,7 @@ func (s *CalendarService) createGoogleEvent(ctx context.Context, cal *models.Cal
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
@@ -1080,7 +1157,7 @@ func (s *CalendarService) createGoogleEvent(ctx context.Context, cal *models.Cal
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("failed to create event: %s", string(respBody))
+		return "", "", fmt.Errorf("failed to create event: %s", string(respBody))
 	}
 
 	var result struct {
@@ -1092,68 +1169,44 @@ func (s *CalendarService) createGoogleEvent(ctx context.Context, cal *models.Cal
 		} `json:"conferenceData"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	// Update conference link if Google Meet was created
-	if len(result.ConferenceData.EntryPoints) > 0 && details.Booking.ConferenceLink == "" {
-		details.Booking.ConferenceLink = result.ConferenceData.EntryPoints[0].URI
+	conferenceLink := ""
+	if len(result.ConferenceData.EntryPoints) > 0 && input.ConferenceLink == "" {
+		conferenceLink = result.ConferenceData.EntryPoints[0].URI
 	}
 
-	return result.ID, nil
+	return result.ID, conferenceLink, nil
 }
 
 // updateGoogleEvent PATCHes an existing Google Calendar event. The patch body
 // only includes mutable fields (description, location, attendees) — title and
 // time are left unchanged so this method composes safely with reschedule
 // (which deletes and recreates rather than patches).
-func (s *CalendarService) updateGoogleEvent(ctx context.Context, cal *models.CalendarConnection, details *BookingWithDetails) (string, error) {
+func (s *CalendarService) updateGoogleEvent(ctx context.Context, cal *models.CalendarConnection, input *CalendarEventInput) (string, error) {
 	if err := s.refreshGoogleToken(cal); err != nil {
 		return "", err
 	}
 
-	attendees := []map[string]string{
-		{"email": details.Booking.InviteeEmail},
-	}
-	for _, guest := range details.Booking.AdditionalGuests {
-		if strings.Contains(guest, "@") && len(strings.Split(guest, "@")[0]) > 0 && len(strings.Split(guest, "@")[1]) > 1 {
-			attendees = append(attendees, map[string]string{"email": guest})
+	attendees := make([]map[string]string, 0, len(input.Attendees))
+	for _, email := range input.Attendees {
+		if isValidEmail(email) {
+			attendees = append(attendees, map[string]string{"email": email})
 		}
 	}
-
-	description := details.Template.Description
-	if details.Booking.Answers != nil {
-		if agenda, ok := details.Booking.Answers["agenda"].(string); ok && agenda != "" {
-			if description != "" {
-				description += "\n\n"
-			}
-			description += "Agenda:\n" + agenda
-		}
-		if notes, ok := details.Booking.Answers["host_notes"].(string); ok && notes != "" {
-			if description != "" {
-				description += "\n\n"
-			}
-			description += "Notes from host:\n" + notes
-		}
-	}
-	rescheduleURL := fmt.Sprintf("%s/m/%s/%s/%s/reschedule/%s",
-		s.cfg.Server.BaseURL, details.Tenant.Slug, details.Host.Slug, details.Template.Slug, details.Booking.ID)
-	if description != "" {
-		description += "\n\n"
-	}
-	description += "Reschedule this meeting:\n" + rescheduleURL
 
 	patch := map[string]interface{}{
-		"description": description,
+		"description": input.Description,
 		"attendees":   attendees,
 	}
-	if details.Booking.ConferenceLink != "" {
-		patch["location"] = details.Booking.ConferenceLink
+	if input.ConferenceLink != "" {
+		patch["location"] = input.ConferenceLink
 	}
 
 	body, _ := json.Marshal(patch)
 	patchURL := fmt.Sprintf("https://www.googleapis.com/calendar/v3/calendars/%s/events/%s?sendUpdates=all",
-		url.PathEscape(cal.CalendarID), url.PathEscape(details.Booking.CalendarEventID))
+		url.PathEscape(cal.CalendarID), url.PathEscape(input.EventID))
 
 	req, _ := http.NewRequest("PATCH", patchURL, strings.NewReader(string(body)))
 	req.Header.Set("Authorization", "Bearer "+cal.AccessToken)
@@ -1174,7 +1227,7 @@ func (s *CalendarService) updateGoogleEvent(ctx context.Context, cal *models.Cal
 		return "", fmt.Errorf("failed to update event: %s", string(respBody))
 	}
 
-	return details.Booking.CalendarEventID, nil
+	return input.EventID, nil
 }
 
 func (s *CalendarService) deleteGoogleEvent(ctx context.Context, cal *models.CalendarConnection, eventID string) error {
@@ -1568,41 +1621,31 @@ func parseICSDuration(line string) (time.Duration, bool) {
 	return duration, duration > 0
 }
 
-func (s *CalendarService) createCalDAVEvent(ctx context.Context, cal *models.CalendarConnection, details *BookingWithDetails) (string, error) {
+func (s *CalendarService) createCalDAVEvent(ctx context.Context, cal *models.CalendarConnection, input *CalendarEventInput) (string, error) {
 	eventUID := uuid.New().String()
 
-	// Build location string
 	location := ""
-	if details.Template.LocationType == models.ConferencingProviderPhone {
-		if details.Template.CustomLocation != "" {
-			location = "Call " + details.Template.CustomLocation
+	if input.LocationType == models.ConferencingProviderPhone {
+		if input.CustomLocation != "" {
+			location = "Call " + input.CustomLocation
 		}
-	} else if details.Booking.ConferenceLink != "" {
-		location = details.Booking.ConferenceLink
-	} else if details.Template.CustomLocation != "" {
-		location = details.Template.CustomLocation
+	} else if input.ConferenceLink != "" {
+		location = input.ConferenceLink
+	} else if input.CustomLocation != "" {
+		location = input.CustomLocation
 	}
 
-	// Build description with template description and agenda if provided
-	description := details.Template.Description
-	if details.Booking.Answers != nil {
-		if agenda, ok := details.Booking.Answers["agenda"].(string); ok && agenda != "" {
-			if description != "" {
-				description += "\\n\\n"
-			}
-			description += "Agenda:\\n" + strings.ReplaceAll(agenda, "\n", "\\n")
+	// iCalendar requires literal "\n" sequences (escaped) in DESCRIPTION; the
+	// caller composes the description with real newlines, we escape here.
+	icsDescription := strings.ReplaceAll(input.Description, "\n", "\\n")
+
+	var attendeeLines string
+	for _, email := range input.Attendees {
+		if isValidEmail(email) {
+			attendeeLines += fmt.Sprintf("\nATTENDEE:mailto:%s", email)
 		}
 	}
 
-	// Add reschedule link
-	rescheduleURL := fmt.Sprintf("%s/m/%s/%s/%s/reschedule/%s",
-		s.cfg.Server.BaseURL, details.Tenant.Slug, details.Host.Slug, details.Template.Slug, details.Booking.ID)
-	if description != "" {
-		description += "\\n\\n"
-	}
-	description += "Reschedule this meeting:\\n" + rescheduleURL
-
-	// Build iCalendar event
 	ics := fmt.Sprintf(`BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//MeetWhen//EN
@@ -1613,18 +1656,17 @@ DTEND:%s
 SUMMARY:%s
 DESCRIPTION:%s
 LOCATION:%s
-ORGANIZER:mailto:%s
-ATTENDEE:mailto:%s
+ORGANIZER:mailto:%s%s
 END:VEVENT
 END:VCALENDAR`,
 		eventUID,
-		details.Booking.StartTime.UTC().Format("20060102T150405Z"),
-		details.Booking.EndTime.UTC().Format("20060102T150405Z"),
-		details.Template.Name+" with "+details.Booking.InviteeName,
-		description,
+		input.Start.UTC().Format("20060102T150405Z"),
+		input.End.UTC().Format("20060102T150405Z"),
+		input.Summary,
+		icsDescription,
 		location,
-		details.Host.Email,
-		details.Booking.InviteeEmail,
+		input.HostEmail,
+		attendeeLines,
 	)
 
 	eventURL := fmt.Sprintf("%s/%s.ics", strings.TrimSuffix(cal.CalDAVURL, "/"), eventUID)

@@ -32,7 +32,8 @@ func New(cfg *config.Config, repos *repository.Repositories) *Services {
 	auditLogSvc := NewAuditLogService(repos)
 
 	contactSvc := NewContactService(repos)
-	bookingSvc := NewBookingService(cfg, repos, calendarSvc, conferencingSvc, emailSvc, auditLogSvc, contactSvc)
+	syncerSvc := NewCalendarEventSyncer(repos, calendarSvc)
+	bookingSvc := NewBookingService(cfg, repos, calendarSvc, syncerSvc, conferencingSvc, emailSvc, auditLogSvc, contactSvc)
 	templateSvc := NewTemplateService(repos, auditLogSvc)
 	sessionSvc := NewSessionService(cfg, repos)
 	authSvc := NewAuthService(cfg, repos, sessionSvc, auditLogSvc)
