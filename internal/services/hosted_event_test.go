@@ -26,6 +26,7 @@ type spyEmailSender struct {
 	updated          []emailCall
 	updatedToHost    []emailCall
 	cancelled        []emailCall
+	cancelledToHost  []emailCall
 	cancelledForAttn []emailCall
 	reminders        []emailCall
 }
@@ -58,6 +59,12 @@ func (s *spyEmailSender) SendHostedEventCancelled(_ context.Context, e *models.H
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.cancelled = append(s.cancelled, emailCall{EventID: e.ID, AttendeeEmail: a.Email})
+}
+
+func (s *spyEmailSender) SendHostedEventCancelledToHost(_ context.Context, e *models.HostedEvent, h *models.Host, _ *models.Tenant, _ []*models.HostedEventAttendee) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cancelledToHost = append(s.cancelledToHost, emailCall{EventID: e.ID, AttendeeEmail: h.Email})
 }
 
 func (s *spyEmailSender) SendHostedEventCancelledForAttendee(_ context.Context, e *models.HostedEvent, a *models.HostedEventAttendee, _ *models.Host, _ *models.Tenant) {
@@ -93,6 +100,12 @@ func (s *spyEmailSender) updatedToHostCount() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return len(s.updatedToHost)
+}
+
+func (s *spyEmailSender) cancelledToHostCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.cancelledToHost)
 }
 
 func (s *spyEmailSender) cancelledForAttendeeEmails() []string {
@@ -643,6 +656,10 @@ func TestHostedEventCancel_DeletesTrackedRowsAndEmails(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 	if got := h.email.cancelledEmails(); !equalSet(got, []string{"alice@example.com", "bob@example.com"}) {
 		t.Fatalf("cancelled emails = %v, want [alice, bob]", got)
+	}
+	// The host must receive exactly one cancellation confirmation.
+	if got := h.email.cancelledToHostCount(); got != 1 {
+		t.Fatalf("expected 1 host cancellation email, got %d", got)
 	}
 }
 

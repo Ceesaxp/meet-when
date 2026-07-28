@@ -78,6 +78,7 @@ type hostedEventEmailSender interface {
 	SendHostedEventUpdated(ctx context.Context, event *models.HostedEvent, attendee *models.HostedEventAttendee, host *models.Host, tenant *models.Tenant, changedFields []string)
 	SendHostedEventUpdatedToHost(ctx context.Context, event *models.HostedEvent, host *models.Host, tenant *models.Tenant, attendees []*models.HostedEventAttendee, changedFields []string)
 	SendHostedEventCancelled(ctx context.Context, event *models.HostedEvent, attendee *models.HostedEventAttendee, host *models.Host, tenant *models.Tenant)
+	SendHostedEventCancelledToHost(ctx context.Context, event *models.HostedEvent, host *models.Host, tenant *models.Tenant, attendees []*models.HostedEventAttendee)
 	SendHostedEventCancelledForAttendee(ctx context.Context, event *models.HostedEvent, attendee *models.HostedEventAttendee, host *models.Host, tenant *models.Tenant)
 	SendHostedEventReminder(ctx context.Context, event *models.HostedEvent, attendee *models.HostedEventAttendee, host *models.Host, tenant *models.Tenant)
 }
@@ -631,6 +632,9 @@ func (s *HostedEventService) Cancel(ctx context.Context, hostID, tenantID, event
 	for _, a := range details.Attendees {
 		s.email.SendHostedEventCancelled(ctx, details.Event, a, details.Host, details.Tenant)
 	}
+	// Confirmation to the host that their event was cancelled (mirrors the
+	// update-to-host notification).
+	s.email.SendHostedEventCancelledToHost(ctx, details.Event, details.Host, details.Tenant, details.Attendees)
 
 	hID := hostID
 	s.audit.Log(ctx, tenantID, &hID, "hosted_event.cancelled", "hosted_event", eventID, models.JSONMap{
