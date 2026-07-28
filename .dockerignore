@@ -1,0 +1,38 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Docker / compose / proxy config (not needed inside the build context)
+.dockerignore
+Dockerfile
+docker-compose*.yml
+Caddyfile
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Local databases and build artifacts
+*.db
+*.sqlite
+*.sqlite3
+/server
+bin
+dist
+coverage.out
+*.test
+
+# Docs and scratch
+*.md
+audit.txt
+TODO.md
+SIGNUP_CONVERSION_SUMMARY.md
+
+# Agent/editor/tooling directories
+.worktrees
+.agents
+.claude
+.vscode
+.idea

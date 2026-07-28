@@ -1,48 +1,56 @@
+# syntax=docker/dockerfile:1
+
 # Build stage
 FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies
-#RUN apk add --no-cache git
-
 # Copy go mod files first for better layer caching
 COPY go.mod go.sum ./
-RUN go mod download && go mod verify
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download && go mod verify
 
 # Copy source code
 COPY . .
 
-# Build the application with optimizations
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o server ./cmd/server
+# Build the application with optimizations. BuildKit cache mounts keep the
+# module and compiler caches warm across builds; -trimpath drops local paths
+# for reproducible binaries.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-w -s" -o server ./cmd/server
 
 # Runtime stage
 FROM alpine:3.21
 
-WORKDIR /app
-
-# Install runtime dependencies
+# Install runtime dependencies:
+#   ca-certificates — TLS for OAuth/API calls
+#   tzdata          — IANA timezone database (event scheduling relies on it)
 RUN apk add --no-cache ca-certificates tzdata
 
-# Copy binary from builder
-COPY --from=builder /app/server .
+# Create the non-root user up front so the COPY --chown below needs no extra
+# chown -R layer (which would duplicate the whole app tree).
+RUN adduser -D -H -u 10001 appuser
 
-# Copy static files and templates
-COPY --from=builder /app/templates ./templates
-COPY --from=builder /app/static ./static
-COPY --from=builder /app/migrations ./migrations
+WORKDIR /app
 
-# Create non-root user
-RUN adduser -D -g '' appuser && \
-    chown -R appuser:appuser /app
+# Copy binary and runtime assets, already owned by the runtime user.
+COPY --from=builder --chown=appuser:appuser /app/server ./server
+COPY --from=builder --chown=appuser:appuser /app/templates ./templates
+COPY --from=builder --chown=appuser:appuser /app/static ./static
+COPY --from=builder --chown=appuser:appuser /app/migrations ./migrations
+
 USER appuser
 
-# Expose port
-EXPOSE 8080
+# Port the server listens on. Keep in sync with SERVER_ADDRESS; the healthcheck
+# and EXPOSE both derive from it so there is a single source of truth.
+ARG APP_PORT=8080
+ENV APP_PORT=${APP_PORT}
+EXPOSE ${APP_PORT}
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+# Health check (start-period covers migrations on first boot).
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider "http://localhost:${APP_PORT}/health" || exit 1
 
 # Run the application
 CMD ["./server"]
