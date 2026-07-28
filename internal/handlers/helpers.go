@@ -59,6 +59,26 @@ func formatTimeInTZ(t interface{}, tz string) string {
 	return toTime(t).In(loc).Format("3:04 PM")
 }
 
+// dateInputInTZ formats a time as a YYYY-MM-DD string in the given timezone,
+// suitable for an <input type="date"> value. Falls back to UTC on a bad zone.
+func dateInputInTZ(t interface{}, tz string) string {
+	loc, err := time.LoadLocation(tz)
+	if err != nil || loc == nil {
+		loc = time.UTC
+	}
+	return toTime(t).In(loc).Format("2006-01-02")
+}
+
+// timeInputInTZ formats a time as a 24h HH:MM string in the given timezone,
+// suitable for an <input type="time"> value. Falls back to UTC on a bad zone.
+func timeInputInTZ(t interface{}, tz string) string {
+	loc, err := time.LoadLocation(tz)
+	if err != nil || loc == nil {
+		loc = time.UTC
+	}
+	return toTime(t).In(loc).Format("15:04")
+}
+
 // tzAbbrev returns the timezone abbreviation (e.g. "CET", "EST") for a
 // given IANA timezone name at the specified point in time.
 func tzAbbrev(tz string, t interface{}) string {

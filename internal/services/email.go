@@ -1053,6 +1053,72 @@ Meet When`,
 	_ = tenant
 }
 
+// SendHostedEventUpdatedToHost notifies the host (organizer) that their own
+// event changed. Mirrors the per-host reschedule notification in the booking
+// flow: the host was missing from the update fan-out, so they never learned
+// their own edits took effect. The attached ICS also refreshes the host's
+// calendar copy.
+func (s *EmailService) SendHostedEventUpdatedToHost(ctx context.Context, event *models.HostedEvent, host *models.Host, tenant *models.Tenant, attendees []*models.HostedEventAttendee, changedFields []string) {
+	if host == nil || host.Email == "" {
+		return
+	}
+	subject := fmt.Sprintf("Updated: %s", event.Title)
+
+	changedSummary := ""
+	if len(changedFields) > 0 {
+		changedSummary = fmt.Sprintf("\nWhat changed: %s\n", strings.Join(changedFields, ", "))
+	}
+
+	attendeeList := "None"
+	if len(attendees) > 0 {
+		names := make([]string, 0, len(attendees))
+		for _, a := range attendees {
+			if a.Name != "" {
+				names = append(names, fmt.Sprintf("%s <%s>", a.Name, a.Email))
+			} else {
+				names = append(names, a.Email)
+			}
+		}
+		attendeeList = strings.Join(names, ", ")
+	}
+
+	body := fmt.Sprintf(`Hello %s,
+
+Your event has been updated:
+
+Meeting: %s
+When: %s
+Duration: %d minutes
+Location: %s
+Attendees: %s
+%s
+Your attendees have been notified and your calendar has been updated.
+
+Best regards,
+Meet When`,
+		host.Name,
+		event.Title,
+		hostedEventTime(event),
+		event.Duration,
+		hostedEventLocationLabel(event),
+		attendeeList,
+		changedSummary,
+	)
+
+	// Build the ICS with the host as the calendar party so their own client
+	// updates the event in place.
+	hostParty := &models.HostedEventAttendee{Email: host.Email, Name: host.Name}
+	ics := s.generateICSForHostedEvent(event, host, hostParty, "REQUEST", "CONFIRMED")
+
+	go func() {
+		if err := s.sendEmail(host.Email, subject, body, ics); err != nil {
+			log.Printf("[EMAIL] Error sending hosted-event update to host %s: %v", host.Email, err)
+		}
+	}()
+
+	_ = tenant
+}
+
 // SendHostedEventCancelled notifies an attendee that the entire event was
 // cancelled. The ICS is METHOD:CANCEL so calendar clients can remove it.
 func (s *EmailService) SendHostedEventCancelled(ctx context.Context, event *models.HostedEvent, attendee *models.HostedEventAttendee, host *models.Host, tenant *models.Tenant) {

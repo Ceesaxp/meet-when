@@ -76,6 +76,7 @@ type HostedEventWithDetails struct {
 type hostedEventEmailSender interface {
 	SendHostedEventInvited(ctx context.Context, event *models.HostedEvent, attendee *models.HostedEventAttendee, host *models.Host, tenant *models.Tenant)
 	SendHostedEventUpdated(ctx context.Context, event *models.HostedEvent, attendee *models.HostedEventAttendee, host *models.Host, tenant *models.Tenant, changedFields []string)
+	SendHostedEventUpdatedToHost(ctx context.Context, event *models.HostedEvent, host *models.Host, tenant *models.Tenant, attendees []*models.HostedEventAttendee, changedFields []string)
 	SendHostedEventCancelled(ctx context.Context, event *models.HostedEvent, attendee *models.HostedEventAttendee, host *models.Host, tenant *models.Tenant)
 	SendHostedEventCancelledForAttendee(ctx context.Context, event *models.HostedEvent, attendee *models.HostedEventAttendee, host *models.Host, tenant *models.Tenant)
 	SendHostedEventReminder(ctx context.Context, event *models.HostedEvent, attendee *models.HostedEventAttendee, host *models.Host, tenant *models.Tenant)
@@ -522,6 +523,14 @@ func (s *HostedEventService) Update(ctx context.Context, input UpdateHostedEvent
 		for _, a := range retainedAttendees {
 			s.email.SendHostedEventUpdated(ctx, event, a, details.Host, details.Tenant, changed)
 		}
+	}
+
+	// The host organizes the event, so notify them whenever attendees were
+	// notified (time/location/etc. changed, or the attendee list changed).
+	// Also refreshes the host's own calendar copy via the attached ICS.
+	hostNotified := len(removedAttendees) > 0 || len(addedAttendeeRows) > 0 || (materialChanged && len(retainedAttendees) > 0)
+	if hostNotified {
+		s.email.SendHostedEventUpdatedToHost(ctx, event, details.Host, details.Tenant, finalAttendees, changed)
 	}
 
 	// ---- Contact upsert (added attendees only) ----

@@ -252,6 +252,8 @@ func templateFuncs() template.FuncMap {
 		"formatDateTime": formatDateTime,
 		"formatDateInTZ": formatDateInTZ,
 		"formatTimeInTZ": formatTimeInTZ,
+		"dateInputInTZ":  dateInputInTZ,
+		"timeInputInTZ":  timeInputInTZ,
 		"tzAbbrev":       tzAbbrev,
 		"formatTimeHHMM": formatTimeHHMM,
 		"timeAgo":        timeAgo,
