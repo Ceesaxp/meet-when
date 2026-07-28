@@ -1180,10 +1180,11 @@ func (s *CalendarService) createGoogleEvent(ctx context.Context, cal *models.Cal
 	return result.ID, conferenceLink, nil
 }
 
-// updateGoogleEvent PATCHes an existing Google Calendar event. The patch body
-// only includes mutable fields (description, location, attendees) — title and
-// time are left unchanged so this method composes safely with reschedule
-// (which deletes and recreates rather than patches).
+// updateGoogleEvent PATCHes an existing Google Calendar event, syncing the
+// mutable fields callers can change: summary, description, start/end time,
+// location, and attendees. Start/End and Summary are only patched when set so
+// a partial input never blanks them. Reschedule uses delete+recreate (not this
+// path), so patching the time here is safe.
 func (s *CalendarService) updateGoogleEvent(ctx context.Context, cal *models.CalendarConnection, input *CalendarEventInput) (string, error) {
 	if err := s.refreshGoogleToken(cal); err != nil {
 		return "", err
@@ -1199,6 +1200,19 @@ func (s *CalendarService) updateGoogleEvent(ctx context.Context, cal *models.Cal
 	patch := map[string]interface{}{
 		"description": input.Description,
 		"attendees":   attendees,
+	}
+	if input.Summary != "" {
+		patch["summary"] = input.Summary
+	}
+	if !input.Start.IsZero() && !input.End.IsZero() {
+		patch["start"] = map[string]string{
+			"dateTime": input.Start.Format(time.RFC3339),
+			"timeZone": "UTC",
+		}
+		patch["end"] = map[string]string{
+			"dateTime": input.End.Format(time.RFC3339),
+			"timeZone": "UTC",
+		}
 	}
 	if input.ConferenceLink != "" {
 		patch["location"] = input.ConferenceLink

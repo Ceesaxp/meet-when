@@ -267,13 +267,13 @@ func TestEventForm_EditMode_PrefillsAndCarriesExcludeEventID(t *testing.T) {
 	out := renderTemplateNamed(t, tmpl, "content", data)
 
 	for _, want := range []string{
-		"Edit Event",                                   // header
-		"/dashboard/events/evt-99/edit",                // form action targets edit endpoint
-		"value=\"Already scheduled\"",                  // title prefilled
-		"value=\"2026-06-01\"",                         // date prefilled
-		"value=\"10:00\"",                              // time prefilled
-		"name=\"exclude_event_id\" value=\"evt-99\"",   // self-collision exclusion in conflict check
-		"alice@example.com",                            // attendee chip
+		"Edit Event",                                 // header
+		"/dashboard/events/evt-99/edit",              // form action targets edit endpoint
+		"value=\"Already scheduled\"",                // title prefilled
+		"value=\"2026-06-01\"",                       // date prefilled
+		"value=\"10:00\"",                            // time prefilled
+		"name=\"exclude_event_id\" value=\"evt-99\"", // self-collision exclusion in conflict check
+		"alice@example.com",                          // attendee chip
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("edit-mode form missing %q\nfull output:\n%s", want, out)
@@ -286,6 +286,47 @@ func TestEventForm_EditMode_PrefillsAndCarriesExcludeEventID(t *testing.T) {
 	// 45-minute duration chip should be selected.
 	if !strings.Contains(out, "value=\"45\" checked") {
 		t.Errorf("expected 45-min duration to be selected; got: %s", out)
+	}
+}
+
+// TestEventForm_EditMode_PrefillsLocalWallClock guards against the timezone
+// shift bug: stored times are UTC, but the edit form must pre-fill the
+// date/time inputs in the event's own timezone so they agree with the
+// timezone field. Otherwise saving an untouched form re-parses the UTC clock
+// as local time and walks the event by the zone's offset on every save.
+func TestEventForm_EditMode_PrefillsLocalWallClock(t *testing.T) {
+	tmpl := loadEventFormPage(t)
+
+	// 13:00 UTC in Europe/Berlin (CEST, +2 in June) is 15:00 local.
+	start := time.Date(2026, 6, 1, 13, 0, 0, 0, time.UTC)
+	event := &models.HostedEvent{
+		ID: "evt-tz", Title: "Berlin meeting",
+		StartTime: models.NewSQLiteTime(start), EndTime: models.NewSQLiteTime(start.Add(30 * time.Minute)),
+		Duration: 30, Timezone: "Europe/Berlin", LocationType: models.ConferencingProviderZoom,
+	}
+
+	data := PageData{
+		Title:  "Edit Event",
+		Host:   &models.Host{ID: "h1", Slug: "host", Name: "Host", Timezone: "Europe/Berlin"},
+		Tenant: &models.Tenant{ID: "t1", Slug: "t", Name: "Tenant"},
+		Data: map[string]interface{}{
+			"IsNew":        false,
+			"Event":        event,
+			"Attendees":    []*models.HostedEventAttendee{{ID: "a1", Email: "alice@example.com", Name: "Alice"}},
+			"HostTimezone": "Europe/Berlin",
+		},
+	}
+	out := renderTemplateNamed(t, tmpl, "content", data)
+
+	if !strings.Contains(out, `value="15:00"`) {
+		t.Errorf("expected local wall-clock 15:00 in time input; got:\n%s", out)
+	}
+	if strings.Contains(out, `value="13:00"`) {
+		t.Error("time input pre-filled with raw UTC clock (13:00) — timezone shift bug")
+	}
+	// The timezone must be carried into the hidden picker field.
+	if !strings.Contains(out, `name="timezone"`) || !strings.Contains(out, "Europe/Berlin") {
+		t.Errorf("expected Europe/Berlin in timezone field; got:\n%s", out)
 	}
 }
 

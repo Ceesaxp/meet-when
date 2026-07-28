@@ -24,6 +24,7 @@ type spyEmailSender struct {
 
 	invited          []emailCall
 	updated          []emailCall
+	updatedToHost    []emailCall
 	cancelled        []emailCall
 	cancelledForAttn []emailCall
 	reminders        []emailCall
@@ -45,6 +46,12 @@ func (s *spyEmailSender) SendHostedEventUpdated(_ context.Context, e *models.Hos
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.updated = append(s.updated, emailCall{EventID: e.ID, AttendeeEmail: a.Email, ChangedFields: append([]string(nil), changed...)})
+}
+
+func (s *spyEmailSender) SendHostedEventUpdatedToHost(_ context.Context, e *models.HostedEvent, h *models.Host, _ *models.Tenant, _ []*models.HostedEventAttendee, changed []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.updatedToHost = append(s.updatedToHost, emailCall{EventID: e.ID, AttendeeEmail: h.Email, ChangedFields: append([]string(nil), changed...)})
 }
 
 func (s *spyEmailSender) SendHostedEventCancelled(_ context.Context, e *models.HostedEvent, a *models.HostedEventAttendee, _ *models.Host, _ *models.Tenant) {
@@ -80,6 +87,12 @@ func (s *spyEmailSender) updatedCount() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return len(s.updated)
+}
+
+func (s *spyEmailSender) updatedToHostCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.updatedToHost)
 }
 
 func (s *spyEmailSender) cancelledForAttendeeEmails() []string {
@@ -458,6 +471,10 @@ func TestHostedEventUpdate_AttendeeDiff_RoutesEmailsCorrectly(t *testing.T) {
 	}
 	if h.email.updatedCount() != 1 {
 		t.Fatalf("expected 1 updated email (alice retained), got %d", h.email.updatedCount())
+	}
+	// The host must be notified of their own event's changes exactly once.
+	if got := h.email.updatedToHostCount(); got != 1 {
+		t.Fatalf("expected 1 host-update email, got %d", got)
 	}
 }
 
