@@ -225,8 +225,17 @@ a:hover {
     border-color: #fecaca;
 }
 
-/* Secondary small button - neutral style for Archive/Unarchive */
+/* Secondary small button - neutral style for Archive/Unarchive/Edit.
+   Must restate sizing: the full-size .btn-secondary rule (flex:1, min-height
+   52px, larger padding) has equal specificity and comes later in the sheet, so
+   without these the small variant would inherit the full button's dimensions. */
 .btn-sm.btn-secondary {
+    flex: 0 0 auto;
+    max-width: none;
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    min-height: 36px;
+    border-radius: var(--radius-sm);
     background: var(--white);
     color: var(--gray-700);
     border: 1px solid var(--gray-200);
@@ -1743,6 +1752,7 @@ body.landing .section-header {
 
 .table-actions {
     display: flex;
+    align-items: center;
     gap: 8px;
 }
 
