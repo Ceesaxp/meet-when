@@ -1163,6 +1163,63 @@ Meet When`,
 	_ = tenant
 }
 
+// SendHostedEventCancelledToHost confirms to the host (organizer) that their
+// own event was cancelled. Mirrors SendHostedEventUpdatedToHost; the attached
+// CANCEL ICS also removes the event from the host's own calendar client.
+func (s *EmailService) SendHostedEventCancelledToHost(ctx context.Context, event *models.HostedEvent, host *models.Host, tenant *models.Tenant, attendees []*models.HostedEventAttendee) {
+	if host == nil || host.Email == "" {
+		return
+	}
+	subject := fmt.Sprintf("Cancelled: %s", event.Title)
+
+	attendeeList := "None"
+	if len(attendees) > 0 {
+		names := make([]string, 0, len(attendees))
+		for _, a := range attendees {
+			if a.Name != "" {
+				names = append(names, fmt.Sprintf("%s <%s>", a.Name, a.Email))
+			} else {
+				names = append(names, a.Email)
+			}
+		}
+		attendeeList = strings.Join(names, ", ")
+	}
+
+	body := fmt.Sprintf(`Hello %s,
+
+Your event has been cancelled:
+
+Meeting: %s
+Was scheduled for: %s
+Attendees: %s
+
+%s
+
+Your attendees have been notified and the event has been removed from your calendar.
+
+Best regards,
+Meet When`,
+		host.Name,
+		event.Title,
+		hostedEventTime(event),
+		attendeeList,
+		formatCancelReason(event.CancelReason),
+	)
+
+	// CANCEL ICS with the host as the calendar party so their own client
+	// removes the event.
+	hostParty := &models.HostedEventAttendee{Email: host.Email, Name: host.Name}
+	ics := s.generateICSForHostedEvent(event, host, hostParty, "CANCEL", "CANCELLED")
+
+	go func() {
+		if err := s.sendEmail(host.Email, subject, body, ics); err != nil {
+			log.Printf("[EMAIL] Error sending hosted-event cancellation to host %s: %v", host.Email, err)
+		}
+	}()
+
+	_ = tenant
+}
+
 // SendHostedEventCancelledForAttendee notifies an attendee that they were
 // removed from an event that otherwise still goes ahead.
 func (s *EmailService) SendHostedEventCancelledForAttendee(ctx context.Context, event *models.HostedEvent, attendee *models.HostedEventAttendee, host *models.Host, tenant *models.Tenant) {
