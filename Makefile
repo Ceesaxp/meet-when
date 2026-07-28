@@ -34,7 +34,8 @@ docker-build:
 dev: build
 	@export $$(grep -v '^#' .env | xargs) && ./$(BINARY_NAME)
 
-# Start development environment with Docker (Postgres + Mailhog)
+# Start development email server (Mailhog) in Docker. The app itself runs on
+# the host via `make dev` (SQLite); Postgres is prod-profile only.
 dev-docker:
 	docker-compose --profile dev up -d
 
