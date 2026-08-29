@@ -3,7 +3,7 @@
 - **Status:** Proposed prototype specification
 - **Related proposal:** [MeetWhen v2: Intent-first, agentic scheduling](../proposals/meetwhen-v2-agentic-scheduling.md)
 - **Related issue:** [#53](https://github.com/Ceesaxp/meet-when/issues/53)
-- **Primary surface:** Public host portal `/m/{tenant}/{host}`
+- **Primary surface:** Isolated concierge route `/c/{tenant}/{host}`
 - **Prototype capability:** Read-only calendar availability; no new booking creation
 
 ## 1. Executive summary
@@ -15,7 +15,7 @@ MeetWhen currently provides two public scheduling surfaces:
 
 A meeting type is not merely a label. It is a scheduling policy that determines duration, calendars, required hosts, availability rules, buffers, notice, scheduling horizon, approval, conferencing, and other booking behavior. Direct booking links remain valuable because they select this policy in advance.
 
-The MeetWhen v2 prototype adds a lightweight conversational concierge to the public host portal. A visitor explains why they want to meet and, optionally, when they are generally available. The concierge:
+The MeetWhen v2 prototype adds a lightweight conversational concierge on an isolated `/c/{tenant}/{host}` route. The existing `/m/` host portal and direct booking links remain unchanged during testing. A visitor explains why they want to meet and, optionally, when they are generally available. The concierge:
 
 1. detects the request language;
 2. obtains the visitor timezone from the browser, visibly and correctably;
@@ -136,7 +136,13 @@ The prototype begins as a lightweight chat. Once availability exists, the visito
 
 ### 7.1 Entry point
 
-The concierge is added only to:
+The concierge is exposed at:
+
+```text
+/c/{tenant}/{host}
+```
+
+The existing conventional host portal remains at:
 
 ```text
 /m/{tenant}/{host}
@@ -1125,8 +1131,8 @@ Primary evaluation metrics:
 
 The prototype is complete when all of the following are demonstrated with real MeetWhen availability data:
 
-1. The public host portal renders a lightweight chat interface.
-2. Direct meeting-type links remain unchanged.
+1. `/c/{tenant}/{host}` renders a lightweight chat interface.
+2. The conventional `/m/{tenant}/{host}` portal and direct meeting-type links remain unchanged.
 3. Host administrators can configure routing description, examples, exclusions, discoverability, and priority.
 4. The concierge detects and responds in the request language.
 5. Browser timezone is inferred, displayed, and correctable.
@@ -1175,7 +1181,8 @@ The prototype is complete when all of the following are demonstrated with real M
 
 ### Phase E — Lightweight chat and grid
 
-- Replace/enhance host portal with concierge interface.
+- Add the concierge interface on the isolated `/c/{tenant}/{host}` route.
+- Leave the existing `/m/` portal and direct booking routes unchanged.
 - Add HTMX/JS conversation interactions.
 - Render slots and grid from server responses.
 - Preserve conventional meeting-option access.
